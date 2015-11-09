@@ -1,0 +1,8 @@
+*.vcxproj
+*.user
+*.filters
+obj
+bin*
+buildr.bat
+loadenv.bat
+setpath.bat
