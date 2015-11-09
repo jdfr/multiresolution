@@ -147,6 +147,7 @@ public:
     size_t input_idx, output_idx;
     std::vector<InputSliceData> input;
     std::vector<OutputSliceData> output;
+    std::vector<int> num_output_by_tool;
 
     void clear() { input.clear(); output.clear(); err = std::string(); has_err = false; input_idx = output_idx = 0; zmin = zmax = 0.0; rm.clear(); }
 

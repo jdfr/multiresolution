@@ -37,14 +37,15 @@ void writeSlice(FILES files, int64 type, int64 ntool, double z, clp::Paths &path
 }
 
 const char *ERR =
-"\nArguments: CONFIGFILENAME MESHFILENAME (save OUTPUTFILENAME | nsave) (show (3d | 2d (all | nall)) | nshow) MULTISLICING_PARAMETERS\n\n"
+"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d | 2d (all | nall)) | nshow) MULTISLICING_PARAMETERS (save OUTPUTFILENAME | multisave OUTPUT1 OUTPUT2 ... | nsave)\n\n"
 "    -CONFIGFILENAME is required (config file name).\n\n"
 "    -MESHFILENAME is required (input mesh file name).\n\n"
 "    -If 'show 3d' is specified, a 3D view of the contours will be generated with mayavi after all is computed (viewing parameters are set in the config file)\n\n"
 "    -If 'show 2d all' is specified, Z-navigable 2D views of contours will be generated with matplotlib after they are computed (viewing parameters are set in the config file)\n\n"
 "    -If 'show 2d nall' is specified, 2D views of contours will be generated as they are computed (computation will be interrumpted until the viewing window is closed)\n\n"
-"    -If 'save OUTPUTFILENAME' is specified, OUTPUTFILENAME is the name of the file to save all\n\n"
-"    -MULTISLICING_PARAMETERS represents all further arguments, which are evaluated verbatim by the multislicing engine (in particular, metric arguments execept z_uniform_step must be supplied in the engine's native unit)\n\n";
+"    -MULTISLICING_PARAMETERS represents the parameters specifying the multislicing process all further arguments, which are evaluated verbatim by the multislicing engine (in particular, metric arguments execept z_uniform_step must be supplied in the engine's native unit)\n\n"
+"    -If 'save OUTPUTFILENAME' is specified, OUTPUTFILENAME is the name of the file to save all toolpaths\n\n"
+"    -If 'multisave OUTPUT1 OUTPUT2 ...' is specified, must be as many output files as processes.\n\n";
 
 void printError(ParamReader &rd) {
     rd.fmt << ERR;
@@ -72,15 +73,11 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
-    const char *configfilename, *meshfilename, *outputfile = NULL;
-    bool save, show, use2d, showAtEnd;
+    const char *configfilename, *meshfilename = NULL;
+    bool show, use2d, showAtEnd;
 
     if (!rd.readParam(configfilename,  "CONFIGFILENAME"))         { printError(rd); return -1; }
     if (!rd.readParam(meshfilename,    "MESHFILENAME"))           { printError(rd); return -1; }
-    if (!rd.readParam(save, "save",    "save flag (save/nsave)")) { printError(rd); return -1; }
-    if (save) {
-        if (!rd.readParam(outputfile,  "OUTPUTFILENAME"))         { printError(rd); return -1; }
-    }
     if (!rd.readParam(show, "show",    "show flag (show/nshow)")) { printError(rd); return -1; }
     if (show) {
         if (!rd.readParam(use2d, "2d", "view mode flag (2d/3d)")) { printError(rd); return -1; }
@@ -100,24 +97,6 @@ int main(int argc, const char** argv) {
 #           ifndef STANDALONE_USEPYTHON
                 fprintf(stderr, "WARNING: 'show 3d' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE TO ADD SUPPORT!!!!\n\n");
 #           endif
-        }
-    } else if (!save) {
-        fprintf(stderr, "WARNING: computed contours will be neither saved nor shown!!!!!\n");
-    }
-
-    bool saveContours = show && ((!use2d) || showAtEnd);
-    bool showInline = show && use2d && (!showAtEnd);
-    bool shownotinline = show && showAtEnd;
-    bool removeUnused = true; //!saveContours;
-    bool write = save || shownotinline;
-
-    FILE *output=NULL;
-    
-    if (save) {
-        output = fopen(outputfile, "wb");
-        if (output == NULL) {
-            fprintf(stderr, "Error trying to open this file for output: %s\n", outputfile);
-            return -1;
         }
     }
 
@@ -153,10 +132,69 @@ int main(int argc, const char** argv) {
     slicer_to_internal_factor = strtod(val_slicer_to_internal_factor.c_str(), NULL);
     input_to_internal_factor = input_to_slicer_factor*slicer_to_internal_factor;
     internal_to_input_factor = 1 / input_to_internal_factor;
-        
-    FILES files;
+
+    bool save, savemultiple;
+    const char * savemode, *singleoutputfilename=NULL;
+    std::vector<const char *> multioutputfilenames;
+    if (!rd.readParam(savemode, "save mode (save/multisave/nsave)")) { printError(rd); return -1; }
+    savemultiple = strcmp(savemode, "multisave")==0;
+    save = savemultiple || (strcmp(savemode, "save")==0);
     if (save) {
-        files.push_back(output);
+        if (savemultiple) {
+            multioutputfilenames.resize(args.multispec->numspecs);
+            for (int k = 0; k < multioutputfilenames.size(); ++k) {
+                if (!rd.readParam(multioutputfilenames[k], "output file name for process ", k)) { printError(rd); return -1; }
+            }
+        } else {
+            if (!rd.readParam(singleoutputfilename, "OUTPUTFILENAME")) { printError(rd); return -1; }
+        }
+    }
+
+    if (rd.argidx != rd.argc) {
+        fprintf(stderr, "ERROR: SOME REMAINING PARAMETERS HAVE NOT BEEN USED: \n");
+        for (int k = rd.argidx; k < rd.argc; ++k) {
+            fprintf(stderr, "   %d/%d: %s\n", k, rd.argc - 1, rd.argv[k]);
+        }
+        return -1;
+    }
+
+    if (!save && !show) {
+        fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
+        return -1;
+    }
+
+    bool saveContours = show && ((!use2d) || showAtEnd);
+    bool showInline = show && use2d && (!showAtEnd);
+    bool shownotinline = show && showAtEnd;
+    bool removeUnused = true; //!saveContours;
+    bool write = save || shownotinline;
+
+    FILES all_files;
+    FILES current_files;
+    FILES multitool_files;
+    FILES singletool_files(multioutputfilenames.size(), NULL);
+    FILE *singleoutput = NULL;
+    int currentoutputfile;
+    if (save) {
+        if (savemultiple) {
+            for (int k = 0; k < singletool_files.size(); ++k) {
+                singletool_files[k] = fopen(multioutputfilenames[k], "wb");
+                if (singletool_files[k] == NULL) {
+                    fprintf(stderr, "Error trying to open this file for output: %s (for process %d)\n", singletool_files[k], k);
+                    return -1;
+                }
+            }
+            current_files.push_back(singletool_files[0]);
+            currentoutputfile = (int)(current_files.size()-1);
+        } else {
+            singleoutput = fopen(singleoutputfilename, "wb");
+            if (singleoutput == NULL) {
+                fprintf(stderr, "Error trying to open this file for output: %s\n", singleoutputfilename);
+                return -1;
+            }
+              current_files.push_back(singleoutput);
+            multitool_files.push_back(singleoutput);
+        }
     }
 
     SlicerManager *slicer = getSlicerManager(*args.config, SlicerManagerExternal);
@@ -170,9 +208,13 @@ int main(int argc, const char** argv) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
             return -1;
         }
-        files.push_back(slicesViewer->pipeIN);
+          current_files.push_back(slicesViewer->pipeIN);
+        multitool_files.push_back(slicesViewer->pipeIN);
     }
 #endif
+
+    COPYTO( multitool_files, all_files);
+    COPYTO(singletool_files, all_files);
 
     if (!slicer->start(meshfilename)) {
         std::string err = slicer->getErrorMessage();
@@ -184,16 +226,17 @@ int main(int argc, const char** argv) {
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps, numtools = args.multispec->numspecs;
     if (write) {
-        applyToAllFiles(files, writeInt64, numtools);
         int64 useSched = args.multispec->global.useScheduler;
-        applyToAllFiles(files, writeInt64, useSched);
+        int64 onetool = 1;
+        applyToAllFiles(all_files, writeInt64, numtools);
+        applyToAllFiles(all_files, writeInt64, useSched);
         for (int k = 0; k < numtools; ++k) {
             double v;
             v = args.multispec->radiuses[k]*internal_to_input_factor;
-            applyToAllFiles(files, writeDouble, v);
+            applyToAllFiles(all_files, writeDouble, v);
             if (useSched) {
                 v = args.multispec->profiles[k]->getVoxelSemiHeight()*internal_to_input_factor;
-                applyToAllFiles(files, writeDouble, v);
+                applyToAllFiles(all_files, writeDouble, v);
             }
         }
     }
@@ -220,7 +263,13 @@ int main(int argc, const char** argv) {
 
         if (write) {
             numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-            applyToAllFiles(files, writeInt64, numoutputs);
+            applyToAllFiles(multitool_files, writeInt64, numoutputs);
+            if (!singletool_files.empty()) {
+                for (int k = 0; k < singletool_files.size(); ++k) {
+                    int64 numouts = alsoContours ? sched.num_output_by_tool[k] * 2 + schednuminputslices : sched.num_output_by_tool[k];
+                    writeInt64(singletool_files[k], numouts);
+                }
+            }
         }
 
         std::vector<double> rawZs = sched.rm.rawZs;
@@ -240,7 +289,7 @@ int main(int argc, const char** argv) {
             slicer->readNextSlice(rawslice);
 
             if (write && alsoContours) {
-                writeSlice(files, TYPE_RAW_CONTOUR, -1, rawZs[i], rawslice, internal_to_input_factor, PathLoop);
+                writeSlice(all_files, TYPE_RAW_CONTOUR, -1, rawZs[i], rawslice, internal_to_input_factor, PathLoop);
             }
 
 #           ifdef STANDALONE_USEPYTHON
@@ -272,10 +321,13 @@ int main(int argc, const char** argv) {
                 }
                 printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
                 if (write) {
+                    if (savemultiple) {
+                        current_files[currentoutputfile] = singletool_files[single->ntool];
+                    }
                     double z = single->z * internal_to_input_factor;
-                    writeSlice(files, TYPE_TOOLPATH, single->ntool, z, single->toolpaths, internal_to_input_factor, PathOpen);
+                    writeSlice(    current_files, TYPE_TOOLPATH,          single->ntool, z, single->toolpaths,      internal_to_input_factor, PathOpen);
                     if (alsoContours) {
-                        writeSlice(files, TYPE_PROCESSED_CONTOUR, single->ntool, z, single->contoursToShow, internal_to_input_factor, PathLoop);
+                        writeSlice(current_files, TYPE_PROCESSED_CONTOUR, single->ntool, z, single->contoursToShow, internal_to_input_factor, PathLoop);
                     }
                 }
 #               ifdef STANDALONE_USEPYTHON
@@ -311,7 +363,13 @@ int main(int argc, const char** argv) {
         if (write) {
             //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
             numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-            applyToAllFiles(files, writeInt64, numoutputs);
+            applyToAllFiles(multitool_files, writeInt64, numoutputs);
+            if (!singletool_files.empty()) {
+                for (int k = 0; k < singletool_files.size(); ++k) {
+                    int64 numouts = alsoContours ? numsteps * 3 : numsteps;
+                    writeInt64(singletool_files[k], numouts);
+                }
+            }
         }
 
         for (int i = 0; i < numsteps; ++i) {
@@ -340,7 +398,7 @@ int main(int argc, const char** argv) {
                 //SHOWCONTOURS(args.multispec->global.config, "raw", &rawslice);
 #           endif
 
-            if (write && alsoContours) writeSlice(files, TYPE_RAW_CONTOUR, -1, zs[i], rawslice, internal_to_input_factor, PathLoop);
+            if (write && alsoContours) writeSlice(all_files, TYPE_RAW_CONTOUR, -1, zs[i], rawslice, internal_to_input_factor, PathLoop);
 
             int lastk = multi.applyProcesses(ress, rawslice, dummy);
             if (lastk != numtools) {
@@ -350,9 +408,12 @@ int main(int argc, const char** argv) {
 
             if (write) {
                 for (int k = 0; k < numtools; ++k) {
-                    writeSlice(files, TYPE_TOOLPATH, k, zs[i], ress[k]->toolpaths, internal_to_input_factor, PathOpen);
+                    if (savemultiple) {
+                        current_files[currentoutputfile] = singletool_files[k];
+                    }
+                    writeSlice(    current_files, TYPE_TOOLPATH,          k, zs[i], ress[k]->toolpaths,      internal_to_input_factor, PathOpen);
                     if (alsoContours) {
-                        writeSlice(files, TYPE_PROCESSED_CONTOUR, k, zs[i], ress[k]->contoursToShow, internal_to_input_factor, PathLoop);
+                        writeSlice(current_files, TYPE_PROCESSED_CONTOUR, k, zs[i], ress[k]->contoursToShow, internal_to_input_factor, PathLoop);
                     }
                 }
             }
@@ -371,18 +432,34 @@ int main(int argc, const char** argv) {
 
     }
 
+    for (auto file = all_files.begin(); file != all_files.end(); ++file) {
+        fflush(*file);
+    }
+    if (save) {
+        if (savemultiple) {
+            for (auto file = singletool_files.begin(); file != singletool_files.end(); ++file) {
+                fclose(*file);
+            }
+        } else {
+            fclose(singleoutput);
+        }
+    }
+
+    results.clear();
+
     if (shownotinline) {
 #ifdef STANDALONE_USEPYTHON
         slicesViewer->wait();
         delete slicesViewer;
 #endif
     }
-    results.clear();
+
     if (!slicer->finalize()) {
         std::string err = slicer->getErrorMessage();
         fprintf(stderr, "Error while finalizing the slicer manager: %s!!!!", err.c_str());
     }
     delete slicer;
+
     return 0;
 }
 

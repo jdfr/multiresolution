@@ -305,6 +305,7 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
 void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
     //get indexes for sorting inputs by Z
     output_idx = 0;
+    num_output_by_tool.resize(tm.spec.numspecs, 0);
     output.resize(input.size());
     std::vector<int> order_to_output(input.size());
     std::iota(order_to_output.begin(), order_to_output.end(), 0);
@@ -317,6 +318,7 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
         output[i].z = input[ii].z;
         output[i].ntool = input[ii].ntool;
         input[ii].mapInputToOutput = i;
+        ++num_output_by_tool[output[i].ntool];
     }
 }
 
