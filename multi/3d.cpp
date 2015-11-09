@@ -166,12 +166,19 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
         throw std::runtime_error("option ScheduleLaserSimple not implemented!!!!");
         break;
     case ScheduleTwoPhotonSimple:
-        double extent = maxz - minz;
-        int num = 0;
-        for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.profiles[k]->sliceHeight) + 3;
-        input.reserve(num);
-        std::vector<double> minzs(tm.spec.numspecs, minz);
-        recursiveSimpleInputScheduler(0, minzs, zmax);// zmax - tm.profiles[0].sliceHeight / 2.0);
+        if (tm.spec.global.manualScheduler) {
+            input.reserve(tm.spec.global.schedSpec.size());
+            for (auto pair = tm.spec.global.schedSpec.begin(); pair != tm.spec.global.schedSpec.end(); ++pair) {
+                input.push_back(InputSliceData(pair->z, pair->ntool));
+            }
+        } else {
+            double extent = maxz - minz;
+            int num = 0;
+            for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.profiles[k]->sliceHeight) + 3;
+            input.reserve(num);
+            std::vector<double> minzs(tm.spec.numspecs, minz);
+            recursiveSimpleInputScheduler(0, minzs, zmax);
+        }
         computeSimpleOutputOrderForInputSlices();
         pruneInputZsAndCreateRawZs(epsilon);
     }

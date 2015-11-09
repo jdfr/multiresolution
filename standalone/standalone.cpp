@@ -266,6 +266,12 @@ int main(int argc, const char** argv) {
 
         slicer->getZLimits(&minz, &maxz);
 
+        if (args.multispec->global.manualScheduler) {
+            for (auto pair = args.multispec->global.schedSpec.begin(); pair != args.multispec->global.schedSpec.end(); ++pair) {
+                pair->z *= input_to_internal_factor;
+            }
+        }
+
         sched.createSlicingSchedule(minz*input_to_internal_factor, maxz*input_to_internal_factor, args.multispec->global.z_epsilon, ScheduleTwoPhotonSimple);
 
         if (sched.has_err) {

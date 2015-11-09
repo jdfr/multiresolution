@@ -158,10 +158,23 @@ std::string GlobalSpec::readFromCommandLine(ParamReader &rd, double scale) {
     if (!rd.readParam(applyMotionPlanner, "motion_opt", "order optimization parameter")) return rd.fmt.str();
     if (!rd.readScaled(limitX,            "limitX"))                                     return rd.fmt.str();
     if (!rd.readScaled(limitY,            "limitY"))                                     return rd.fmt.str();
-    if (!rd.readParam(useScheduler,       "sched",      "useScheduler (sched/nosched)")) return rd.fmt.str();
+    const char * schedMode;
+    if (!rd.readParam(schedMode,          "useScheduler (sched/manual/uniform)"))        return rd.fmt.str();
+    manualScheduler = strcmp(schedMode, "manual")==0;
+    useScheduler = manualScheduler || (strcmp(schedMode, "sched")==0);
     if (useScheduler) {
         if (!rd.readParam(avoidVerticalOverwriting,     "vcorrect", "avoid vertical overwritting (vcorrect/novcorrect)")) return rd.fmt.str();
         if (!rd.readScaled(z_epsilon,                   "Z epsilon"))                                                     return rd.fmt.str();
+        if (manualScheduler) {
+            int numlayers;
+            if (!rd.readParam(numlayers,                "number of input layers"))                                        return rd.fmt.str();
+            if (numlayers <= 0) return str("The number of input layers cannot be ", numlayers, "!!!");
+            schedSpec.resize(numlayers);
+            for (int k = 0; k < numlayers; ++k) {
+                if (!rd.readParam(schedSpec[k].z,       "Z height of input layer ", k, '/', numlayers))                   return rd.fmt.str();
+                if (!rd.readParam(schedSpec[k].ntool,      "ntool of input layer ", k, '/', numlayers))                   return rd.fmt.str();
+            }
+      }
     } else {
         if (!rd.readParam(z_uniform_step,               "Z uniform step"))                                                return rd.fmt.str();
     }
@@ -199,10 +212,15 @@ bool Arguments::readArguments(bool doscale, ParamReader &rd) {
 "    USE_MOTION_PLANNER: flag ('motion_opt' if true) to use a very simple (greedy, and without finding optimal entry points for closed contours) motion planner to order toolpaths\n\n"
 "    LIMITX and LIMITY: if non-negative, they specify the semi-lengths for a origin-centered rectangle, which will be added as an enclosing contour. The goal is to simulate subtractive processes without handling them as separate code paths.\n\n"
 "    SCHEDULING_PARAMETERS: list of scheduling parameters, with variable specifications:\n\n"
-"      -if the first parameter in this list is 'sched': sched VERTICAL_CORRECTION Z_EPSILON\n\n"
+"      -if the first parameter in this list is 'sched': sched VERTICAL_CORRECTION Z_EPSILON Z_SEQUENCE\n\n"
 "          *VERTICAL_CORRECTION: flag ('vcorrect' if true) to use memory- and cpu- expensive operations to ensure vertical correctness.\n\n"
 "          *Z_EPSILON: maximal absolute distance between scheduled slices to consider them to be at the same Z level (required because of floating point errors: if the voxel heights are just right, some slices for different processes may be scheduled at the same height).\n\n"
-"      -otherwise (the first parameter is not 'sched'): nsched Z_UNIFORM_STEP\n\n"
+"      -if the first parameter in this list is 'manual': manual VERTICAL_CORRECTION Z_EPSILON NUMLAYERS Z_1 NTOOL_1 Z_2 NTOOL_2 Z_3 NTOOL_3 ...\n\n"
+"          *VERTICAL_CORRECTION and Z_EPSILON: the same as in the previous case.\n\n"
+"          *NUMLAYERS: number of layers in a sequence specifying a schedule of layers to be processed.\n\n"
+"          *Z_i: Z height of the i-th layer in the schedule (in input file units, usually assumed to be in millimeters).\n\n"
+"          *NTOOL_i: number of the process to use for the i-th layer in the schedule.\n\n"
+"      -otherwise (the first parameter is neither 'sched' nor 'manual'): nsched Z_UNIFORM_STEP\n\n"
 "          *Z_UNIFORM_STEP: uniform slicing step in input file units, usually assumed to be in millimeters. Not really required if using the shared library interface, but it is kept for consistency.\n\n"
 "    ADDSUB_FLAG: flag ('addsub' if true) to specify the use of additive/subtractive logic that considers the first process to be additive, and all subsequent ones to be subtractive (or vice versa). If false, all processes are supposed to be either additive or subtractive.\n\n"
 "NUMBER_OF_PROCESSES: number of processes; after it, there will be a sequence of process parameters for each process.\n\n"
