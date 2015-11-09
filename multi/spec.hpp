@@ -21,10 +21,12 @@ MACROS TO GENERATE BOILERPLATE FOR READING ARGUMENTS
 
 enum ParamMode { ParamString, ParamFile };
 
+//this class is rather inefficient, it exists in its current form to have less boilerplate when reading arguments and checking them
 class ParamReader {
 public:
     std::string err;
     std::ostringstream fmt;
+    std::string errorAppendix;
     int argidx;
     int argc;
     const char **argv;
@@ -42,7 +44,7 @@ public:
         if (argidx >= argc) {
             fmt << "error reading ";
             int dummy[sizeof...(Args)] = { (fmt << args, 0)... };
-            fmt << ", not enough arguments (arg. number " << (argidx + 1) << "/" << argc << ")\n"; \
+            fmt << ", not enough arguments (arg. number " << (argidx + 1) << "/" << argc << ")\n" << errorAppendix;
             return false;
         }
         return true;

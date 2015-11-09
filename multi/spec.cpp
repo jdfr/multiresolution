@@ -189,6 +189,44 @@ Arguments::~Arguments() {
 }
 
 bool Arguments::readArguments(bool doscale, ParamReader &rd) {
+    rd.errorAppendix =
+"\n"
+"Specification of configuration parameters: GLOBAL_PARAMETERS NUMBER_OF_PROCESSES PROCESS_PARAMETERS_1 PROCESS_PARAMETERS_2 ...\n\n"
+"IMPORTANT: All distance parameters are specified in units with a x1000 factor with respect to input file units, unless stated otherwise. Therefore, if the input file is in millimeters, distance parameters are in microns.\n\n"
+"GLOBAL_PARAMETERS: ALSO_CONTOURS CORRECT_INPUT USE_MOTION_PLANNER LIMITX LIMITY SCHEDULING_PARAMETERS ADDSUB_FLAG;\n\n"
+"    ALSO_CONTOURS: flag ('contours' if true) to also provide the contours in addition to the toolpaths\n\n"
+"    CORRECT_INPUT: flag ('correct' if true) to consistently correct the orientation of each contour in the raw input slices if they were not computed with Slic3r::TriangleMeshSlicer.\n\n"
+"    USE_MOTION_PLANNER: flag ('motion_opt' if true) to use a very simple (greedy, and without finding optimal entry points for closed contours) motion planner to order toolpaths\n\n"
+"    LIMITX and LIMITY: if non-negative, they specify the semi-lengths for a origin-centered rectangle, which will be added as an enclosing contour. The goal is to simulate subtractive processes without handling them as separate code paths.\n\n"
+"    SCHEDULING_PARAMETERS: list of scheduling parameters, with variable specifications:\n\n"
+"      -if the first parameter in this list is 'sched': sched VERTICAL_CORRECTION Z_EPSILON\n\n"
+"          *VERTICAL_CORRECTION: flag ('vcorrect' if true) to use memory- and cpu- expensive operations to ensure vertical correctness.\n\n"
+"          *Z_EPSILON: maximal absolute distance between scheduled slices to consider them to be at the same Z level (required because of floating point errors: if the voxel heights are just right, some slices for different processes may be scheduled at the same height).\n\n"
+"      -otherwise (the first parameter is not 'sched'): nsched Z_UNIFORM_STEP\n\n"
+"          *Z_UNIFORM_STEP: uniform slicing step in input file units, usually assumed to be in millimeters. Not really required if using the shared library interface, but it is kept for consistency.\n\n"
+"    ADDSUB_FLAG: flag ('addsub' if true) to specify the use of additive/subtractive logic that considers the first process to be additive, and all subsequent ones to be subtractive (or vice versa). If false, all processes are supposed to be either additive or subtractive.\n\n"
+"NUMBER_OF_PROCESSES: number of processes; after it, there will be a sequence of process parameters for each process.\n\n"
+"PROCESS_PARAMETERS_i: sequence of parameters for process 'i': LASER_BEAM_RADIUS VOXEL_PARAMETERS GRID_STEP RADIUS_ARCTOLERANCE GRIDSTEP_ARCTOLERANCE NOSNAP_RESOLUTION RADIUS_REMOVECOMMON SNAP_FLAG SAFESTEP_FLAG CLEARANCE_FLAG MEDIALAXIS_PARAMETERS INFILLING_PARAMETERS\n\n"
+"    LASER_BEAM_RADIUS: resolution\n\n"
+"    VOXEL_PARAMETERS: only if using the 3D scheduler:\n\n"
+"      -voxel shape: either 'ellipsoid' or 'constant'\n\n"
+"      -voxel Z radius (in order to define the size of the voxel in Z)\n\n"
+"      -voxel Z semi height (in order to define the Z step for slicing the model at that resolution)\n\n"
+"    GRID_STEP: X/Y stage step\n\n"
+"    RADIUS_ARCTOLERANCE: roundness parameter\n\n"
+"    GRIDSTEP_ARCTOLERANCE: roundness parameter\n\n"
+"    NOSNAP_RESOLUTION: smoothing radius if snapping is not done\n\n"
+"    RADIUS_REMOVECOMMON: radius for clipping contour segments common to previous proceses\n\n"
+"    SNAP_FLAG: do/do not snapping ('snap' if true) \n\n"
+"    SAFESTEP_FLAG: if true ('safestep'), try to minimize the resolution loss from snapping\n\n"
+"    CLEARANCE_FLAG: if true ('clearance'), override NOSNAP_RESOLUTION /SAFESTEP_FLAG and avoid the contour toolpaths from drawing overlapping lines to the maximum possible extent\n\n"
+"    MEDIALAXIS_PARAMETERS: list of medial axis factors to fill regions not filled by the contours. The first element if the number of factors, the rest are the factors. Example: 2 1.0 0.5 0.1 means 3 factors, 1.0, 0.5 and 0.1\n\n"
+"    INFILLING_PARAMETERS:  list of infilling parameters: it is either a single element ('noinfill', meaning that infilling is not considered) or is a three element list:\n\n"
+"      -keyword 'infill'\n\n"
+"      -infill mode: either 'concentric', 'lines', or 'justcontour' (the last one is to pass the infillings to AutoCAD for the Hatches)\n\n"
+"      -flag ('recursive' is True) to try to fill (or not) areas not properly infilled with other means (medial axis, higher resolution processes). Has no effect for infill mode 'justcontour'\n\n"
+"      -list of medial axis factors for infilling, just like the previous list of medial axis factors. The first element if the number of factors, the rest are the factors. ;\n\n"
+"\n";
     double scale = 0.0;
     if (doscale) {
         if (config->hasKey("PARAMETER_TO_INTERNAL_FACTOR")) {
@@ -211,7 +249,7 @@ bool Arguments::readArguments(bool doscale, ParamReader &rd) {
         return false;
     }
 
-    this->multispec = new MultiSpec(global, numtools);
+    this->multispec = new MultiSpec(std::move(global), numtools);
 
     err = this->multispec->readFromCommandLine(rd, scale);
     if (!err.empty()) {
