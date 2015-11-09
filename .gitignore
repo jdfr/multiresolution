@@ -6,3 +6,5 @@ bin*
 buildr.bat
 loadenv.bat
 setpath.bat
+config*
+params*
