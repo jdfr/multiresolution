@@ -37,12 +37,14 @@ void writeSlice(FILES files, int64 type, int64 ntool, double z, clp::Paths &path
 }
 
 const char *ERR =
-"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d | 2d (all | nall)) | nshow) MULTISLICING_PARAMETERS (save OUTPUTFILENAME | multisave OUTPUT1 OUTPUT2 ... | nsave)\n\n"
+"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d (spec SPEC_3D | nspec) | 2d (spec SPEC_2D | nspec | debug)) | nshow) MULTISLICING_PARAMETERS (save OUTPUTFILENAME | multisave OUTPUT1 OUTPUT2 ... | nsave)\n\n"
 "    -CONFIGFILENAME is required (config file name).\n\n"
 "    -MESHFILENAME is required (input mesh file name).\n\n"
-"    -If 'show 3d' is specified, a 3D view of the contours will be generated with mayavi after all is computed (viewing parameters are set in the config file)\n\n"
-"    -If 'show 2d all' is specified, Z-navigable 2D views of contours will be generated with matplotlib after they are computed (viewing parameters are set in the config file)\n\n"
-"    -If 'show 2d nall' is specified, 2D views of contours will be generated as they are computed (computation will be interrumpted until the viewing window is closed)\n\n"
+"    -If 'show 3d nspec' is specified, a 3D view of the contours will be generated with mayavi after all is computed (viewing parameters are set in the config file)\n\n"
+"    -If 'show 3d spec SPEC_3D' is the same as the previous one, but SPEC_3D is a python expression for specifying the viewing parameters\n\n"
+"    -If 'show 2d nspec' is specified, Z-navigable 2D views of contours will be generated with matplotlib after they are computed (viewing parameters are set in the config file)\n\n"
+"    -If 'show 2d spec SPEC_2D' is the same as the previous one, but SPEC_2D is a python expression for specifying the viewing parameters\n\n"
+"    -If 'show 2d debug' is specified, 2D views of contours will be generated as they are computed (computation will be interrumpted until the viewing window is closed)\n\n"
 "    -MULTISLICING_PARAMETERS represents the parameters specifying the multislicing process all further arguments, which are evaluated verbatim by the multislicing engine (in particular, metric arguments execept z_uniform_step must be supplied in the engine's native unit)\n\n"
 "    -If 'save OUTPUTFILENAME' is specified, OUTPUTFILENAME is the name of the file to save all toolpaths\n\n"
 "    -If 'multisave OUTPUT1 OUTPUT2 ...' is specified, must be as many output files as processes.\n\n";
@@ -74,28 +76,41 @@ int main(int argc, const char** argv) {
     }
 
     const char *configfilename, *meshfilename = NULL;
-    bool show, use2d, showAtEnd;
-
+    
     if (!rd.readParam(configfilename,  "CONFIGFILENAME"))         { printError(rd); return -1; }
     if (!rd.readParam(meshfilename,    "MESHFILENAME"))           { printError(rd); return -1; }
+
+    bool show, use2d, showAtEnd, useviewparams;
+    const char *viewmode, *viewparams=NULL;
     if (!rd.readParam(show, "show",    "show flag (show/nshow)")) { printError(rd); return -1; }
     if (show) {
         if (!rd.readParam(use2d, "2d", "view mode flag (2d/3d)")) { printError(rd); return -1; }
+        if (!rd.readParam(viewmode,    "viewing parameters flag (spec/nspec/debug)")) { printError(rd); return -1; }
+        useviewparams = strcmp(viewmode, "spec") == 0;
+        if (useviewparams) {
+          if (!rd.readParam(viewparams,"python viewing parameters")) { printError(rd); return -1; }
+        }
+        showAtEnd = strcmp(viewmode, "debug") != 0;
+        if ((!use2d) && (!showAtEnd)) {
+            fprintf(stderr, "'3d debug' cannot be specified!!!");
+            return -1;
+        }
         if (use2d) {
-            if (!rd.readParam(showAtEnd, "all", "view after finishing computations flag (all/nall)")) { printError(rd); return -1; }
             if (showAtEnd) {
 #               ifndef STANDALONE_USEPYTHON
-                    fprintf(stderr, "WARNING: 'show 2d all' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE TO ADD SUPPORT!!!!\n\n");
+                    fprintf(stderr, "ERROR: 'show 2d all' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
+                    return -1;
 #               endif
             } else {
 #               ifndef STANDALONE_USEPYTHON
-                    fprintf(stderr, "ERROR: 'show 2d nall' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE TO ADD SUPPORT!!!!\n\n");
+                    fprintf(stderr, "ERROR: 'show 2d nall' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
                     return -1;
 #               endif
             }
         } else {
 #           ifndef STANDALONE_USEPYTHON
-                fprintf(stderr, "WARNING: 'show 3d' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE TO ADD SUPPORT!!!!\n\n");
+                fprintf(stderr, "ERROR: 'show 3d' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
+                return -1;
 #           endif
         }
     }
@@ -202,7 +217,7 @@ int main(int argc, const char** argv) {
 #ifdef STANDALONE_USEPYTHON
     SlicesViewer *slicesViewer=NULL;
     if (shownotinline) {
-        slicesViewer = new SlicesViewer(*args.config, "view slices", use2d);
+        slicesViewer = new SlicesViewer(*args.config, "view slices", use2d, viewparams);
         std::string err = slicesViewer->start();
         if (!err.empty()) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
