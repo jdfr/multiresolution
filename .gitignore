@@ -1,7 +1,7 @@
 *.vcxproj
 *.user
 *.filters
-obj
+obj*
 bin*
 buildr.bat
 loadenv.bat

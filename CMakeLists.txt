@@ -36,9 +36,15 @@ if(EXISTS ${SRC}/../clipper)
   set(CLIPPER_BASE_DIR ${SRC}/../clipper)
 else()
   #as far as I understand, this will enable users of cmake-gui to set this directory
-  set(CLIPPER_BASE_DIR "" CACHE PATH "path to pyclipper (must be built before debugging!!!)")
+  set(CLIPPER_BASE_DIR "" CACHE PATH "path to clipper library")
 endif()
 
+if(EXISTS ${SRC}/../boost)
+  set(BOOST_BASE_DIR ${SRC}/..)
+else()
+  #as far as I understand, this will enable users of cmake-gui to set this directory
+  set(BOOST_BASE_DIR "" CACHE PATH "path to boost library")
+endif()
 
 set(clipper_include_dir ${CLIPPER_BASE_DIR}/clipper)
 set(iopaths_include_dir ${CLIPPER_BASE_DIR}/iopaths)
@@ -91,17 +97,55 @@ if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-set (INCLUDE_DIRS ${clipper_include_dir} ${iopaths_include_dir} ${SRC}/.. ${SRC}/multi ${SRC}/interfaces ${SRC}/python ${SRC}/shared ${SRC}/apps)
+set (INCLUDE_DIRS
+  ${clipper_include_dir}
+  ${iopaths_include_dir}
+  ${BOOST_BASE_DIR}
+  ${SRC}/multi
+  ${SRC}/interfaces
+  ${SRC}/python
+  ${SRC}/shared
+  ${SRC}/apps
+  )
 include_directories(${INCLUDE_DIRS})
 
-set(CORESOURCES ${clipper_source} ${iopaths_source} multi/3d.cpp multi/auxgeom.cpp multi/config.cpp multi/medialaxis.cpp multi/motionPlanner.cpp multi/multislicer.cpp multi/orientPaths.cpp multi/snapToGrid.cpp multi/spec.cpp )
+set(CORESOURCES
+  ${clipper_source}
+  ${iopaths_source}
+  multi/3d.hpp
+  multi/3d.cpp
+  multi/auxgeom.hpp
+  multi/auxgeom.cpp
+  multi/config.hpp
+  multi/config.cpp
+  multi/medialaxis.hpp
+  multi/medialaxis.cpp
+  multi/motionPlanner.hpp
+  multi/motionPlanner.cpp
+  multi/multislicer.hpp
+  multi/multislicer.cpp
+  multi/orientPaths.hpp
+  multi/orientPaths.cpp
+  multi/snapToGrid.hpp
+  multi/snapToGrid.cpp
+  multi/spec.hpp
+  multi/spec.cpp
+  )
 
 if (USEPYTHON OR GENERATE_EXECUTABLE)
-  set(CORESOURCES ${CORESOURCES} interfaces/subprocess.cpp)
+  set(CORESOURCES
+    ${CORESOURCES}
+    interfaces/subprocess.hpp
+    interfaces/subprocess.cpp
+    )
 endif()
 
 if (USE_PYTHON_DEBUG)
-  set(CORESOURCES ${CORESOURCES} python/showcontours.cpp)
+  set(CORESOURCES
+    ${CORESOURCES}
+    python/showcontours.hpp
+    python/showcontours.cpp
+    )
 endif()
 
 if (NOT LINKING_OPTIMIZATION)
@@ -112,9 +156,15 @@ if (NOT LINKING_OPTIMIZATION)
 endif()
   
 if(GENERATE_LIBRARY)
-  set(LIBRARY_SOURCES shared/multiresolution.cpp)
+  set(LIBRARY_SOURCES
+    shared/multiresolution.h
+    shared/multiresolution.cpp
+    )
   if(LINKING_OPTIMIZATION)
-    set(LIBRARY_SOURCES ${LIBRARY_SOURCES} ${CORESOURCES})
+    set(LIBRARY_SOURCES
+      ${LIBRARY_SOURCES}
+      ${CORESOURCES}
+      )
   endif()
   ADD_LIBRARY(multiresolution_library SHARED ${LIBRARY_SOURCES})
   set_target_properties(multiresolution_library PROPERTIES COMPILE_DEFINITIONS "LIBRARY_EXPORTS")
@@ -125,12 +175,23 @@ if(GENERATE_LIBRARY)
 endif()
   
 if(GENERATE_EXECUTABLE)
-  set(EXECSOURCES apps/slicermanager.cpp apps/standalone.cpp)
+  set(EXECSOURCES
+    apps/slicermanager.hpp
+    apps/slicermanager.cpp
+    apps/standalone.cpp
+    )
   if(USE_PYTHON_VIEWER)
-    set(EXECSOURCES ${EXECSOURCES} python/sliceviewer.cpp)
+    set(EXECSOURCES
+      ${EXECSOURCES}
+      python/sliceviewer.hpp
+      python/sliceviewer.cpp
+      )
   endif()
   if(LINKING_OPTIMIZATION)
-    set(EXECSOURCES ${EXECSOURCES} ${CORESOURCES})
+    set(EXECSOURCES
+      ${EXECSOURCES}
+      ${CORESOURCES}
+      )
   endif()
   ADD_EXECUTABLE(multiresolution_executable ${EXECSOURCES})
   set_target_properties(multiresolution_executable PROPERTIES OUTPUT_NAME multiresolution)
