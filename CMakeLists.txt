@@ -91,7 +91,7 @@ if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-set (INCLUDE_DIRS ${clipper_include_dir} ${iopaths_include_dir} ${SRC}/.. ${SRC}/multi ${SRC}/interfaces ${SRC}/python ${SRC}/shared ${SRC}/standalone)
+set (INCLUDE_DIRS ${clipper_include_dir} ${iopaths_include_dir} ${SRC}/.. ${SRC}/multi ${SRC}/interfaces ${SRC}/python ${SRC}/shared ${SRC}/apps)
 include_directories(${INCLUDE_DIRS})
 
 set(CORESOURCES ${clipper_source} ${iopaths_source} multi/3d.cpp multi/auxgeom.cpp multi/config.cpp multi/medialaxis.cpp multi/motionPlanner.cpp multi/multislicer.cpp multi/orientPaths.cpp multi/snapToGrid.cpp multi/spec.cpp )
@@ -125,7 +125,7 @@ if(GENERATE_LIBRARY)
 endif()
   
 if(GENERATE_EXECUTABLE)
-  set(EXECSOURCES standalone/slicermanager.cpp standalone/standalone.cpp)
+  set(EXECSOURCES apps/slicermanager.cpp apps/standalone.cpp)
   if(USE_PYTHON_VIEWER)
     set(EXECSOURCES ${EXECSOURCES} python/sliceviewer.cpp)
   endif()
