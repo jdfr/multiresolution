@@ -5,9 +5,9 @@
 #include "spec.hpp"
 #include "auxgeom.hpp"
 #include <stdio.h>
-#include <ctype.h>
 #include <sstream>
 #include <string>
+#include <iomanip>
 
 
 void writePolygonSVG(FILE * f, clp::Path &path, bool isContour, double scalingFactor, double minx, double miny) {
@@ -71,7 +71,7 @@ void writeSVG(const char * filename, HoledPolygons &hps, double scalingFactor, c
     fclose(f);
 }
 
-std::string getFirstMatchFromFile(const char * filename, PathInFileSpec spec, clp::Paths &output, double &scaling) {
+std::string processMatches(const char * filename, const char * svgfilename, PathInFileSpec spec, bool matchFirst) {
     FILE * f = fopen(filename, "rb");
     if (f == NULL) { return str("Could not open file ", filename); }
 
@@ -80,38 +80,58 @@ std::string getFirstMatchFromFile(const char * filename, PathInFileSpec spec, cl
     if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
 
     SliceHeader sliceheader;
-    int currentRecord = 0;
-    err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
-    if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
-    if (currentRecord >= fileheader.numRecords) { fclose(f); return std::string("Could not match the specification to file contents"); }
+    int index = 0;
+    for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
+        err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
+        if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
+        if (currentRecord >= fileheader.numRecords) break;
 
-    scaling = sliceheader.scaling;
-    if (sliceheader.saveFormat == SAVEMODE_INT64) {
-        readClipperPaths(f, output);
-        err = std::string();
-        for (int n = 0; n < output.size(); ++n) {
-            if (output[n].front() != output[n].back()) {
-                err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but path ", n, "-th inside it is not closed!!!");
+        if (sliceheader.saveFormat == SAVEMODE_INT64) {
+            clp::Paths output;
+            readClipperPaths(f, output);
+            err = std::string();
+            for (int n = 0; n < output.size(); ++n) {
+                if (output[n].front() != output[n].back()) {
+                    err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but path ", n, "-th inside it is not closed!!!");
+                    break;
+                }
+            }
+            HoledPolygons hps;
+            AddPathsToHPs(output, hps);
+
+            std::string svgname;
+            if (matchFirst) {
+                svgname = str(svgfilename, ".svg");
+            } else {
+                svgname = str(svgfilename, '.', std::setfill('0'), std::setw(3), index++, ".svg");
+            }
+
+            writeSVG(svgname.c_str(), hps, sliceheader.scaling, "mm");
+
+            if (matchFirst) {
                 break;
             }
+
+        } else if (sliceheader.saveFormat == SAVEMODE_DOUBLE) {
+            err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but it was saved in DOUBLE format (if you know what you are doing, you can convert it back to INT64 format)");
+            //fprintf(stderr, "WARNING: in file %s, path %d matches specification, but it was saved in DOUBLE format. This may cause (hard to debug) errors in some cases because of the required conversion to INT64\n", filename, currentRecord);
+            //readDoublePaths(f, output, 1/sliceheader.scaling);
+            //err = std::string();
+        } else {
+            err = str("In file ", filename, ", for path ", currentRecord, ", save mode not understood: ", sliceheader.saveFormat, "\n");
         }
-    } else if (sliceheader.saveFormat == SAVEMODE_DOUBLE) {
-        err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but it was saved in DOUBLE format (if you know what you are doing, you can convert it back to INT64 format)");
-        //fprintf(stderr, "WARNING: in file %s, path %d matches specification, but it was saved in DOUBLE format. This may cause (hard to debug) errors in some cases because of the required conversion to INT64\n", filename, currentRecord);
-        //readDoublePaths(f, output, 1/sliceheader.scaling);
-        //err = std::string();
-    } else {
-        err = str("In file ", filename, ", for path ", currentRecord, ", save mode not understood: ", sliceheader.saveFormat, "\n");
     }
     fclose(f);
+
     return err;
 }
 
 const char *ERR =
-"\nArguments: PATHSFILENAME SVGFILENAME [SPECTYPE VALUE]*\n\n"
+"\nArguments: PATHSFILENAME SVGFILENAME (first | all) [SPECTYPE VALUE]*\n\n"
 "    -PATHSFILENAME is required (input paths file name).\n\n"
 "    -SVGFILENAME is required (output svg file name).\n\n"
-"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], p[rocessed] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former.\n\n"
+"    -if 'first' is specified, only the first eligible match is converted to SVG. If 'all' is specified, all eligible paths are converted, creating one SVG file for each one.\n\n"
+"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], p[rocessed] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
 "This tool writes as a SVG file the first record in PATHSFILENAME that matches the specification.\n\n";
 
 void printError(ParamReader &rd) {
@@ -128,10 +148,21 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
-    const char *pathsfilename, *svgfilename;
+    const char *pathsfilename, *svgfilename, *matchMode;
+    bool matchFirst;
     
-    if (!rd.readParam(pathsfilename,   "PATHSFILENAME"))          { printError(rd); return -1; }
-    if (!rd.readParam(svgfilename,     "SVGFILENAME"))            { printError(rd); return -1; }
+    if (!rd.readParam(pathsfilename,   "PATHSFILENAME"))             { printError(rd); return -1; }
+    if (!rd.readParam(svgfilename,     "SVGFILENAME"))               { printError(rd); return -1; }
+    if (!rd.readParam(matchMode,       "matching mode (first/all)")) { printError(rd); return -1; }
+
+    if (strcmp(matchMode, "first") == 0) {
+        matchFirst = true;
+    } else if (strcmp(matchMode, "all") == 0) {
+        matchFirst = false;
+    } else {
+        fprintf(stderr, "matching mode should be 'first' or 'all', but it is: %s\n", matchMode);
+        return -1;
+    }
 
     if (!fileExists( pathsfilename)) { fprintf(stderr,  "the input file was not found: %s!!!", pathsfilename ); return -1; }
 
@@ -143,18 +174,12 @@ int main(int argc, const char** argv) {
     }
 
     clp::Paths paths;
-    double scaling;
-    err = getFirstMatchFromFile(pathsfilename, spec, paths, scaling);
+    err = processMatches(pathsfilename, svgfilename, spec, matchFirst);
 
     if (!err.empty()) {
         fprintf(stderr, "Error while trying to get a set of paths according to the specification: %s", err.c_str());
         return -1;
     }
-
-    HoledPolygons hps;
-    AddPathsToHPs(paths, hps);
-
-    writeSVG(svgfilename, hps, scaling, "mm");
 
     return 0;
 }
