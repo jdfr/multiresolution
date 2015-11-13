@@ -8,7 +8,6 @@
 #include "spec.hpp"
 #include "auxgeom.hpp"
 #include <stdio.h>
-#include <ctype.h>
 #include <sstream>
 #include <string>
 
@@ -31,8 +30,7 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
     data.reserve(fileheader.numRecords);
 
     SliceHeader sliceheader;
-    int currentRecord = 0;
-    while (currentRecord < fileheader.numRecords) {
+    for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
         if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
         if (currentRecord >= fileheader.numRecords) break;
@@ -42,7 +40,6 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
         if (fread(&(data.back().data[0]), sizeof(int64), numRecords, f) != numRecords) {
             fclose(f); return str("error trying to read ", currentRecord, "-th slice payload in ", filename);
         }
-        ++currentRecord;
     }
     fclose(f);
 
@@ -73,7 +70,7 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
 const char *ERR =
 "\nArguments: PATHSFILENAME_INPUT PATHSFILENAME_OUTPUT [SPECTYPE VALUE]*\n\n"
 "    -PATHSFILENAME_INPUT and PATHSFILENAME_OUTPUT are required (input/output paths file names).\n\n"
-"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], p[rocessed] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former.\n\n"
+"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], p[rocessed] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
 "This tool writes filters the contents of PATHSFILENAME_INPUT, writing in PATHSFILENAME_OUTPUT only the contents that match the specification.\n\n";
 
 void printError(ParamReader &rd) {
