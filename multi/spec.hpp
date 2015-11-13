@@ -75,6 +75,7 @@ protected:
     void setState(std::string &args, ParamMode mode);
 };
 
+ParamReader getParamReader(int argc, const char **argv);
 
 /********************************************************
 GLOBAL PARAMETERS

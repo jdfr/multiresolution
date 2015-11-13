@@ -28,6 +28,12 @@ public:
     std::string getValue(const char *      key);
 };
 
+typedef struct MetricFactors {
+    std::string err;
+    double input_to_internal, internal_to_input, input_to_slicer, slicer_to_internal;
+    MetricFactors(Configuration &config);
+} MetricFactors;
+
 //this si a hack to convert a series of things to a string
 template<typename... Args> std::string str(Args... args) {
     std::ostringstream fmt;

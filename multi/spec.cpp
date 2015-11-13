@@ -28,6 +28,15 @@ void ParamReader::setState(std::string &args, ParamMode mode) {
     }
 }
 
+ParamReader getParamReader(int argc, const char **argv) {
+    //first argument is exec's filename
+    if (argc == 2) {
+        return ParamReader(argv[1], ParamFile);
+    } else {
+        return ParamReader(0, --argc, ++argv);
+    }
+}
+
 bool MultiSpec::validate() {
     //do not validate anything for now
     return true;

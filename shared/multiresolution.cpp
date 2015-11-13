@@ -4,6 +4,7 @@
 #include "multiresolution.h"
 #include "common.hpp"
 static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface.h so typedef coord_type resolves to the same type as typedef ClipperLib::cInt");
+#include "app.hpp"
 
 //THIS FILE IMPLEMENTS THE SHARED LIBRARY INTERFACE
 

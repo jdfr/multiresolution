@@ -209,6 +209,26 @@ static inline std::string &trim(std::string &s) {
     return ltrim(rtrim(s));
 }
 
+MetricFactors::MetricFactors(Configuration &config) {
+    std::string val_input_to_slicer, val_slicer_to_internal;
+    if (config.hasKey("INPUT_TO_SLICER_FACTOR")) {
+        val_input_to_slicer = config.getValue("INPUT_TO_SLICER_FACTOR");
+    } else {
+        err = "the configuration value INPUT_TO_SLICER_FACTOR was not found in the configuration file!";
+        return;
+    }
+    if (config.hasKey("SLICER_TO_INTERNAL_FACTOR")) {
+        val_slicer_to_internal = config.getValue("SLICER_TO_INTERNAL_FACTOR");
+    } else {
+        err = "the configuration value SLICER_TO_INTERNAL_FACTOR was not found in the configuration file!";
+        return;
+    }
+    input_to_slicer = strtod(val_input_to_slicer.c_str(), NULL);
+    slicer_to_internal = strtod(val_slicer_to_internal.c_str(), NULL);
+    input_to_internal = input_to_slicer*slicer_to_internal;
+    internal_to_input = 1 / input_to_internal;
+}
+
 Configuration::Configuration(const char *filename) {
     bool ok = true;
     std::string contents = get_file_contents(filename, ok);
