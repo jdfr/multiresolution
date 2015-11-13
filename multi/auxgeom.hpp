@@ -170,6 +170,7 @@ typedef struct BBox {
 BBox getBB(clp::Path &path);
 BBox getBB(clp::Paths &paths);
 BBox getBB(HoledPolygon &hp);
+BBox getBB(HoledPolygons &hps);
 
 
 /////////////////////////////////////////////////

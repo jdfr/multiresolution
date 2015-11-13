@@ -149,6 +149,24 @@ BBox getBB(HoledPolygon &hp) {
     return getBB(hp.contour); //we are relying on the contour ALWAYS being the outer path
 }
 
+BBox getBB(HoledPolygons &hps) {
+    if (hps.empty()) {
+        return BBox();
+    }
+
+    BBox bb(LLONG_MAX, LLONG_MIN, LLONG_MAX, LLONG_MIN);
+    BBox sub;
+    for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
+        sub = getBB(*hp);
+        bb.minx = std::min(bb.minx, sub.minx);
+        bb.maxx = std::max(bb.maxx, sub.maxx);
+        bb.miny = std::min(bb.miny, sub.miny);
+        bb.maxy = std::max(bb.maxy, sub.maxy);
+    }
+
+    return bb;
+}
+
 //const int maxpower = 27;
 const int maxpower = 31;
 const clp::cInt MAX32 = (((clp::cInt)1) << maxpower) - 1;

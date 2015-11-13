@@ -1,11 +1,13 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.0)
 
-option(USE_PYTHON_DEBUG "add support for viewing contours in python for debugging" ON)
-option(USE_PYTHON_VIEWER "add support for viewing slices in python" ON)
-option(GENERATE_LIBRARY "generate shared library"  ON)
-option(GENERATE_EXECUTABLE "generate standalone executable"  ON)
+option(USE_PYTHON_DEBUG      "add support for viewing contours in python for debugging" ON)
+option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
+option(GENERATE_LIBRARY      "generate shared library"  ON)
+option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
+option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
+option(GENERATE_FILEFILTER   "generate filter for paths files"  ON)
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
-option(LINKING_OPTIMIZATION "optimizations that may make the build process significantly slower" OFF)
+option(LINKING_OPTIMIZATION  "optimizations that may make the build process significantly slower" OFF)
 
 if (USE_PYTHON_DEBUG OR USE_PYTHON_VIEWER)
   set(USE_PYTHON ON)
@@ -110,8 +112,11 @@ set (INCLUDE_DIRS
 include_directories(${INCLUDE_DIRS})
 
 set(CORESOURCES
+  ${clipper_header}
   ${clipper_source}
+  ${iopaths_header}
   ${iopaths_source}
+  ${common_header}
   multi/3d.hpp
   multi/3d.cpp
   multi/auxgeom.hpp
@@ -130,6 +135,8 @@ set(CORESOURCES
   multi/snapToGrid.cpp
   multi/spec.hpp
   multi/spec.cpp
+  apps/app.hpp
+  apps/app.cpp
   )
 
 if (USEPYTHON OR GENERATE_EXECUTABLE)
@@ -195,12 +202,45 @@ if(GENERATE_EXECUTABLE)
   endif()
   ADD_EXECUTABLE(multiresolution_executable ${EXECSOURCES})
   set_target_properties(multiresolution_executable PROPERTIES OUTPUT_NAME multiresolution)
-  set_target_properties(multiresolution_executable PROPERTIES COMPILE_DEFINITIONS "STANDALONE_EXECUTABLE")
   if (USE_PYTHON_DEBUG AND USE_PYTHON_VIEWER)
-    set_property(TARGET APPEND PROPERTY COMPILE_DEFINITIONS "STANDALONE_USEPYTHON")
+    set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "STANDALONE_USEPYTHON")
   endif()
   if(NOT LINKING_OPTIMIZATION)
     target_link_libraries(multiresolution_executable corelib)
+  endif()
+endif()
+
+if(GENERATE_SVGCONVERTER)
+  set(SVGCONVERTER
+    apps/svg.cpp
+    )
+  if(LINKING_OPTIMIZATION)
+    set(SVGCONVERTER
+      ${SVGCONVERTER}
+      ${CORESOURCES}
+      )
+  endif()
+  ADD_EXECUTABLE(multiresolution_svgconverter ${SVGCONVERTER})
+  set_target_properties(multiresolution_svgconverter PROPERTIES OUTPUT_NAME svgconv)
+  if(NOT LINKING_OPTIMIZATION)
+    target_link_libraries(multiresolution_svgconverter corelib)
+  endif()
+endif()
+
+if(GENERATE_FILEFILTER)
+  set(FILEFILTER
+    apps/filter.cpp
+    )
+  if(LINKING_OPTIMIZATION)
+    set(FILEFILTER
+      ${FILEFILTER}
+      ${CORESOURCES}
+      )
+  endif()
+  ADD_EXECUTABLE(multiresolution_filefilter ${FILEFILTER})
+  set_target_properties(multiresolution_filefilter PROPERTIES OUTPUT_NAME filter)
+  if(NOT LINKING_OPTIMIZATION)
+    target_link_libraries(multiresolution_filefilter corelib)
   endif()
 endif()
 
