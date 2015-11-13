@@ -1,5 +1,6 @@
 #include "app.hpp"
 #include <stdio.h>
+#include <ctype.h>
 
 bool fileExists(const char *filename) {
     FILE *test = fopen(filename, "rb");
@@ -143,7 +144,7 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd) {
         if (strcmp(spectype, "type") == 0) {
             this->usetype = true;
             const char * typ=NULL;
-            if (!rd.readParam(this->type, "value for type specification")) { return std::string(rd.fmt.str()); };
+            if (!rd.readParam(typ, "value for type specification")) { return std::string(rd.fmt.str()); };
             char t = tolower(typ[0]);
             if ((t == 'r') || (typ[0] == '0')) {
                 this->type = TYPE_RAW_CONTOUR;
