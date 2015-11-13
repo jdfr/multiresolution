@@ -166,14 +166,24 @@ std::string GlobalSpec::readFromCommandLine(ParamReader &rd, double scale) {
     if (!rd.readParam(applyMotionPlanner, "motion_opt", "order optimization parameter")) return rd.fmt.str();
     if (!rd.readScaled(limitX,            "limitX"))                                     return rd.fmt.str();
     if (!rd.readScaled(limitY,            "limitY"))                                     return rd.fmt.str();
-    const char * schedMode;
-    if (!rd.readParam(schedMode,          "useScheduler (sched/manual/uniform)"))        return rd.fmt.str();
-    manualScheduler = strcmp(schedMode, "manual")==0;
-    useScheduler = manualScheduler || (strcmp(schedMode, "sched")==0);
+    const char * schedModeStr;
+    if (!rd.readParam(schedModeStr,       "useScheduler (sched/manual/uniform/pathsfile)")) return rd.fmt.str();
+    if (strcmp(schedModeStr, "sched") == 0) {
+        schedMode = SimpleScheduler;
+    } else if (strcmp(schedModeStr, "manual") == 0)  {
+        schedMode = ManualScheduling;
+    } else if (strcmp(schedModeStr, "uniform") == 0)  {
+        schedMode = UniformScheduling;
+    } else if (strcmp(schedModeStr, "pathsfile") == 0)  {
+        schedMode = PathsFileScheduling;
+    } else {
+        return str("useScheduler was not recognized (valid values: sched/manual/uniform/pathsfile): ", schedModeStr);
+    }
+    useScheduler = schedMode != UniformScheduling;
     if (useScheduler) {
         if (!rd.readParam(avoidVerticalOverwriting,     "vcorrect", "avoid vertical overwritting (vcorrect/novcorrect)")) return rd.fmt.str();
         if (!rd.readScaled(z_epsilon,                   "Z epsilon"))                                                     return rd.fmt.str();
-        if (manualScheduler) {
+        if (schedMode==ManualScheduling) {
             int numlayers;
             if (!rd.readParam(numlayers,                "number of input layers"))                                        return rd.fmt.str();
             if (numlayers <= 0) return str("The number of input layers cannot be ", numlayers, "!!!");
@@ -228,7 +238,11 @@ bool Arguments::readArguments(bool doscale, ParamReader &rd) {
 "          *NUMLAYERS: number of layers in a sequence specifying a schedule of layers to be processed.\n\n"
 "          *Z_i: Z height of the i-th layer in the schedule (in input file units, usually assumed to be in millimeters).\n\n"
 "          *NTOOL_i: number of the process to use for the i-th layer in the schedule.\n\n"
-"      -otherwise (the first parameter is neither 'sched' nor 'manual'): nsched Z_UNIFORM_STEP\n\n"
+"      -(NOT FUNCTIONAL YET) if the first parameter in this list is 'pathsfile': pathsfile VERTICAL_CORRECTION Z_EPSILON PATHSFILE SLICE_SPEC\n\n"
+"          *VERTICAL_CORRECTION and Z_EPSILON: the same as in the previous case.\n\n"
+"          *PATHSFILE: input file for reading paths.\n\n"
+"          *SLICE_SPEC: either 'raw' or 'processed NTOOL', where ntool is a tool number. All paths from PATHSFILE conforming to SLICE_SPEC will be used as input.\n\n"
+"      -if the first parameter in this list is 'uniform': uniform Z_UNIFORM_STEP\n\n"
 "          *Z_UNIFORM_STEP: uniform slicing step in input file units, usually assumed to be in millimeters. Not really required if using the shared library interface, but it is kept for consistency.\n\n"
 "    ADDSUB_FLAG: flag ('addsub' if true) to specify the use of additive/subtractive logic that considers the first process to be additive, and all subsequent ones to be subtractive (or vice versa). If false, all processes are supposed to be either additive or subtractive.\n\n"
 "NUMBER_OF_PROCESSES: number of processes; after it, there will be a sequence of process parameters for each process.\n\n"

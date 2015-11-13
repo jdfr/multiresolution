@@ -237,7 +237,7 @@ int main(int argc, const char** argv) {
 
         slicer->getZLimits(&minz, &maxz);
 
-        if (args.multispec->global.manualScheduler) {
+        if (args.multispec->global.schedMode == ManualScheduling) {
             for (auto pair = args.multispec->global.schedSpec.begin(); pair != args.multispec->global.schedSpec.end(); ++pair) {
                 pair->z *= factors.input_to_internal;
             }

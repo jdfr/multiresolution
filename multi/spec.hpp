@@ -81,11 +81,13 @@ ParamReader getParamReader(int argc, const char **argv);
 GLOBAL PARAMETERS
 *********************************************************/
 
+enum SchedulerMode { SimpleScheduler, UniformScheduling, ManualScheduling, PathsFileScheduling };
+
 typedef struct GlobalSpec {
     typedef struct { double z; int ntool; } ZNTool;
     Configuration &config;
+    SchedulerMode schedMode;
     bool useScheduler;
-    bool manualScheduler;
     bool addsubWorkflowMode;
     bool alsoContours;
     bool applyMotionPlanner;
