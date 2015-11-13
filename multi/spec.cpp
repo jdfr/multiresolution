@@ -6,8 +6,7 @@
 
 void ParamReader::setState(std::string &args, ParamMode mode) {
     if (mode == ParamString) {
-        auto spec = escaped_list_separator<char>("", " \t\n\v\f\r", "\"");
-        splitted = split(args, spec);
+        splitted = split(args, "", " \t\n\v\f\r", "\"", '#', '\n');
         local_argv.resize(splitted.size());
         for (int k = 0; k<local_argv.size(); ++k) {
             local_argv[k] = splitted[k].c_str();

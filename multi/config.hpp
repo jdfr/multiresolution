@@ -1,6 +1,7 @@
 #ifndef CONFIG_HEADER
 #define CONFIG_HEADER
 
+#include <vector>
 #include <map>
 #include <string>
 #include <sstream>
@@ -8,11 +9,8 @@
 //slurp file
 std::string get_file_contents(const char *filename, bool &ok);
 
-#include <boost/tokenizer.hpp>
-using boost::tokenizer;
-using boost::escaped_list_separator;
-
-std::vector<std::string> split(std::string &input, escaped_list_separator<char> &tokspec);
+std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars);
+std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars, char startComment, char endComment);
 
 /*this is a class to read key/value configuration pairs from a file with the following format (whitespace is trimmed both from keys and values):
     key1 : value1 ;
