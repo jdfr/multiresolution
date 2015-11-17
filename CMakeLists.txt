@@ -5,6 +5,7 @@ option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
 option(GENERATE_LIBRARY      "generate shared library"  ON)
 option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
 option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
+option(GENERATE_TRANSFORMER  "generate executable to apply transformations to paths"  ON)
 option(GENERATE_FILEFILTER   "generate filter for paths files"  ON)
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 option(LINKING_OPTIMIZATION  "optimizations that may make the build process significantly slower" OFF)
@@ -241,6 +242,23 @@ if(GENERATE_FILEFILTER)
   set_target_properties(multiresolution_filefilter PROPERTIES OUTPUT_NAME filter)
   if(NOT LINKING_OPTIMIZATION)
     target_link_libraries(multiresolution_filefilter corelib)
+  endif()
+endif()
+
+if(GENERATE_TRANSFORMER)
+  set(FILETRANSFORM
+    apps/transform.cpp
+    )
+  if(LINKING_OPTIMIZATION)
+    set(FILETRANSFORM
+      ${FILETRANSFORM}
+      ${CORESOURCES}
+      )
+  endif()
+  ADD_EXECUTABLE(multiresolution_transform ${FILETRANSFORM})
+  set_target_properties(multiresolution_transform PROPERTIES OUTPUT_NAME transform)
+  if(NOT LINKING_OPTIMIZATION)
+    target_link_libraries(multiresolution_transform corelib)
   endif()
 endif()
 
