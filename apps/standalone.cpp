@@ -224,7 +224,9 @@ int main(int argc, const char** argv) {
     int numtools = (int)args.multispec->numspecs;
     if (write) {
         FileHeader header(*args.multispec, factors);
-        header.writeToFiles(all_files, false);
+        for (auto f = all_files.begin(); f != all_files.end(); ++f) {
+            header.writeToFile(*f, false);
+        }
     }
 
     std::vector<std::shared_ptr<ResultSingleTool>> results;

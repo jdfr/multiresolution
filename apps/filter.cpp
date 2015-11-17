@@ -49,14 +49,13 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
 
     FILE * o = fopen(outputname, "wb");
     if (o == NULL) { return str("Could not open output file ", outputname); }
-    FILES os(1, o);
 
     fileheader.numRecords = data.size();
-    fileheader.writeToFiles(os, true);
+    fileheader.writeToFile(o, true);
 
     err = std::string();
     for (auto d = data.begin(); d != data.end(); ++d) {
-        d->header.writeToFiles(os);
+        d->header.writeToFile(o);
         if (fwrite(&(d->data[0]), sizeof(int64), d->data.size(), o) != d->data.size()) {
              err = str("error trying to write ", d->k, "-th slice payload of ", filename, " in ", outputname);
              break;

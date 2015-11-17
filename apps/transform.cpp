@@ -33,7 +33,6 @@ bool transformationSurelyIsAffine(TransformationMatrix matrix) {
 }
 
 void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible, SliceHeader &sliceheader, DPaths &paths) {
-    FILES ff(1, f);
     if (is2DCompatible) {
         sliceheader.z = sliceheader.z*matrix[10] + matrix[11];
         for (auto path = paths.begin(); path != paths.end(); ++path) {
@@ -44,7 +43,7 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible,
                 point->Y = y;
             }
         }
-        sliceheader.writeToFiles(ff);
+        sliceheader.writeToFile(f);
         writeDoublePaths(f, paths, PathOpen);
     } else {
         Paths3D paths3;
@@ -65,7 +64,7 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible,
         sliceheader.saveFormat = SAVEMODE_DOUBLE_3D;
         sliceheader.totalSize = getPathsSerializedSize(paths3, PathOpen);
         sliceheader.setBuffer();
-        sliceheader.writeToFiles(ff);
+        sliceheader.writeToFile(f);
 
         write3DPaths(f, paths3, PathOpen);
     }
@@ -83,7 +82,7 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, SliceHeader &slicehe
             point->z = z;
         }
     }
-    sliceheader.writeToFiles(ff);
+    sliceheader.writeToFile(f);
     write3DPaths(f, paths, PathOpen);
 }
 
@@ -98,9 +97,7 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
     FILE * o = fopen(outputname, "wb");
     if (o == NULL) { return str("Could not open output file ", outputname); }
 
-    FILES oo(1, o);
-
-    fileheader.writeToFiles(oo, true);
+    fileheader.writeToFile(o, true);
 
     bool is2DCompatible = transformationIs2DCOmpatible(matrix);
 

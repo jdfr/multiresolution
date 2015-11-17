@@ -31,17 +31,17 @@ void FileHeader::buildFrom(MultiSpec &multispec, MetricFactors &factors) {
     numRecords = 0;
 }
 
-void FileHeader::writeToFiles(FILES &files, bool alsoNumRecords) {
-    applyToAllFiles(files, writeInt64, numtools);
-    applyToAllFiles(files, writeInt64, useSched);
+void FileHeader::writeToFile(FILE *file, bool alsoNumRecords) {
+    WRITE_BINARY(&numtools, sizeof(numtools), 1, file);
+    WRITE_BINARY(&useSched, sizeof(useSched), 1, file);
     for (int k = 0; k < numtools; ++k) {
-        applyToAllFiles(files, writeDouble, radiusX[k]);
+        WRITE_BINARY(&(radiusX[k]), sizeof(double), 1, file);
         if (useSched) {
-            applyToAllFiles(files, writeDouble, radiusZ[k]);
+            WRITE_BINARY(&(radiusZ[k]), sizeof(double), 1, file);
         }
     }
     if (alsoNumRecords) {
-        applyToAllFiles(files, writeInt64, numRecords);
+        WRITE_BINARY(&numRecords, sizeof(numRecords), 1, file);
     }
 }
 
@@ -94,8 +94,8 @@ void SliceHeader::setBuffer() {
 }
 
 
-void SliceHeader::writeToFiles(FILES &files) {
-    applyToAllFiles(files, writeT64, &(alldata.front()), alldata.size());
+void SliceHeader::writeToFile(FILE *file) {
+    WRITE_BINARY(&(alldata.front()), sizeof(T64), alldata.size(), file);
 }
 
 std::string SliceHeader::readFromFile(FILE * f) {
@@ -119,7 +119,9 @@ std::string SliceHeader::readFromFile(FILE * f) {
 
 
 std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode) {
-    header.writeToFiles(files);
+    for (auto f = files.begin(); f != files.end(); ++f) {
+        header.writeToFile(*f);
+    }
     if (header.saveFormat == SAVEMODE_INT64) {
         applyToAllFiles(files, writeClipperPaths, paths, mode);
     } else if (header.saveFormat == SAVEMODE_DOUBLE) {

@@ -38,7 +38,7 @@ typedef struct FileHeader {
     void buildFrom(MultiSpec &multispec, MetricFactors &factors);
     std::string readFromFile(FILE * f);
     std::string openAndReadFromFile(const char * filename, FILE *&file);
-    void writeToFiles(FILES &files, bool alsoNumRecords);
+    void writeToFile(FILE *file, bool alsoNumRecords);
 } HeaderFile;
 
 typedef struct SliceHeader {
@@ -55,7 +55,7 @@ typedef struct SliceHeader {
     SliceHeader(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling) { setTo(paths, mode, _type, _ntool, _z, _saveFormat, _scaling); }
     void setTo(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling);
     void setBuffer();
-    void writeToFiles(FILES &files);
+    void writeToFile(FILE *files);
     std::string readFromFile(FILE * f);
 } SliceHeader;
 
