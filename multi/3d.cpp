@@ -47,7 +47,12 @@ void ToolpathManager::removeUsedSlicesBelowZ(double z) {
 //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
 void ToolpathManager::applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth) {
 
-    offsetDo(multi.offset, auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
+    if (diffwidth == 0.0) {
+        auxUpdate.clear();
+        COPYTO(contours, auxUpdate);
+    } else {
+        offsetDo(multi.offset, auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
+    }
     if (auxUpdate.empty()) return;
     if (spec.global.addsubWorkflowMode) {
         //here, computeContoursAlreadyFilled will always be false
