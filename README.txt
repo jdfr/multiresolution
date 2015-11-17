@@ -11,9 +11,11 @@ BEFORE COMPILING:
 
 2. If it is not already at ../boost, put a copy of boost there (the originally used version is a stripped down copy of Boost 1.055). If compiling with MinGw-64, please make sure that the DLLs at ../mingwdlls match the dlls of your MinGW-64 distribution.
 
-3. A configuration file has to be supplied. config.txt is supplied as an example. It cannot have proper comments, but bogus key/value pairs can be added as such. It must contain:
+3. A configuration file has to be supplied. config.txt is supplied as an example. It must contain:
     *paths and options for the slicer if the code is compiled as a standalone application.
     *python and script paths if the debugging facilities at showcontours.hpp are used.
+
+4. A parameters file is not necessary, but convenient. params.txt is supplied as an example.
 
 TO COMPILE:
 
