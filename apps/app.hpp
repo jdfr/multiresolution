@@ -9,8 +9,9 @@
 #define TYPE_PROCESSED_CONTOUR 1
 #define TYPE_TOOLPATH          2
 
-#define SAVEMODE_INT64  0
-#define SAVEMODE_DOUBLE 1
+#define SAVEMODE_INT64     0
+#define SAVEMODE_DOUBLE    1
+#define SAVEMODE_DOUBLE_3D 2
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
 
@@ -84,5 +85,18 @@ typedef struct PathInFileSpec {
 } PathInFileSpec;
 
 std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int &currentRecord, PathInFileSpec &spec, SliceHeader &sliceheader);
+
+typedef struct Point3D {
+    double x, y, z;
+    Point3D() {}
+    Point3D(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
+} Point3D;
+
+typedef std::vector<Point3D> Path3D;
+typedef std::vector<Path3D> Paths3D;
+
+void read3DPaths(FILE * f, Paths3D &paths);
+void write3DPaths(FILE * f, Paths3D &paths, PathCloseMode mode);
+int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode);
 
 #endif

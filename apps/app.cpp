@@ -182,3 +182,48 @@ std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int 
     return std::string();
 }
 
+void read3DPaths(FILE * f, Paths3D &paths) {
+    int64 numpaths, numpoints;
+
+    READ_BINARY(&numpaths, sizeof(int64), 1, f);
+
+    size_t oldsize = paths.size(), newsize = oldsize + numpaths;
+
+    paths.resize(newsize);
+    for (auto path = paths.begin() + oldsize; path != paths.end(); ++path) {
+        READ_BINARY(&numpoints, sizeof(int64), 1, f);
+        path->resize(numpoints);
+        size_t num = 3 * numpoints;
+        READ_BINARY(&((*path)[0]), sizeof(double), num, f);
+    }
+}
+
+void write3DPaths(FILE * f, Paths3D &paths, PathCloseMode mode) {
+    int64 numpaths = paths.size(), numpoints, numpointsdeclared;
+    WRITE_BINARY(&numpaths, sizeof(int64), 1, f);
+
+    bool addlast = (mode == PathLoop) && (paths.size() > 0);
+    for (auto path = paths.begin(); path != paths.end(); ++path) {
+        numpoints = path->size();
+        numpointsdeclared = addlast ? (numpoints + 1) : numpoints;
+        WRITE_BINARY(&numpointsdeclared, sizeof(int64), 1, f);
+        size_t num = 3 * numpoints;
+        WRITE_BINARY(&((*path)[0]), sizeof(double), num, f);
+        if (addlast) {
+            WRITE_BINARY(&((*path)[0]), sizeof(double), 3, f);
+        }
+    }
+}
+
+int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode) {
+    int s = 0;
+    for (auto path = paths.begin(); path != paths.end(); ++path) {
+        s += (int)path->size();
+    }
+    s *= 3;
+    s += 1 + ((int)paths.size());
+    if ((mode == PathLoop) && (paths.size() > 0)) s += 3 * (int)paths.size();
+    s *= 8;
+    return s;
+}
+
