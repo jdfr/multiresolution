@@ -10,7 +10,8 @@ public:
         use2D = _use2d;
         filesep = config.getValue("FILESEP");
         workdir = config.getValue("SLICEVIEWER_SCRIPTPATH");
-        scriptPath = workdir + filesep + config.getValue("SLICEVIEWER_SCRIPTNAME");
+        //scriptPath = workdir + filesep + config.getValue("SLICEVIEWER_SCRIPTNAME");
+        scriptPath = config.getValue("SLICEVIEWER_SCRIPTNAME");
         execpath = config.getValue("PYPATH");
         if (viewparams != NULL) {
             use_custom_formatting = true;
