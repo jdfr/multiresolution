@@ -22,6 +22,15 @@ std::string SubProcessManager::start() {
     if (inUse) return std::string("already in use");
 
     pipeIN = pipeOUT = NULL;
+#ifdef INWINDOWS
+    int ACCESSMODE = 0;
+#else
+    int ACCESSMODE = X_OK;
+#endif
+
+    if (access(execpath.c_str(), ACCESSMODE) != 0) {
+        return str("Cannot execute this file: ", execpath);
+    }
 
 #ifdef INWINDOWS
 
