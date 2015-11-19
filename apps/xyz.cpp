@@ -9,25 +9,16 @@ using boost::tokenizer;
 using boost::escaped_list_separator;
 typedef escaped_list_separator<char> sep;
 
-std::string bbxyz(const char *inputfilename) {
+//algorithm to iterate over a xyz file
+template<typename Function> std::string withXYZDo(const char *inputfilename, int &nline, Function function) {
     sep pointsep("", ",; \t", "");
 
     std::string line;
     std::ifstream f(inputfilename);
-    int nline = 0;
+    nline = 0;
     std::vector<double> xyz;
     xyz.reserve(3);
-
-    double minx = std::numeric_limits<double>::infinity();
-    double maxx = -std::numeric_limits<double>::infinity();
-    double miny = std::numeric_limits<double>::infinity();
-    double maxy = -std::numeric_limits<double>::infinity();
-    double minz = std::numeric_limits<double>::infinity();
-    double maxz = -std::numeric_limits<double>::infinity();
-
     while (getline(f, line)) {
-        ++nline;
-
         xyz.clear();
 
         tokenizer<sep> tok(line, pointsep);
@@ -36,34 +27,61 @@ std::string bbxyz(const char *inputfilename) {
             if (!it->empty()) {
                 xyz.push_back(strtod(it->c_str(), NULL));
             }
+            if (xyz.size() == 3) break; //allow for point cloud files with more than 3 fields
         }
 
         if (xyz.empty()) continue;
 
+        ++nline;
         if (xyz.size() != 3) {
             return str("In file ", inputfilename, ", line ", nline, " cannot be converted to three input values: ", line, "\n");
         }
 
-        minx = fmin(minx, xyz[0]);
-        maxx = fmax(maxx, xyz[0]);
-        miny = fmin(miny, xyz[1]);
-        maxy = fmax(maxy, xyz[1]);
-        minz = fmin(minz, xyz[2]);
-        maxz = fmax(maxz, xyz[2]);
-
+        function(xyz);
     }
 
     if (nline == 0) {
-        return str("Could not open file ", inputfilename, ", or it is empty");
+        return str("Could not open file ", inputfilename, ", or it has no points");
     }
 
-    fprintf(stdout, "number of points: %d\n", nline);
-    fprintf(stdout, "bounding box:\n");
-    fprintf(stdout, "X: %25.20g %25.20g\n", minx, maxx);
-    fprintf(stdout, "Y: %25.20g %25.20g\n", miny, maxy);
-    fprintf(stdout, "Z: %25.20g %25.20g\n", minz, maxz);
-
     return std::string();
+}
+
+typedef struct Limits {
+    double minx = std::numeric_limits<double>::infinity();
+    double maxx = -std::numeric_limits<double>::infinity();
+    double miny = std::numeric_limits<double>::infinity();
+    double maxy = -std::numeric_limits<double>::infinity();
+    double minz = std::numeric_limits<double>::infinity();
+    double maxz = -std::numeric_limits<double>::infinity();
+} Limits;
+
+std::string bbxyz(const char *inputfilename) {
+    Limits lims;
+
+    auto getLimits = [&lims](std::vector<double> &xyz) {
+        lims.minx = fmin(lims.minx, xyz[0]);
+        lims.maxx = fmax(lims.maxx, xyz[0]);
+        lims.miny = fmin(lims.miny, xyz[1]);
+        lims.maxy = fmax(lims.maxy, xyz[1]);
+        lims.minz = fmin(lims.minz, xyz[2]);
+        lims.maxz = fmax(lims.maxz, xyz[2]);
+    };
+
+    int nline;
+
+    std::string res = withXYZDo(inputfilename, nline, getLimits);
+
+    if (res.empty()) {
+        fprintf(stdout, "number of points: %d\n", nline);
+        fprintf(stdout, "bounding box:\n");
+        fprintf(stdout, "X: %25.20g %25.20g\n", lims.minx, lims.maxx);
+        fprintf(stdout, "Y: %25.20g %25.20g\n", lims.miny, lims.maxy);
+        fprintf(stdout, "Z: %25.20g %25.20g\n", lims.minz, lims.maxz);
+    }
+
+    return res;
+
 }
 
 //const int mlen = 16; //for true matrix
@@ -72,48 +90,23 @@ const int mlen = 12; //do not care about the last row of the transformation matr
 typedef double TransformationMatrix[mlen];
 
 std::string transformAndSave(const char *input, const char *output, TransformationMatrix matrix) {
-    std::ifstream f(input);
-
     FILE * o = fopen(output, "w");
     if (o == NULL) { return str("Could not open output file ", output); }
 
-    sep pointsep("", ",; \t", "");
-    std::string line;
-    int nline = 0;
-    std::vector<double> xyz;
-    xyz.reserve(3);
-
-    while (getline(f, line)) {
-        nline++;
-        xyz.clear();
-
-        tokenizer<sep> tok(line, pointsep);
-
-        for (tokenizer<sep>::iterator it = tok.begin(); it != tok.end(); ++it) {
-            if (!it->empty()) {
-                xyz.push_back(strtod(it->c_str(), NULL));
-            }
-        }
-
-        if (xyz.empty()) continue;
-
-        if (xyz.size() != 3) {
-            return str("In file ", input, ", line ", nline, " cannot be converted to three input values: ", line, "\n");
-        }
-
-        double x = (matrix[0] * xyz[0]) + (matrix[1] * xyz[1]) + (matrix[2]  * xyz[2]) + matrix[3];
-        double y = (matrix[4] * xyz[0]) + (matrix[5] * xyz[1]) + (matrix[6]  * xyz[2]) + matrix[7];
+    auto doTransform = [matrix, o](std::vector<double> &xyz) {
+        double x = (matrix[0] * xyz[0]) + (matrix[1] * xyz[1]) + (matrix[2] * xyz[2]) + matrix[3];
+        double y = (matrix[4] * xyz[0]) + (matrix[5] * xyz[1]) + (matrix[6] * xyz[2]) + matrix[7];
         double z = (matrix[8] * xyz[0]) + (matrix[9] * xyz[1]) + (matrix[10] * xyz[2]) + matrix[11];
 
         fprintf(o, "%25.20g %25.20g %25.20g\n", x, y, z);
+    };
 
-    }
+    int nline;
+
+    std::string res = withXYZDo(input, nline, doTransform);
 
     fclose(o);
-    if (nline == 0) {
-        return str("Could not open file ", input, ", or it is empty");
-    }
-    return std::string();
+    return res;
 }
 
 
