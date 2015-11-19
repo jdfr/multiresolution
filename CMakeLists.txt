@@ -6,6 +6,7 @@ option(GENERATE_LIBRARY      "generate shared library"  ON)
 option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
 option(SET_CONFIGURE_FILE    "generate example configuration files (the variables PYPATH and INITIAL_MESH_FILE must be set!!!)" ON)
 option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
+option(GENERATE_XYZHANDLER   "generate utility to process xyz point cloud files"  ON)
 option(GENERATE_TRANSFORMER  "generate executable to apply transformations to paths"  ON)
 option(GENERATE_FILEFILTER   "generate filter for paths files"  ON)
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
@@ -215,59 +216,31 @@ if(GENERATE_EXECUTABLE)
   endif()
 endif()
 
-if(GENERATE_SVGCONVERTER)
-  set(SVGCONVERTER
-    apps/svg.cpp
-    )
-  if(LINKING_OPTIMIZATION)
-    set(SVGCONVERTER
-      ${SVGCONVERTER}
-      ${CORESOURCES}
-      )
+function(SINGLESOURCE_EXECUTABLE GENERATE_OPTION TARGETNAME SOURCEFILE EXENAME)
+  if(GENERATE_OPTION)
+    set(SINGLESOURCE ${SOURCEFILE})
+    if(LINKING_OPTIMIZATION)
+      set(SINGLESOURCE ${SINGLESOURCE} ${CORESOURCES})
+    endif()
+    ADD_EXECUTABLE(${TARGETNAME} ${SINGLESOURCE})
+    set_target_properties(${TARGETNAME} PROPERTIES OUTPUT_NAME ${EXENAME})
+    if(NOT LINKING_OPTIMIZATION)
+      target_link_libraries(${TARGETNAME} corelib)
+    endif()
   endif()
-  ADD_EXECUTABLE(multiresolution_svgconverter ${SVGCONVERTER})
-  set_target_properties(multiresolution_svgconverter PROPERTIES OUTPUT_NAME svgconv)
-  if(NOT LINKING_OPTIMIZATION)
-    target_link_libraries(multiresolution_svgconverter corelib)
-  endif()
-endif()
+endfunction(SINGLESOURCE_EXECUTABLE)
 
-if(GENERATE_FILEFILTER)
-  set(FILEFILTER
-    apps/filter.cpp
-    )
-  if(LINKING_OPTIMIZATION)
-    set(FILEFILTER
-      ${FILEFILTER}
-      ${CORESOURCES}
-      )
-  endif()
-  ADD_EXECUTABLE(multiresolution_filefilter ${FILEFILTER})
-  set_target_properties(multiresolution_filefilter PROPERTIES OUTPUT_NAME filter)
-  if(NOT LINKING_OPTIMIZATION)
-    target_link_libraries(multiresolution_filefilter corelib)
-  endif()
-endif()
-
-if(GENERATE_TRANSFORMER)
-  set(FILETRANSFORM
-    apps/transform.cpp
-    )
-  if(LINKING_OPTIMIZATION)
-    set(FILETRANSFORM
-      ${FILETRANSFORM}
-      ${CORESOURCES}
-      )
-  endif()
-  ADD_EXECUTABLE(multiresolution_transform ${FILETRANSFORM})
-  set_target_properties(multiresolution_transform PROPERTIES OUTPUT_NAME transform)
-  if(NOT LINKING_OPTIMIZATION)
-    target_link_libraries(multiresolution_transform corelib)
-  endif()
-endif()
+SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER, multiresolution_svgconverter apps/svg.cpp       svgconv)
+SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER,   multiresolution_filefilter   apps/filter.cpp    filterpaths)
+SINGLESOURCE_EXECUTABLE(GENERATE_TRANSFORMER,  multiresolution_transform    apps/transform.cpp meshtrans)
+SINGLESOURCE_EXECUTABLE(GENERATE_XYZHANDLER,   multiresolution_xyz          apps/xyz.cpp       xyz)
 
 if (CMAKE_RUNTIME_OUTPUT_DIRECTORY)
   set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE)
+  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE})
+elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG)
+  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
 else()
   set(OUTPUTDIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
