@@ -119,9 +119,7 @@ std::string SliceHeader::readFromFile(FILE * f) {
 
 
 std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode) {
-    for (auto f = files.begin(); f != files.end(); ++f) {
-        header.writeToFile(*f);
-    }
+    applyToAllFiles(files, [&header](FILE *f) { header.writeToFile(f); });
     if (header.saveFormat == SAVEMODE_INT64) {
         applyToAllFiles(files, writeClipperPaths, paths, mode);
     } else if (header.saveFormat == SAVEMODE_DOUBLE) {
