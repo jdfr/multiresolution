@@ -1,0 +1,48 @@
+#This file contains pairs of this form:
+#         key : value ;
+#Keys and values retain intermediate whitespace, so this is legal (even with newlines instead of spaces):
+#    key with whitespace : value with whitespace ;
+#Keys and values can contain colons, but not semicolons.
+
+#Comments can be placed before keys (otherwise, they will be interpreted as part of a key or value)
+#comments cannot contain semicolons (unless they are the last non-whitespace character in the comment),
+#otherwise the file will not be correctly read, producing hard to debug errors.
+#This is necessary because values are allowed to have # characters inside them.
+
+#A simple change to the tokenizer to allow escaped characters would allow for escaped semicolons in
+#comments, keys and values. A more complex tokenizer may be used to avoid this restriction altogether.
+
+# config values for the external slicer
+SLICER_PATH                  : ${SLICER_PATH} ;
+SLICER_EXEC                  : ${SLICER_EXEC} ;
+SLICER_REPAIR                : true ;
+SLICER_INCREMENTAL           : true ;
+SLICER_TO_INTERNAL_FACTOR    : 100 ; #IMPLICITLY: INPUT_TO_INTERNAL_FACTOR = INPUT_TO_SLICER_FACTOR * SLICER_TO_INTERNAL_FACTOR
+
+#as slic3r gives the Z max and min values in input mesh units, we have to translate from input units to slic3r units
+INPUT_TO_SLICER_FACTOR       : 1000000 ; 
+
+#This is to make sure that the parameters are in micrometers if INPUT_TO_SLICER_FACTOR * SLICER_TO_INTERNAL_FACTOR == 1e8
+PARAMETER_TO_INTERNAL_FACTOR : 100000 ;
+
+# config values for using python
+FILESEP                      : ${FILESEP} ;
+PYPATH                       : ${PYPATH} ;
+
+# config values for the showcontours debugging facilities (requires python)
+SHOWCONTOURS_SCRIPTPATH      : ${SHOWCONTOURS_SCRIPTPATH} ;
+SHOWCONTOURS_SCRIPTNAME      : contourViewer.py ;
+
+# config values for the slice viewer (requires python)
+SLICEVIEWER_SCRIPTPATH       : ${SLICEVIEWER_SCRIPTPATH} ;
+SLICEVIEWER_SCRIPTNAME       : slicesViewer.py ;
+
+#this has to be a one liner, however long it may get!
+SLICEVIEWER_2D_FORMATTING    : dict( raw=dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor='#cccccc', edgecolor='none', lw=1)), contour=[dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor=fc, edgecolor='none', lw=1)) for fc in ['#440000', '#000044', '#004400']], toolpath=[dict(usepatches=False, patchstyle=None, linestyle=dict(linewidths=2, colors=c)) for c in ['#ff0000', '#0000ff', '#00ff00']] ) ;
+
+#this has to be a one liner, however long it may get!
+SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(0.4,0,0),(0,0.4,0),(0,0,0.4)]], toolpath=[dict(mode='line', args=dict(color=c, line_width=2)) for c in [(1,0,0),(0,1,0),(0,0,1)]] ) ;
+
+#this has to be a one liner, however long it may get!
+_SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(0.4,0,0),(0,0.4,0),(0,0,0.4)]], toolpath=[dict(mode='tube', args=dict(color=c)) for c in [(1,0,0),(0,1,0),(0,0,1)]] ) ;
+

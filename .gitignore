@@ -8,3 +8,6 @@ loadenv.bat
 setpath.bat
 config*
 params*
+!config.template.txt
+!params.template.txt
+cmake.configvars.txt

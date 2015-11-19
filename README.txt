@@ -9,7 +9,7 @@ BEFORE COMPILING:
       ../clipper/iopaths/iopaths.hpp
       ../clipper/iopaths/iopaths.cpp
 
-2. If it is not already at ../boost, put a copy of boost there (the originally used version is a stripped down copy of Boost 1.055). If compiling with MinGw-64, please make sure that the DLLs at ../mingwdlls match the dlls of your MinGW-64 distribution.
+2. If it is not already at ../boost, put a copy of boost there (the originally used version is a stripped down copy of Boost 1.055).
 
 3. A configuration file has to be supplied. config.txt is supplied as an example. It must contain:
     *paths and options for the slicer if the code is compiled as a standalone application.
