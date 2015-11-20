@@ -102,6 +102,7 @@ std::string SliceHeader::readFromFile(FILE * f) {
     if (fread(&totalSize,  sizeof(totalSize),  1, f) != 1) return std::string("could not read totalSize");
     if (fread(&headerSize, sizeof(headerSize), 1, f) != 1) return std::string("could not read headerSize");
     alldata.resize(headerSize/sizeof(T64));
+    if (alldata.size() < 2) return std::string("bad headerSize field");
     alldata[0].i = totalSize;
     alldata[1].i = headerSize;
     if (headerSize > 2) {
@@ -120,9 +121,9 @@ std::string SliceHeader::readFromFile(FILE * f) {
 
 std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode) {
     applyToAllFiles(files, [&header](FILE *f) { header.writeToFile(f); });
-    if (header.saveFormat == SAVEMODE_INT64) {
+    if (header.saveFormat == PATHFORMAT_INT64) {
         applyToAllFiles(files, writeClipperPaths, paths, mode);
-    } else if (header.saveFormat == SAVEMODE_DOUBLE) {
+    } else if (header.saveFormat == PATHFORMAT_DOUBLE) {
         writeDoublePaths(files, paths, header.scaling, mode);
     } else {
         return str("bad saveFormat value: ", header.saveFormat, "\n");
@@ -147,11 +148,11 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd) {
             if (!rd.readParam(typ, "value for type specification")) { return std::string(rd.fmt.str()); };
             char t = tolower(typ[0]);
             if ((t == 'r') || (typ[0] == '0')) {
-                this->type = TYPE_RAW_CONTOUR;
+                this->type = PATHTYPE_RAW_CONTOUR;
             } else if ((t == 'p') || (typ[0] == '1')) {
-                this->type = TYPE_PROCESSED_CONTOUR;
+                this->type = PATHTYPE_PROCESSED_CONTOUR;
             } else if ((t == 't') || (typ[0] == '2')) {
-                this->type = TYPE_TOOLPATH;
+                this->type = PATHTYPE_TOOLPATH;
             } else {
                 return str("Could not understand this type value: ", typ, "\n");
             }

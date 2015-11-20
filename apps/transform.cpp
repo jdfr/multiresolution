@@ -61,7 +61,7 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible,
             }
         }
 
-        sliceheader.saveFormat = SAVEMODE_DOUBLE_3D;
+        sliceheader.saveFormat = PATHFORMAT_DOUBLE_3D;
         sliceheader.totalSize = getPathsSerializedSize(paths3, PathOpen);
         sliceheader.setBuffer();
         sliceheader.writeToFile(f);
@@ -106,7 +106,7 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
         std::string err = sliceheader.readFromFile(f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
         if (sliceheader.alldata.size() < 7) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
-        if (sliceheader.saveFormat == SAVEMODE_INT64) {
+        if (sliceheader.saveFormat == PATHFORMAT_INT64) {
             DPaths paths;
             {
                 clp::Paths paths_input;
@@ -120,14 +120,14 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
                     }
                 }
             }
-            sliceheader.saveFormat = SAVEMODE_DOUBLE;
+            sliceheader.saveFormat = PATHFORMAT_DOUBLE;
             sliceheader.setBuffer();
             transformAndSave(o, matrix, is2DCompatible, sliceheader, paths);
-        } else if (sliceheader.saveFormat == SAVEMODE_DOUBLE) {
+        } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
             DPaths paths;
             readDoublePaths(f, paths);
             transformAndSave(o, matrix, is2DCompatible, sliceheader, paths);
-        } else if (sliceheader.saveFormat == SAVEMODE_DOUBLE_3D) {
+        } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
             Paths3D paths;
             read3DPaths(f, paths);
             transformAndSave(o, matrix, sliceheader, paths);

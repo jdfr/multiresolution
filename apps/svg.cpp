@@ -86,7 +86,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
         if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
         if (currentRecord >= fileheader.numRecords) break;
 
-        if (sliceheader.saveFormat == SAVEMODE_INT64) {
+        if (sliceheader.saveFormat == PATHFORMAT_INT64) {
             clp::Paths output;
             readClipperPaths(f, output);
             err = std::string();
@@ -112,7 +112,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
                 break;
             }
 
-        } else if (sliceheader.saveFormat == SAVEMODE_DOUBLE) {
+        } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
             err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but it was saved in DOUBLE format (if you know what you are doing, you can convert it back to INT64 format)");
             //fprintf(stderr, "WARNING: in file %s, path %d matches specification, but it was saved in DOUBLE format. This may cause (hard to debug) errors in some cases because of the required conversion to INT64\n", filename, currentRecord);
             //readDoublePaths(f, output, 1/sliceheader.scaling);

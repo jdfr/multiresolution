@@ -5,13 +5,13 @@
 #include "iopaths.hpp"
 #include "spec.hpp"
 
-#define TYPE_RAW_CONTOUR       0
-#define TYPE_PROCESSED_CONTOUR 1
-#define TYPE_TOOLPATH          2
+#define PATHTYPE_RAW_CONTOUR       0
+#define PATHTYPE_PROCESSED_CONTOUR 1
+#define PATHTYPE_TOOLPATH          2
 
-#define SAVEMODE_INT64     0
-#define SAVEMODE_DOUBLE    1
-#define SAVEMODE_DOUBLE_3D 2
+#define PATHFORMAT_INT64     0
+#define PATHFORMAT_DOUBLE    1
+#define PATHFORMAT_DOUBLE_3D 2
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
 
