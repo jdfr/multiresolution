@@ -23,12 +23,14 @@ std::string SubProcessManager::start() {
 
     pipeIN = pipeOUT = NULL;
 #ifdef INWINDOWS
+#   define ACCESS _access
     int ACCESSMODE = 0;
 #else
+#   define ACCESS access
     int ACCESSMODE = X_OK;
 #endif
 
-    if (access(execpath.c_str(), ACCESSMODE) != 0) {
+    if (ACCESS(execpath.c_str(), ACCESSMODE) != 0) {
         return str("Cannot execute this file: ", execpath);
     }
 
