@@ -77,7 +77,7 @@ typedef struct SharedLibraryResult {
     ~SharedLibraryResult();
 } SharedLibraryResult;
 
-#if defined(_MSC_VER)
+#if ( defined(_WIN32) || defined(_WIN64) )
 //taken from http://codereview.stackexchange.com/questions/419/converting-between-stdwstring-and-stdstring
 std::wstring s2ws(const std::string& s)
 {
@@ -129,7 +129,7 @@ SharedLibraryResult::~SharedLibraryResult() {
 
 LIBRARY_API  BSTR getErrorText(void* value) {
     //err is defined as the first memeber in all structs to be able to retrieve it from any of them with uniform code. Yes, I know, this is dirty as hell
-#if defined(_MSC_VER) //( defined(_WIN32) || defined(_WIN64) )
+#if ( defined(_WIN32) || defined(_WIN64) )
     std::wstring werr = s2ws(((SharedLibraryResult*)value)->err);
     return SysAllocString(werr.c_str());
 #else
@@ -250,7 +250,7 @@ LIBRARY_API  int alsoComplementary(SharedLibraryResult* result, int ntool) {
     return result->res[ntool]->alsoInfillingAreas;
 }
 
-inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, PathType pathtype) {
+inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, OutputSliceInfo_PathType pathtype) {
     clp::Paths * paths;
     switch (pathtype) {
     case PathProcessed:
@@ -264,26 +264,28 @@ inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, PathT
     return paths;
 }
 
-LIBRARY_API OutputSliceInfo getOutputSliceInfo(SharedLibraryResult* result, int ntool, PathType pathtype) {
-    OutputSliceInfo out;
+template<typename InfoStruct, typename PointType, typename CoordType> void genericFillOutput(InfoStruct &out, std::vector<std::vector<PointType>> &paths, int *&numpoints, CoordType **&pathpointers) {
+    out.numpaths = (int)(paths.size());
+    if (numpoints != NULL) delete numpoints;
+    numpoints = new int[out.numpaths];
+    for (size_t k = 0; k<out.numpaths; ++k) {
+        numpoints[k] = (int)(paths[k].size());
+    }
+    out.numpointsArray = numpoints;
+
+    if (pathpointers != NULL) delete pathpointers;
+    pathpointers = new CoordType*[out.numpaths];
+    for (size_t k = 0; k < out.numpaths; ++k) {
+        pathpointers[k] = (CoordType*) (paths[k].data());
+    }
+    out.pathsArray = (decltype(out.pathsArray))pathpointers;
+}
+
+LIBRARY_API OutputSliceInfo getOutputSliceInfo(SharedLibraryResult* result, int ntool, OutputSliceInfo_PathType pathtype) {
     clp::Paths * paths = getDesiredPaths(result, ntool, pathtype);
 
-    out.numpaths = (int) ((*paths).size());
-
-    if (result->numpoints != NULL) delete result->numpoints;
-    result->numpoints = new int[out.numpaths];
-    for (size_t k = 0; k<out.numpaths; ++k) {
-        result->numpoints[k] = (int)((*paths)[k].size());
-    }
-
-    out.numpointsArray = result->numpoints;
-
-    if (result->pathpointers != NULL) delete result->pathpointers;
-    result->pathpointers = new clp::cInt*[out.numpaths];
-    for (size_t k = 0; k < out.numpaths; ++k) {
-        result->pathpointers[k] = (clp::cInt*) ((*paths)[k].data());
-    }
-    out.pathsArray = result->pathpointers;
+    OutputSliceInfo out;
+    genericFillOutput(out, *paths, result->numpoints, result->pathpointers);
 
     out.ntool = result->ntool;
 
@@ -367,5 +369,114 @@ LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
 #endif
     return ret;
 }
+
+
+typedef struct SharedLibraryPaths {
+    std::string err;
+    std::string filename;
+    FILE *file;
+    FileHeader fileheader;
+    int currentRecord;
+    int* numpoints;
+    clp::cInt **pathpointersi;
+    double **pathpointersd;
+    clp::Paths pathsi;
+    DPaths pathsd;
+    Paths3D pathsd3;
+    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), file(f), err(), currentRecord(0), numpoints(NULL), pathpointersi(NULL), pathpointersd(NULL) {}
+    void clearPaths() {
+        pathsi.clear();
+        pathsd.clear();
+        pathsd3.clear();
+        if (pathpointersi != NULL) delete pathpointersi;
+        if (pathpointersd != NULL) delete pathpointersd;
+        pathpointersi = NULL;
+        pathpointersd = NULL;
+    }
+    ~SharedLibraryPaths() {
+        if (numpoints     != NULL) delete numpoints;
+        if (pathpointersi != NULL) delete pathpointersi;
+        if (pathpointersd != NULL) delete pathpointersd;
+        if (file          != NULL) fclose(file);
+    }
+} SharedLibraryPaths;
+
+LIBRARY_API  LoadPathFileInfo loadPathsFile(char *pathsfilename) {
+    LoadPathFileInfo result;
+    result.numRecords = result.ntools = -1;
+    result.pathfile   = NULL;
+
+    FILE * file = fopen(pathsfilename, "rb");
+
+    result.pathfile = new SharedLibraryPaths(pathsfilename, file);
+
+    if (file == NULL) {
+        result.pathfile->err = str("error while trying to open file ", pathsfilename);
+        return result;
+    }
+
+    result.pathfile->err = result.pathfile->fileheader.readFromFile(file);
+    result.numRecords    = (int)result.pathfile->fileheader.numRecords;
+    result.ntools        = (int)result.pathfile->fileheader.numtools;
+
+    return result;
+}
+
+LIBRARY_API void freePathsFile(PathsHandle paths) {
+    if (paths != NULL) {
+        delete paths;
+    }
+}
+
+LIBRARY_API  LoadPathInfo loadNextPaths(PathsHandle paths) {
+    LoadPathInfo out;
+
+    if (!paths->err.empty()) {
+        out.numpointsArray = NULL; //avoid annoying warning in MSVS
+        return out;
+    }
+    if (paths->currentRecord >= paths->fileheader.numRecords) {
+        out.numRecord = -1;
+        return out;
+    } else {
+        out.numRecord = paths->currentRecord;
+    }
+    if (feof(paths->file) != 0) {
+        paths->err = str("In file ", paths->filename, ": could not read record ", paths->currentRecord, " (unexpected EOF)");
+        return out;
+    }
+
+    SliceHeader header;
+    paths->err = header.readFromFile(paths->file);
+    if (!paths->err.empty()) {
+        return out;
+    }
+    if (header.alldata.size() < 7) {
+        paths->err = str("in file ", paths->filename, "record ", paths->currentRecord, " had a bad header");
+        return out;
+    }
+
+    paths->clearPaths();
+    if (header.saveFormat == PATHFORMAT_INT64) {
+        readClipperPaths(paths->file, paths->pathsi);
+        genericFillOutput(out, paths->pathsi, paths->numpoints, paths->pathpointersi);
+    } else if (header.saveFormat == PATHFORMAT_DOUBLE) {
+        readDoublePaths(paths->file, paths->pathsd);
+        genericFillOutput(out, paths->pathsd, paths->numpoints, paths->pathpointersd);
+    } else if (header.saveFormat == PATHFORMAT_DOUBLE_3D) {
+        read3DPaths(paths->file, paths->pathsd3);
+        genericFillOutput<LoadPathInfo, Point3D, double>(out, paths->pathsd3, paths->numpoints, paths->pathpointersd);
+    }
+    out.ntool      = (int)header.ntool;
+    out.type       = (int)header.type;
+    out.saveFormat = (int)header.saveFormat;
+    out.scaling    =      header.scaling;
+    out.z          =      header.z;
+
+    ++(paths->currentRecord);
+
+    return out;
+}
+
 
 #endif

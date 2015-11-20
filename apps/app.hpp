@@ -4,14 +4,7 @@
 #include "common.hpp"
 #include "iopaths.hpp"
 #include "spec.hpp"
-
-#define PATHTYPE_RAW_CONTOUR       0
-#define PATHTYPE_PROCESSED_CONTOUR 1
-#define PATHTYPE_TOOLPATH          2
-
-#define PATHFORMAT_INT64     0
-#define PATHFORMAT_DOUBLE    1
-#define PATHFORMAT_DOUBLE_3D 2
+#include "multiresolution.h" //this is needed just to import the definitions for fields saveFormat and type in SliceHeader
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
 
