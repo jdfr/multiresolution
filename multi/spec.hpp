@@ -40,20 +40,35 @@ public:
     ParamReader(ParamReader &&pr) : err(std::move(pr.err)), argidx(pr.argidx), argc(pr.argc), argv(pr.argv), scale(pr.scale), splitted(std::move(pr.splitted)), local_argv(std::move(pr.local_argv)) {}
 #endif
     //these methods are templated in order to laziy generate a error message from several arguments if there is a problem
+    template<typename... Args> void writeError(Args... args) {
+        fmt << "error reading ";
+        int dummy[sizeof...(Args)] = { (fmt << args, 0)... };
+        fmt << " (arg.number " << (argidx + 1) << " / " << argc << ")";
+    }
+
     template<typename... Args> bool checkEnoughParams(Args... args) {
         if (argidx >= argc) {
-            fmt << "error reading ";
-            int dummy[sizeof...(Args)] = { (fmt << args, 0)... };
-            fmt << ", not enough arguments (arg. number " << (argidx + 1) << "/" << argc << ")\n" << errorAppendix;
+            writeError(args...);
+            fmt << ", not enough arguments\n" << errorAppendix;
             return false;
         }
         return true;
     }
-    template<typename... Args> bool readParam(double &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; param =      strtod (argv[argidx++], NULL);         return true; }
-    template<typename... Args> bool readParam(int64  &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; param =      strtoll(argv[argidx++], NULL, 10);     return true; }
-    template<typename... Args> bool readParam(int    &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; param = (int)strtol (argv[argidx++], NULL, 10);     return true; }
-    template<typename... Args> bool readParam(bool   &param, const char* trueval, Args... args) { if (!checkEnoughParams(args...)) return false; param =       strcmp(argv[argidx++], trueval) == 0; return true; }
-    template<typename... Args> bool readParam(const char* &param,                 Args... args) { if (!checkEnoughParams(args...)) return false; param =              argv[argidx++];                return true; }
+    template<typename... Args> bool checkNumber(const char *param, const char *endptr, Args... args) {
+        bool ok = (*endptr) == 0;
+        if (ok) {
+            ++argidx;
+        } else {
+            writeError(args...);
+            fmt << ", <" << param << "> is not a valid number\n" << errorAppendix;
+        }
+        return ok;
+    }
+    template<typename... Args> bool readParam(double &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; const char *p = argv[argidx]; char *e; param =      strtod (p, &e);     return checkNumber(p, e, args...); }
+    template<typename... Args> bool readParam(int64  &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; const char *p = argv[argidx]; char *e; param =      strtoll(p, &e, 10); return checkNumber(p, e, args...); }
+    template<typename... Args> bool readParam(int    &param,                      Args... args) { if (!checkEnoughParams(args...)) return false; const char *p = argv[argidx]; char *e; param = (int)strtol (p, &e, 10); return checkNumber(p, e, args...); }
+    template<typename... Args> bool readParam(bool   &param, const char* trueval, Args... args) { if (!checkEnoughParams(args...)) return false; param = strcmp(argv[argidx++], trueval) == 0; return true; }
+    template<typename... Args> bool readParam(const char* &param,                 Args... args) { if (!checkEnoughParams(args...)) return false; param =        argv[argidx++];                return true; }
     template<typename... Args> bool readScaled(int64  &param, Args... args) {
         if (scale == 0.0)
             return readParam(param, args...);
