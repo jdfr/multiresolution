@@ -55,10 +55,6 @@ typedef struct SliceHeader {
 
 std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode);
 
-inline std::string writeSlice(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
-    return writeSlice(files, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
-}
-
 typedef struct PathInFileSpec {
     int64 type;
     int64 ntool;

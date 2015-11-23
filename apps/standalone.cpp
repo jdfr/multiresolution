@@ -17,6 +17,10 @@
 #    include "sliceviewer.hpp"
 #endif
 
+inline std::string writeSlice(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
+    return writeSlice(files, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
+}
+
 const char *ERR =
 "\nArguments: CONFIGFILENAME MESHFILENAME (show (3d (spec SPEC_3D | nspec) | 2d (spec SPEC_2D | nspec | debug)) | nshow) MULTISLICING_PARAMETERS (save (float | integer) OUTPUTFILENAME | multisave (float | integer) OUTPUT1 OUTPUT2 ... | nsave)\n\n"
 "This list of arguments can be read from the command line, or a single argument can specify a text file from which tha arguments are read.\n\n"
