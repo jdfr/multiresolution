@@ -17,8 +17,26 @@
 #    include "sliceviewer.hpp"
 #endif
 
-inline std::string writeSlice(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
-    return writeSlice(files, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
+//utility template for IO functionality
+template<typename Function, typename... Args> std::string applyToAllFiles(FILES &files, Function function, Args... args) {
+    for (auto file = files.begin(); file != files.end(); ++file) {
+        std::string err = function(*file, args...);
+        if (!err.empty()) return str("For ", file - files.begin(), "-th file: ", err);
+    }
+    return std::string();
+}
+template<typename Function, typename... Args> std::string applyToAllFilesWithIOP(FILES &files, IOPaths iop, Function function, Args... args) {
+    for (auto file = files.begin(); file != files.end(); ++file) {
+        iop.f = *file;
+        if (!((iop.*function)(args...))) {
+            return str("For ", file - files.begin(), "-th file: error <", iop.errs[0].message, "> in ", iop.errs[0].function);
+        }
+    }
+    return std::string();
+}
+
+inline std::string writeSlices(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
+    return applyToAllFiles(files, writeSlice, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
 }
 
 const char *ERR =
@@ -174,6 +192,7 @@ int main(int argc, const char** argv) {
     FILES multitool_files;
     FILES singletool_files(multioutputfilenames.size(), NULL);
     FILE *singleoutput = NULL;
+    IOPaths iop;
     int currentoutputfile;
     if (save) {
         if (savemultiple) {
@@ -228,7 +247,7 @@ int main(int argc, const char** argv) {
     int numtools = (int)args.multispec->numspecs;
     if (write) {
         FileHeader header(*args.multispec, factors);
-        applyToAllFiles(all_files, [&header](FILE *f) { header.writeToFile(f, false); });
+        applyToAllFiles(all_files, [&header](FILE *f) { return header.writeToFile(f, false); });
     }
 
     std::vector<std::shared_ptr<ResultSingleTool>> results;
@@ -259,11 +278,19 @@ int main(int argc, const char** argv) {
 
         if (write) {
             numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-            applyToAllFiles(multitool_files, writeInt64, numoutputs);
+            std::string err = applyToAllFilesWithIOP(multitool_files, iop, &IOPaths::writeInt64, numoutputs);
+            if (!err.empty()) {
+                fprintf(stderr, err.c_str());
+                return -1;
+            }
             if (!singletool_files.empty()) {
                 for (int k = 0; k < singletool_files.size(); ++k) {
                     int64 numouts = alsoContours ? sched.num_output_by_tool[k] * 2 + schednuminputslices : sched.num_output_by_tool[k];
-                    writeInt64(singletool_files[k], numouts);
+                    iop.f = singletool_files[k];
+                    if (!iop.writeInt64(numouts)) {
+                        fprintf(stderr, "For %d-th singletool output file: error <%s> in %s", k, iop.errs[0].message, iop.errs[0].function);
+                        return -1;
+                    }
                 }
             }
         }
@@ -285,7 +312,7 @@ int main(int argc, const char** argv) {
             slicer->readNextSlice(rawslice);
 
             if (write && alsoContours) {
-                std::string err = writeSlice(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
+                std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
                 if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", rawZs[i], err.c_str()); return -1; }
             }
 
@@ -322,10 +349,10 @@ int main(int argc, const char** argv) {
                         current_files[currentoutputfile] = singletool_files[single->ntool];
                     }
                     double z = single->z * factors.internal_to_input;
-                    std::string err     = writeSlice(current_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
+                    std::string err     = writeSlices(current_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
                     if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
                     if (alsoContours) {
-                        std::string err = writeSlice(current_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
+                        std::string err = writeSlices(current_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
                         if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
                     }
                 }
@@ -362,11 +389,15 @@ int main(int argc, const char** argv) {
         if (write) {
             //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
             numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-            applyToAllFiles(multitool_files, writeInt64, numoutputs);
+            std::string err = applyToAllFilesWithIOP(multitool_files, iop, &IOPaths::writeInt64, numoutputs);
+            if (!err.empty()) {
+                fprintf(stderr, err.c_str());
+            }
             if (!singletool_files.empty()) {
-                for (int k = 0; k < singletool_files.size(); ++k) {
-                    int64 numouts = alsoContours ? numsteps * 3 : numsteps;
-                    writeInt64(singletool_files[k], numouts);
+                int64 numouts = alsoContours ? numsteps * 3 : numsteps;
+                err = applyToAllFilesWithIOP(singletool_files, iop, &IOPaths::writeInt64, numouts);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
                 }
             }
         }
@@ -398,7 +429,7 @@ int main(int argc, const char** argv) {
 #           endif
 
             if (write && alsoContours) {
-                std::string err = writeSlice(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, zs[i], saveFormat, factors.internal_to_input);
+                std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, zs[i], saveFormat, factors.internal_to_input);
                 if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", zs[i], err.c_str()); return -1; }
             }
 
@@ -414,10 +445,10 @@ int main(int argc, const char** argv) {
                         current_files[currentoutputfile] = singletool_files[k];
                     }
 
-                    std::string err     = writeSlice(current_files, ress[k]->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          k, zs[i], saveFormat, factors.internal_to_input);
+                    std::string err     = writeSlices(current_files, ress[k]->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          k, zs[i], saveFormat, factors.internal_to_input);
                     if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
                     if (alsoContours) {
-                        std::string err = writeSlice(current_files, ress[k]->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, k, zs[i], saveFormat, factors.internal_to_input);
+                        std::string err = writeSlices(current_files, ress[k]->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, k, zs[i], saveFormat, factors.internal_to_input);
                         if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
                     }
                 }

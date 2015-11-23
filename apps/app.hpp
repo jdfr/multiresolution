@@ -8,17 +8,12 @@
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
 
+typedef std::vector<FILE*> FILES;
+
 bool fileExists(const char *filename);
 
 //Returns NULL if it could not resolve the path. The returned string must be freed with free()
 char *fullPath(const char *path);
-
-//utility template for iopaths functionality
-template<typename Function, typename... Args> void applyToAllFiles(FILES &files, Function function, Args... args) {
-    for (auto file = files.begin(); file != files.end(); ++file) {
-        function(*file, args...);
-    }
-}
 
 typedef struct FileHeader {
     int64 numtools;
@@ -29,9 +24,8 @@ typedef struct FileHeader {
     FileHeader() {}
     FileHeader(MultiSpec &multispec, MetricFactors &factors) { buildFrom(multispec, factors); }
     void buildFrom(MultiSpec &multispec, MetricFactors &factors);
-    std::string readFromFile(FILE * f);
-    std::string openAndReadFromFile(const char * filename, FILE *&file);
-    void writeToFile(FILE *file, bool alsoNumRecords);
+    std::string readFromFile(FILE *f);
+    std::string writeToFile(FILE *f, bool alsoNumRecords);
 } HeaderFile;
 
 typedef struct SliceHeader {
@@ -48,12 +42,12 @@ typedef struct SliceHeader {
     SliceHeader(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling) { setTo(paths, mode, _type, _ntool, _z, _saveFormat, _scaling); }
     void setTo(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling);
     void setBuffer();
-    void writeToFile(FILE *files);
+    std::string writeToFile(FILE * f);
     std::string readFromFile(FILE * f);
 } SliceHeader;
 
 
-std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode);
+std::string writeSlice(FILE *f, SliceHeader header, clp::Paths &paths, PathCloseMode mode);
 
 typedef struct PathInFileSpec {
     int64 type;
@@ -84,8 +78,8 @@ typedef struct Point3D {
 typedef std::vector<Point3D> Path3D;
 typedef std::vector<Path3D> Paths3D;
 
-void read3DPaths(FILE * f, Paths3D &paths);
-void write3DPaths(FILE * f, Paths3D &paths, PathCloseMode mode);
+bool read3DPaths(IOPaths &iop, Paths3D &paths);
+bool write3DPaths(IOPaths &iop, Paths3D &paths, PathCloseMode mode);
 int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode);
 
 #endif

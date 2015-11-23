@@ -13,6 +13,7 @@ we are compiling under MSVS (as slic3r does not compile in MSVS). As the overhea
 seems to be fairly small, we keep it this way for all platforms.*/
 class ExternalSlicerManager : public SlicerManager {
     SubProcessManager subp;
+    IOPaths iopIN, iopOUT;
     std::string execpath;
     std::string workdir;
     std::string err;
@@ -45,6 +46,9 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
 
     err = subp.start();
 
+    iopIN .f = subp.pipeIN;
+    iopOUT.f = subp.pipeOUT;
+
     return err.empty();
 }
 
@@ -56,19 +60,35 @@ bool ExternalSlicerManager::finalize() {
 void ExternalSlicerManager::getZLimits(double *minz, double *maxz) {
     if (!repair) {
         int64 need_repair;
-        READ_BINARY(&need_repair, sizeof(need_repair), 1, subp.pipeOUT);
+        if (!iopOUT.readInt64(need_repair)) {
+            err = "could not read need_repair value from the slicer!!!";
+            return;
+        }
         if (need_repair != 0) {
-            std::runtime_error("The STL needs to be repaired!");
+            err = "The STL needs to be repaired!";
+            return;
         }
     }
-    READ_BINARY(minz, sizeof(double), 1, subp.pipeOUT);
-    READ_BINARY(maxz, sizeof(double), 1, subp.pipeOUT);
+    if (!iopOUT.readDouble(*minz)) {
+        err = "could not read minz value from the slicer!!!";
+        return;
+    }
+    if (!iopOUT.readDouble(*maxz)) {
+        err = "could not read maxz value from the slicer!!!";
+        return;
+    }
 }
 
 void ExternalSlicerManager::sendZs(double *values, int numvalues) {
     int64 num = numvalues;
-    WRITE_BINARY(&num,   sizeof(num),            1, subp.pipeIN);
-    WRITE_BINARY(values, sizeof(double), numvalues, subp.pipeIN);
+    if (!iopIN.writeInt64(num)) {
+        err = "could not write number of Z values to the slicer!!!";
+        return;
+    }
+    if (!iopIN.writeDoubleP(values, num)) {
+        err = "could not write Z values to the slicer!!!";
+        return;
+    }
     fflush(subp.pipeIN);
 }
 
@@ -103,7 +123,10 @@ int ExternalSlicerManager::askForNextSlice() {
 
 void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     askForNextSlice();
-    readPrefixedClipperPaths(subp.pipeOUT, nextSlice);
+    if (!iopOUT.readPrefixedClipperPaths(nextSlice)) {
+        err = "Could not read slice from slicer!!!";
+        return;
+    }
     if (scale != 0) {
         auto paend = nextSlice.end();
         for (auto path = nextSlice.begin(); path != paend; ++path) {

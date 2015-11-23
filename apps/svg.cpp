@@ -81,6 +81,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
 
     SliceHeader sliceheader;
     int index = 0;
+    IOPaths iop(f);
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
         if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
@@ -88,7 +89,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
 
         if (sliceheader.saveFormat == PATHFORMAT_INT64) {
             clp::Paths output;
-            readClipperPaths(f, output);
+            if (!iop.readClipperPaths(output)) return str("error reading paths from record ", currentRecord, " in file ", filename, ": error <", iop.errs[0].message, "> in ", iop.errs[0].function);
             err = std::string();
             for (int n = 0; n < output.size(); ++n) {
                 if (output[n].front() != output[n].back()) {

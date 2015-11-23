@@ -31,18 +31,19 @@ void FileHeader::buildFrom(MultiSpec &multispec, MetricFactors &factors) {
     numRecords = 0;
 }
 
-void FileHeader::writeToFile(FILE *file, bool alsoNumRecords) {
-    WRITE_BINARY(&numtools, sizeof(numtools), 1, file);
-    WRITE_BINARY(&useSched, sizeof(useSched), 1, file);
+std::string FileHeader::writeToFile(FILE *f, bool alsoNumRecords) {
+    if (fwrite(&numtools, sizeof(numtools), 1, f) != 1) return std::string("could not write numtools to file!");
+    if (fwrite(&useSched, sizeof(useSched), 1, f) != 1) return std::string("could not write useSched to file!");
     for (int k = 0; k < numtools; ++k) {
-        WRITE_BINARY(&(radiusX[k]), sizeof(double), 1, file);
+        if (fwrite(&(radiusX[k]), sizeof(double), 1, f) != 1) return std::string("could not write radiusX to file!");
         if (useSched) {
-            WRITE_BINARY(&(radiusZ[k]), sizeof(double), 1, file);
+            if (fwrite(&(radiusZ[k]), sizeof(double), 1, f) != 1) return std::string("could not write radiusZ to file!");
         }
     }
     if (alsoNumRecords) {
-        WRITE_BINARY(&numRecords, sizeof(numRecords), 1, file);
+        if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) return std::string("could not write numRecords to file!");
     }
+    return std::string();
 }
 
 std::string FileHeader::readFromFile(FILE * f) {
@@ -56,18 +57,6 @@ std::string FileHeader::readFromFile(FILE * f) {
     }
     if (fread(&numRecords, sizeof(numRecords), 1, f) != 1) return std::string("could not read numRecords from file!");
     return std::string();
-}
-
-std::string FileHeader::openAndReadFromFile(const char * filename, FILE *&file) {
-    file = fopen(filename, "rb");
-    if (file == NULL) return str("Could not open file ", filename);
-    std::string err = readFromFile(file);
-    if (!err.empty()) {
-        fclose(file);
-        file = NULL;
-        err = str("Could not read header from ", filename, ". Error: ", err);
-    }
-    return err;
 }
 
 void SliceHeader::setTo(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling) {
@@ -94,8 +83,9 @@ void SliceHeader::setBuffer() {
 }
 
 
-void SliceHeader::writeToFile(FILE *file) {
-    WRITE_BINARY(&(alldata.front()), sizeof(T64), alldata.size(), file);
+std::string SliceHeader::writeToFile(FILE * f) {
+    if (fwrite(&(alldata.front()), sizeof(T64), alldata.size(), f) != alldata.size()) return std::string("could not write the slice header");
+    return std::string();
 }
 
 std::string SliceHeader::readFromFile(FILE * f) {
@@ -119,12 +109,14 @@ std::string SliceHeader::readFromFile(FILE * f) {
 }
 
 
-std::string writeSlice(FILES &files, SliceHeader header, clp::Paths &paths, PathCloseMode mode) {
-    applyToAllFiles(files, [&header](FILE *f) { header.writeToFile(f); });
+std::string writeSlice(FILE *f, SliceHeader header, clp::Paths &paths, PathCloseMode mode) {
+    std::string res = header.writeToFile(f);
+    if (!res.empty()) return res;
+    IOPaths iop(f);
     if (header.saveFormat == PATHFORMAT_INT64) {
-        applyToAllFiles(files, writeClipperPaths, paths, mode);
+        if (!iop.writeClipperPaths(paths, mode)) return str("Could not write ClipperPaths in Int64 mode: error <", iop.errs[0].message, "> in ", iop.errs[0].function);
     } else if (header.saveFormat == PATHFORMAT_DOUBLE) {
-        writeDoublePaths(files, paths, header.scaling, mode);
+        if (!iop.writeDoublePaths(paths, header.scaling, mode)) return str("Could not write ClipperPaths in double mode: error <", iop.errs[0].message, "> in ", iop.errs[0].function);
     } else {
         return str("bad saveFormat value: ", header.saveFormat, "\n");
     }
@@ -183,37 +175,39 @@ std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int 
     return std::string();
 }
 
-void read3DPaths(FILE * f, Paths3D &paths) {
+bool read3DPaths(IOPaths &iop, Paths3D &paths) {
     int64 numpaths, numpoints;
 
-    READ_BINARY(&numpaths, sizeof(int64), 1, f);
+    if (!iop.readInt64(numpaths)) return false;
 
     size_t oldsize = paths.size(), newsize = oldsize + numpaths;
 
     paths.resize(newsize);
     for (auto path = paths.begin() + oldsize; path != paths.end(); ++path) {
-        READ_BINARY(&numpoints, sizeof(int64), 1, f);
+        if (!iop.readInt64(numpoints)) return false;
         path->resize(numpoints);
         size_t num = 3 * numpoints;
-        READ_BINARY(&((*path)[0]), sizeof(double), num, f);
+        if (!iop.readDoubleP((double*)&((*path)[0]), num)) return false;
     }
+    return true;
 }
 
-void write3DPaths(FILE * f, Paths3D &paths, PathCloseMode mode) {
+bool write3DPaths(IOPaths &iop, Paths3D &paths, PathCloseMode mode) {
     int64 numpaths = paths.size(), numpoints, numpointsdeclared;
-    WRITE_BINARY(&numpaths, sizeof(int64), 1, f);
+    if (!iop.writeInt64(numpaths)) return false;
 
     bool addlast = (mode == PathLoop) && (paths.size() > 0);
     for (auto path = paths.begin(); path != paths.end(); ++path) {
         numpoints = path->size();
         numpointsdeclared = addlast ? (numpoints + 1) : numpoints;
-        WRITE_BINARY(&numpointsdeclared, sizeof(int64), 1, f);
+        if (!iop.writeInt64(numpointsdeclared)) return false;
         size_t num = 3 * numpoints;
-        WRITE_BINARY(&((*path)[0]), sizeof(double), num, f);
+        if (!iop.writeDoubleP((double*)&((*path)[0]), num)) return false;
         if (addlast) {
-            WRITE_BINARY(&((*path)[0]), sizeof(double), 3, f);
+            if (!iop.writeDoubleP((double*)&((*path)[0]), 3)) return false;
         }
     }
+    return true;
 }
 
 int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode) {

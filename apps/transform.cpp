@@ -32,7 +32,7 @@ bool transformationSurelyIsAffine(TransformationMatrix matrix) {
     return (matrix[12] != 0.0) || (matrix[13] != 0.0) || (matrix[14] != 0.0) || (matrix[15] != 1.0);
 }
 
-void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible, SliceHeader &sliceheader, DPaths &paths) {
+std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2DCompatible, SliceHeader &sliceheader, DPaths &paths) {
     if (is2DCompatible) {
         sliceheader.z = sliceheader.z*matrix[10] + matrix[11];
         for (auto path = paths.begin(); path != paths.end(); ++path) {
@@ -43,8 +43,11 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible,
                 point->Y = y;
             }
         }
-        sliceheader.writeToFile(f);
-        writeDoublePaths(f, paths, PathOpen);
+        std::string err = sliceheader.writeToFile(iop.f);
+        if (!err.empty()) { return err; }
+        if (!iop.writeDoublePaths(paths, PathOpen)) {
+            return std::string("Error while writing double clipperpaths!!!");
+        }
     } else {
         Paths3D paths3;
         paths3.reserve(paths.size());
@@ -64,14 +67,16 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, bool is2DCompatible,
         sliceheader.saveFormat = PATHFORMAT_DOUBLE_3D;
         sliceheader.totalSize = getPathsSerializedSize(paths3, PathOpen);
         sliceheader.setBuffer();
-        sliceheader.writeToFile(f);
-
-        write3DPaths(f, paths3, PathOpen);
+        std::string err = sliceheader.writeToFile(iop.f);
+        if (!err.empty()) { return err; }
+        if (!write3DPaths(iop, paths3, PathOpen)) {
+            return std::string("Error while writing 3d clipperpaths!!!");
+        }
     }
+    return std::string();
 }
 
-void transformAndSave(FILE *f, TransformationMatrix matrix, SliceHeader &sliceheader, Paths3D &paths) {
-    FILES ff(1, f);
+std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, SliceHeader &sliceheader, Paths3D &paths) {
     for (auto path = paths.begin(); path != paths.end(); ++path) {
         for (auto point = path->begin(); point != path->end(); ++point) {
             double x = (matrix[0] * point->x) + (matrix[1] * point->y) + (matrix[2] *  point->z) + matrix[3];
@@ -82,13 +87,18 @@ void transformAndSave(FILE *f, TransformationMatrix matrix, SliceHeader &slicehe
             point->z = z;
         }
     }
-    sliceheader.writeToFile(f);
-    write3DPaths(f, paths, PathOpen);
+    std::string err = sliceheader.writeToFile(iop.f);
+    if (!err.empty()) { return err; }
+    if (!write3DPaths(iop, paths, PathOpen)) {
+        return std::string("Error writing 3D clipperpaths!!!");
+    }
+    return std::string();
 }
 
 std::string transformPaths(const char * filename, const char *outputname, TransformationMatrix matrix) {
     FILE * f = fopen(filename, "rb");
     if (f == NULL) { return str("Could not open input file ", filename); }
+    IOPaths iop_f(f);
 
     FileHeader fileheader;
     std::string err = fileheader.readFromFile(f);
@@ -96,6 +106,7 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
 
     FILE * o = fopen(outputname, "wb");
     if (o == NULL) { return str("Could not open output file ", outputname); }
+    IOPaths iop_o(o);
 
     fileheader.writeToFile(o, true);
 
@@ -110,7 +121,9 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
             DPaths paths;
             {
                 clp::Paths paths_input;
-                readClipperPaths(f, paths_input);
+                if (!iop_f.readClipperPaths(paths_input)) {
+                    return str("Error reading ", currentRecord, "-th integer clipperpaths: header is too short!");
+                }
                 paths.resize(paths_input.size());
                 for (int k = 0; k < paths.size(); ++k) {
                     paths[k].reserve(paths_input[k].size());
@@ -122,15 +135,22 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
             }
             sliceheader.saveFormat = PATHFORMAT_DOUBLE;
             sliceheader.setBuffer();
-            transformAndSave(o, matrix, is2DCompatible, sliceheader, paths);
+            err = transformAndSave(iop_o, matrix, is2DCompatible, sliceheader, paths);
+            if (!err.empty()) return err;
         } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
             DPaths paths;
-            readDoublePaths(f, paths);
-            transformAndSave(o, matrix, is2DCompatible, sliceheader, paths);
+            if (!iop_f.readDoublePaths(paths)) {
+                return str("Error reading ", currentRecord, "-th double clipperpaths: header is too short!");
+            }
+            err = transformAndSave(iop_o, matrix, is2DCompatible, sliceheader, paths);
+            if (!err.empty()) return err;
         } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
             Paths3D paths;
-            read3DPaths(f, paths);
-            transformAndSave(o, matrix, sliceheader, paths);
+            if (read3DPaths(iop_f, paths)) {
+                return str("Error reading ", currentRecord, "-th 3d clipperpaths: header is too short!");
+            }
+            err = transformAndSave(iop_o, matrix, sliceheader, paths);
+            if (!err.empty()) return err;
         } else {
             fclose(f);
             fclose(o);

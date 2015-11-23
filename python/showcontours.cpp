@@ -35,7 +35,12 @@ void showContours(std::vector<clp::Paths*> &contours, ShowContoursInfo &info) {
             std::ostringstream fmtfile;
             fmtfile << info.showContoursDir << info.filesep << "file" << i << ".paths";
             FILE *f = fopen(fmtfile.str().c_str(), "wb");
-            writeClipperPaths(f, *(contours[i]), PathOpen);
+            IOPaths iop(f);
+            if (!iop.writeClipperPaths(*(contours[i]), PathOpen)) {
+                fclose(f);
+                fprintf(stderr, "Could not write contents to file %s\n", fmtfile.str().c_str());
+                return;
+            };
             fclose(f);
             subp.args.push_back(fmtfile.str());
         }
@@ -54,8 +59,11 @@ void showContours(std::vector<clp::Paths*> &contours, ShowContoursInfo &info) {
     if (info.usePipe) {
         int64 numpaths = contours.size();
         fwrite(&numpaths, sizeof(numpaths), 1, subp.pipeIN);
+        IOPaths iop(subp.pipeIN);
         for (int i = 0; i< contours.size(); ++i) {
-            writeClipperPaths(subp.pipeIN, *(contours[i]), PathOpen);
+            if (!iop.writeClipperPaths(*(contours[i]), PathOpen)) {
+                fprintf(stderr, "Could not write the %d-th contour to the subprocess's stdin pipe!!!\n", i);
+            };
         }
         fflush(subp.pipeIN);
     }

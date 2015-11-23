@@ -299,8 +299,6 @@ LIBRARY_API  void freeResult(SharedLibraryResult* result) {
     if (result!=NULL) delete result;
 }
 
-//#define DEBUG_OUTPUT_SLICES_FILENAME "slices.data"
-
 LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax) {
     Slices3DSpecInfo ret;
     if (state->sched == NULL) {
@@ -318,12 +316,6 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
     }
     ret.numinputslices = (int)state->sched->rm.raw.size();
     ret.numoutputslices = (int)state->sched->output.size();
-#ifdef DEBUG_OUTPUT_SLICES_FILENAME
-    FILE *f = fopen(DEBUG_OUTPUT_SLICES_FILENAME, "wb");
-    int64 numslices = ret.numoutputslices;
-    WRITE_BINARY(&numslices, sizeof(int64), 1, f);
-    fclose(f);
-#endif
     ret.zs = &state->sched->rm.rawZs.front();
     return ret;
 }
@@ -359,14 +351,6 @@ LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
     /*ResultsHandle ret = new SharedLibraryResult(1, single->ntool, single->z);
     ret->res[0] = single;*/
 
-#ifdef DEBUG_OUTPUT_SLICES_FILENAME
-    FILE *f = fopen(DEBUG_OUTPUT_SLICES_FILENAME, "ab");
-    std::vector<double> dataz(2);
-    dataz[0] = (double)state->args.multispec->radiuses[ret->ntool];
-    dataz[1] = ret->z;
-    writeClipperSlice(f, ret->res[0]->toolpaths, dataz, PathOpen);
-    fclose(f);
-#endif
     return ret;
 }
 
@@ -374,7 +358,7 @@ LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
 typedef struct SharedLibraryPaths {
     std::string err;
     std::string filename;
-    FILE *file;
+    IOPaths iop;
     FileHeader fileheader;
     int currentRecord;
     int* numpoints;
@@ -383,7 +367,7 @@ typedef struct SharedLibraryPaths {
     clp::Paths pathsi;
     DPaths pathsd;
     Paths3D pathsd3;
-    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), file(f), err(), currentRecord(0), numpoints(NULL), pathpointersi(NULL), pathpointersd(NULL) {}
+    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), iop(f), err(), currentRecord(0), numpoints(NULL), pathpointersi(NULL), pathpointersd(NULL) {}
     void clearPaths() {
         pathsi.clear();
         pathsd.clear();
@@ -397,7 +381,7 @@ typedef struct SharedLibraryPaths {
         if (numpoints     != NULL) delete numpoints;
         if (pathpointersi != NULL) delete pathpointersi;
         if (pathpointersd != NULL) delete pathpointersd;
-        if (file          != NULL) fclose(file);
+        if (iop.f         != NULL) fclose(iop.f);
     }
 } SharedLibraryPaths;
 
@@ -441,13 +425,13 @@ LIBRARY_API  LoadPathInfo loadNextPaths(PathsHandle paths) {
     } else {
         out.numRecord = paths->currentRecord;
     }
-    if (feof(paths->file) != 0) {
+    if (feof(paths->iop.f) != 0) {
         paths->err = str("In file ", paths->filename, ": could not read record ", paths->currentRecord, " (unexpected EOF)");
         return out;
     }
 
     SliceHeader header;
-    paths->err = header.readFromFile(paths->file);
+    paths->err = header.readFromFile(paths->iop.f);
     if (!paths->err.empty()) {
         return out;
     }
@@ -458,13 +442,13 @@ LIBRARY_API  LoadPathInfo loadNextPaths(PathsHandle paths) {
 
     paths->clearPaths();
     if (header.saveFormat == PATHFORMAT_INT64) {
-        readClipperPaths(paths->file, paths->pathsi);
+        if (!paths->iop.readClipperPaths(paths->pathsi)) { paths->err = str("In file ", paths->filename, ": could not read integer paths in record ", paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput(out, paths->pathsi, paths->numpoints, paths->pathpointersi);
     } else if (header.saveFormat == PATHFORMAT_DOUBLE) {
-        readDoublePaths(paths->file, paths->pathsd);
+        if (!paths->iop.readDoublePaths(paths->pathsd))  { paths->err = str("In file ", paths->filename, ": could not read double paths in record ",  paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput(out, paths->pathsd, paths->numpoints, paths->pathpointersd);
     } else if (header.saveFormat == PATHFORMAT_DOUBLE_3D) {
-        read3DPaths(paths->file, paths->pathsd3);
+        if (!read3DPaths(paths->iop, paths->pathsd3))    { paths->err = str("In file ", paths->filename, ": could not read 3d paths in record ",      paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput<LoadPathInfo, Point3D, double>(out, paths->pathsd3, paths->numpoints, paths->pathpointersd);
     }
     out.ntool      = (int)header.ntool;
