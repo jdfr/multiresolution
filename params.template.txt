@@ -13,6 +13,10 @@
   #show 3d nspec #requires python with numpy and mayavi
   ${SHOW_RESULT_PARAMETERS}
 
+#save parameters
+  #save double all.paths               #save in one file, in double floating-point format
+  save integer all.paths               #save in one file, in int64 format
+
 #multislicing parameters
 
 #  global parameters
@@ -29,8 +33,3 @@
        75 constant 750 675 0.1 0.75 0.01 0.01 0 snap safestep clearance 1 1.0 ninfill
 #    parameters for process 1
        10 constant 10 9 0.1 0.1 0.001 0.1 0 snap safestep clearance 1 1.0 ninfill
-
-#save parameters
-  #multisave integer o1.paths o2.paths #save in one file for each tool
-  #save double all.paths               #save in one file, in double floating-point format
-  save integer all.paths               #save in one file, in int64 format
