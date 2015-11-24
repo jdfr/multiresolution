@@ -5,6 +5,8 @@
 #include "config.hpp"
 #include "snapToGrid.hpp"
 #include "motionPlanner.hpp"
+#include <ctype.h>
+#include <string.h>
 #include <memory>
 #include <stdexcept>
 #include <sstream>
@@ -82,6 +84,25 @@ public:
     template<typename... Args> bool readScaled(double  &param, Args... args) {
         bool ok = readParam(param, args...);
         if (ok && (scale!=0.0)) param *= scale;
+        return ok;
+    }
+    template<typename... Args> bool readKeyword(const char* keyword, bool justFirstChar, Args... args) {
+        if (strlen(keyword) == 0) {
+            fmt << "PROGRAMMING ERROR: requested keyword is empty!!!!!!";
+            return false;
+        }
+        const char * word;
+        if (!readParam(word, args...))  { return false; }
+        bool ok;
+        if (justFirstChar) {
+            ok = tolower(keyword[0]) == tolower(word[0]);
+        } else {
+            ok = strcmp(keyword, word) == 0;
+        }
+        if (!ok) {
+            writeError(args...);
+            fmt << "The keyword " << keyword << " was expected, <" << word << "> was read\n";
+        }
         return ok;
     }
 protected:
