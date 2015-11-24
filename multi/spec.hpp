@@ -117,7 +117,7 @@ ParamReader getParamReader(int argc, const char **argv);
 GLOBAL PARAMETERS
 *********************************************************/
 
-enum SchedulerMode { SimpleScheduler, UniformScheduling, ManualScheduling, PathsFileScheduling };
+enum SchedulerMode { SimpleScheduler, UniformScheduling, ManualScheduling };
 
 typedef struct GlobalSpec {
     typedef struct { double z; int ntool; } ZNTool;
