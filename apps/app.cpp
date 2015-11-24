@@ -141,7 +141,7 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd) {
             char t = tolower(typ[0]);
             if ((t == 'r') || (typ[0] == '0')) {
                 this->type = PATHTYPE_RAW_CONTOUR;
-            } else if ((t == 'p') || (typ[0] == '1')) {
+            } else if ((t == 'c') || (typ[0] == '1')) {
                 this->type = PATHTYPE_PROCESSED_CONTOUR;
             } else if ((t == 't') || (typ[0] == '2')) {
                 this->type = PATHTYPE_TOOLPATH;

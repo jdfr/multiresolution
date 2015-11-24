@@ -77,7 +77,7 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
 const char *ERR =
 "\nArguments: PATHSFILENAME_INPUT PATHSFILENAME_OUTPUT [SPECTYPE VALUE]*\n\n"
 "    -PATHSFILENAME_INPUT and PATHSFILENAME_OUTPUT are required (input/output paths file names).\n\n"
-"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], p[rocessed] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
+"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], c[ontour] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
 "This tool writes filters the contents of PATHSFILENAME_INPUT, writing in PATHSFILENAME_OUTPUT only the contents that match the specification.\n\n";
 
 void printError(ParamReader &rd) {
