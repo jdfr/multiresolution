@@ -231,8 +231,8 @@ function(SINGLESOURCE_EXECUTABLE GENERATE_OPTION TARGETNAME SOURCEFILE EXENAME)
 endfunction(SINGLESOURCE_EXECUTABLE)
 
 SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER, multiresolution_svgconverter apps/svg.cpp       svgconv)
-SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER,   multiresolution_filefilter   apps/filter.cpp    filterpaths)
-SINGLESOURCE_EXECUTABLE(GENERATE_TRANSFORMER,  multiresolution_transform    apps/transform.cpp meshtrans)
+SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER,   multiresolution_filefilter   apps/filter.cpp    filterp)
+SINGLESOURCE_EXECUTABLE(GENERATE_TRANSFORMER,  multiresolution_transform    apps/transform.cpp transformp)
 SINGLESOURCE_EXECUTABLE(GENERATE_XYZHANDLER,   multiresolution_xyz          apps/xyz.cpp       xyz)
 
 if (CMAKE_RUNTIME_OUTPUT_DIRECTORY)
