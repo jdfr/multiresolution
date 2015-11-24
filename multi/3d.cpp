@@ -200,11 +200,21 @@ in the following way: first, Z-slices at Z-distances that enable the use of larg
 then are processed Z-slices in their neighbourhood, which will not be able to accomodate large voxels.*/
 //THIS VERSION GENERATES A MODIFIED IN-PLACE VERSION WHERE AT LEAST TWO HIGHER ORDER SECTIONS ARE COMPUTED *BEFORE* THE NEXT ORDER
 
-void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process, std::vector<double> &zbottom, double ztop) {
+void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std::vector<double> &zbottom, double ztop) {
     //ATTENTION: THIS RECURSIVE PROCEDURE CAN GENERATE SLICES THAT ARE AT IDENTICAL OR NEAR IDENTICAL Zs
     //TO AVOID UNNECESARY REPETITIVE SLICING, WE FIX IT IN THE ORDERING STAGE. OF COURSE, THAT DEPENDS CRUCIALLY ON THE ORDERING!
 
-    int nextp = process + 1;
+    int process, nextp;
+    bool nextpok;
+    nextp = process_spec + 1;
+    if (tm.spec.global.schedTools.empty()) {
+        process = process_spec;
+        nextpok = nextp < tm.spec.numspecs;
+    } else {
+        process = tm.spec.global.schedTools[process_spec];
+        nextpok = nextp < tm.spec.global.schedTools.size();
+    }
+
     double z = zbottom[process] + tm.spec.profiles[process]->sliceHeight / 2.0;
     double znext;
     bool atleastone;
@@ -215,7 +225,7 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process, std::vec
 
     while (testSliceNotNearTop(znext = z + tm.spec.profiles[process]->sliceHeight, ztop, process, tm)) {
         input.push_back(InputSliceData(znext, process));
-        if (nextp < tm.spec.numspecs) {
+        if (nextpok) {
             recursiveSimpleInputScheduler(nextp, zbottom, std::min(zbottom[process] + tm.spec.profiles[process]->sliceHeight, ztop));
         }
         zbottom[process] += tm.spec.profiles[process]->sliceHeight;
@@ -223,7 +233,7 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process, std::vec
     }
 
     //add possible high res slices higher than the place where low res slices cannot be placed
-    if (nextp < tm.spec.numspecs) {
+    if (nextpok) {
         recursiveSimpleInputScheduler(nextp, zbottom, ztop);
     }
 

@@ -129,7 +129,8 @@ typedef struct GlobalSpec {
     bool applyMotionPlanner;
     bool avoidVerticalOverwriting;
     bool correct; //this is to correct the contour orientations (not needed if the input is from slic3r's adapted code)
-    std::vector < ZNTool > schedSpec;
+    std::vector < ZNTool > schedSpec; //this is for manual specification of slices
+    std::vector<int> schedTools; //this is for manual selection of tools for scheduling slices
     clp::cInt limitX, limitY;
     double z_uniform_step; //this parameter is the uniform step if useScheduler is false. Unlike most other metric parameters, this is in the mesh's native units!!!!
     double z_epsilon; //epsilon to consider that to Z values are the same.

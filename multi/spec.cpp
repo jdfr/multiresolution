@@ -190,7 +190,27 @@ std::string GlobalSpec::readFromCommandLine(ParamReader &rd, double scale) {
                 if (!rd.readParam(schedSpec[k].z,       "Z height of input layer ", k, '/', numlayers))                   return rd.fmt.str();
                 if (!rd.readParam(schedSpec[k].ntool,      "ntool of input layer ", k, '/', numlayers))                   return rd.fmt.str();
             }
-      }
+        } else {
+            const char *schedToolsMode;
+            if (!rd.readParam(schedToolsMode,           "tool scheduling mode ('all'/non-zero number of scheduled tools)")) return rd.fmt.str();
+            bool ok = strcmp(schedToolsMode, "all")==0;
+            if (!ok) {
+                char * next;
+                int numtools = (int)strtol(schedToolsMode, &next, 10);
+                ok = (*next) == 0;
+                if (ok) {
+                    if (numtools == 0) {
+                        return std::string("tool scheduling mode cannot be 0!");
+                    }
+                    schedTools.resize(numtools);
+                    for (int k = 0; k < numtools; ++k) {
+                        if (!rd.readParam(schedTools[k], k, "-th tool to schedule")) return rd.fmt.str();
+                    }
+                } else {
+                    return str("tool scheduling mode must be either 'all' or the non-zero number of scheduled tools, but it was <", schedToolsMode, ">");
+                }
+            }
+        }
     } else {
         if (!rd.readParam(z_uniform_step,               "Z uniform step"))                                                return rd.fmt.str();
     }
@@ -231,6 +251,7 @@ bool Arguments::readArguments(bool doscale, ParamReader &rd) {
 "      -if the first parameter in this list is 'sched': sched VERTICAL_CORRECTION Z_EPSILON Z_SEQUENCE\n\n"
 "          *VERTICAL_CORRECTION: flag ('vcorrect' if true) to use memory- and cpu- expensive operations to ensure vertical correctness.\n\n"
 "          *Z_EPSILON: maximal absolute distance between scheduled slices to consider them to be at the same Z level (required because of floating point errors: if the voxel heights are just right, some slices for different processes may be scheduled at the same height).\n\n"
+"          *Z_SEQUENCE: either 'all' or a list of integers, representing the tools to be scheduled for slicing. The first element is the number of tools to be scheduled, the rest are the sequence of scheduled tools. This is required in case you want to schedule only some of the tools.\n\n"
 "      -if the first parameter in this list is 'manual': manual VERTICAL_CORRECTION Z_EPSILON NUMLAYERS Z_1 NTOOL_1 Z_2 NTOOL_2 Z_3 NTOOL_3 ...\n\n"
 "          *VERTICAL_CORRECTION and Z_EPSILON: the same as in the previous case.\n\n"
 "          *NUMLAYERS: number of layers in a sequence specifying a schedule of layers to be processed.\n\n"
@@ -254,12 +275,12 @@ bool Arguments::readArguments(bool doscale, ParamReader &rd) {
 "    SNAP_FLAG: do/do not snapping ('snap' if true) \n\n"
 "    SAFESTEP_FLAG: if true ('safestep'), try to minimize the resolution loss from snapping\n\n"
 "    CLEARANCE_FLAG: if true ('clearance'), override NOSNAP_RESOLUTION /SAFESTEP_FLAG and avoid the contour toolpaths from drawing overlapping lines to the maximum possible extent\n\n"
-"    MEDIALAXIS_PARAMETERS: list of medial axis factors to fill regions not filled by the contours. The first element if the number of factors, the rest are the factors. Example: 2 1.0 0.5 0.1 means 3 factors, 1.0, 0.5 and 0.1\n\n"
+"    MEDIALAXIS_PARAMETERS: list of medial axis factors to fill regions not filled by the contours. The first element is the number of factors, the rest are the factors. Example: 2 1.0 0.5 0.1 means 3 factors, 1.0, 0.5 and 0.1\n\n"
 "    INFILLING_PARAMETERS:  list of infilling parameters: it is either a single element ('noinfill', meaning that infilling is not considered) or is a three element list:\n\n"
 "      -keyword 'infill'\n\n"
 "      -infill mode: either 'concentric', 'lines', or 'justcontour' (the last one is to pass the infillings to AutoCAD for the Hatches)\n\n"
 "      -flag ('recursive' is True) to try to fill (or not) areas not properly infilled with other means (medial axis, higher resolution processes). Has no effect for infill mode 'justcontour'\n\n"
-"      -list of medial axis factors for infilling, just like the previous list of medial axis factors. The first element if the number of factors, the rest are the factors. ;\n\n"
+"      -list of medial axis factors for infilling, just like the previous list of medial axis factors. The first element is the number of factors, the rest are the factors. ;\n\n"
 "\n";
     double scale = 0.0;
     if (doscale) {

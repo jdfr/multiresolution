@@ -23,13 +23,16 @@
      contours ncorrect motion_opt -1 -1
 
 #  scheduling parameters
-     manual nvcorrect 1e-6 2 0 0 0.08 1
+     #manual nvcorrect 1e-6 2 0 0 0.08 1
+     #uniform 0.1
+     #sched nvcorrect 1e-6 1 1
+     sched nvcorrect 1e-6 all
 
 #  addsub flag
      simple
 #  number of processes
      2
 #    parameters for process 0
-       75 constant 750 675 0.1 0.75 0.01 0.01 0 snap safestep clearance 1 1.0 ninfill
+       75 constant 75 67.5 0.1 0.75 0.01 0.01 0 snap safestep clearance 1 1.0 ninfill
 #    parameters for process 1
        10 constant 10 9 0.1 0.1 0.001 0.1 0 snap safestep clearance 1 1.0 ninfill
