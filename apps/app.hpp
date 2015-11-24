@@ -64,7 +64,8 @@ typedef struct PathInFileSpec {
     PathInFileSpec(double _z) : z(_z), usetype(false), usentool(false), usez(true) {}
     //this function matches writeSlice()'s header
     bool matchesHeader(SliceHeader &h);
-    std::string readFromCommandLine(ParamReader &rd);
+    //read at most 'maxtimes' specs (as much as possible if maxtimes<0). If furtherArgs is false, tries to consume all the remaining input until all is consumed, treating anything non-conformant as an error. If it is true, it stops if it cannot recognize an argument, to enable consumption of further arguments by other code
+    std::string readFromCommandLine(ParamReader &rd, int maxtimes, bool furtherArgs);
 } PathInFileSpec;
 
 std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int &currentRecord, PathInFileSpec &spec, SliceHeader &sliceheader);

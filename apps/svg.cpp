@@ -168,7 +168,7 @@ int main(int argc, const char** argv) {
     if (!fileExists( pathsfilename)) { fprintf(stderr,  "the input file was not found: %s!!!", pathsfilename ); return -1; }
 
     PathInFileSpec spec;
-    std::string err = spec.readFromCommandLine(rd);
+    std::string err = spec.readFromCommandLine(rd, -1, false);
     if (!err.empty()) {
         fprintf(stderr, "Error while trying to read the specification: %s", err.c_str());
         return -1;

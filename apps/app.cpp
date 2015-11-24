@@ -130,8 +130,8 @@ bool PathInFileSpec::matchesHeader(SliceHeader &h) {
             ((!usez)     || (z == h.z));
 }
 
-std::string PathInFileSpec::readFromCommandLine(ParamReader &rd) {
-    while (true) {
+std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, bool furtherArgs) {
+    while ((maxtimes--) != 0) {
         const char * spectype;
         if (!rd.readParam(spectype, "SPECTYPE (type/ntool/z)")) break;
         if (strcmp(spectype, "type") == 0) {
@@ -154,6 +154,9 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd) {
         } else if (strcmp(spectype, "z") == 0) {
             this->usez = true;
             if (!rd.readParam(this->z, "value for z specification")) { return std::string(rd.fmt.str()); };
+        } else if (furtherArgs) {
+            --rd.argidx;
+            break;
         } else {
             return str("SPECTYPE not understood (should be type/ntool/z): ", spectype, "\n");
         }

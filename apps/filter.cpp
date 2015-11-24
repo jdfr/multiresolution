@@ -100,7 +100,7 @@ int main(int argc, const char** argv) {
     if (!rd.readParam(pathsfilename_output,   "PATHSFILENAME_OUTPUT"))          { printError(rd); return -1; }
 
     PathInFileSpec spec;
-    std::string err = spec.readFromCommandLine(rd);
+    std::string err = spec.readFromCommandLine(rd, -1, false);
     if (!err.empty()) {
         fprintf(stderr, "Error while trying to read the specification: %s", err.c_str());
         return -1;
