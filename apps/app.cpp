@@ -92,7 +92,7 @@ std::string SliceHeader::readFromFile(FILE * f) {
     if (fread(&totalSize,  sizeof(totalSize),  1, f) != 1) return std::string("could not read totalSize");
     if (fread(&headerSize, sizeof(headerSize), 1, f) != 1) return std::string("could not read headerSize");
     alldata.resize(headerSize/sizeof(T64));
-    if (alldata.size() < 2) return std::string("bad headerSize field");
+    if (alldata.size() < 2) return str("bad headerSize field (", headerSize, ")");
     alldata[0].i = totalSize;
     alldata[1].i = headerSize;
     if (headerSize > 2) {
