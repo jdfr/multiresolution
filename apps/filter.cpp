@@ -51,16 +51,24 @@ std::string filterMatchesFromFile(const char * filename, const char *outputname,
     if (o == NULL) { return str("Could not open output file ", outputname); }
 
     fileheader.numRecords = data.size();
-    fileheader.writeToFile(o, true);
-
-    err = std::string();
-    for (auto d = data.begin(); d != data.end(); ++d) {
-        d->header.writeToFile(o);
-        if (fwrite(&(d->data[0]), sizeof(int64), d->data.size(), o) != d->data.size()) {
-             err = str("error trying to write ", d->k, "-th slice payload of ", filename, " in ", outputname);
-             break;
+    std::string e = fileheader.writeToFile(o, true);
+    if (!e.empty()) {
+        err = str("error writing file ", outputname, ": ", e);
+    } else {
+        err = std::string();
+        for (auto d = data.begin(); d != data.end(); ++d) {
+            e = d->header.writeToFile(o);
+            if (!e.empty()) {
+                err = str("error trying to write ", d->k, "-th slice of ", filename, " in ", outputname, ": ", e);
+                break;
+            }
+            if (fwrite(&(d->data[0]), sizeof(int64), d->data.size(), o) != d->data.size()) {
+                err = str("error trying to write ", d->k, "-th slice payload of ", filename, " in ", outputname);
+                break;
+            }
         }
     }
+
 
     fclose(o);
     return err;
