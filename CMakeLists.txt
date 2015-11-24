@@ -9,6 +9,7 @@ option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
 option(GENERATE_XYZHANDLER   "generate utility to process xyz point cloud files"  ON)
 option(GENERATE_TRANSFORMER  "generate executable to apply transformations to paths"  ON)
 option(GENERATE_FILEFILTER   "generate filter for paths files"  ON)
+option(GENERATE_FILEINFO     "generate info dumper for paths files"  ON)
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 option(LINKING_OPTIMIZATION  "optimizations that may make the build process significantly slower" OFF)
 
@@ -232,6 +233,7 @@ endfunction(SINGLESOURCE_EXECUTABLE)
 
 SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER, multiresolution_svgconverter apps/svg.cpp       svgconv)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER,   multiresolution_filefilter   apps/filter.cpp    filterp)
+SINGLESOURCE_EXECUTABLE(GENERATE_FILEINFO,     multiresolution_fileinfo     apps/info.cpp      infop)
 SINGLESOURCE_EXECUTABLE(GENERATE_TRANSFORMER,  multiresolution_transform    apps/transform.cpp transformp)
 SINGLESOURCE_EXECUTABLE(GENERATE_XYZHANDLER,   multiresolution_xyz          apps/xyz.cpp       xyz)
 
