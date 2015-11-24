@@ -17,7 +17,7 @@ void writePolygonSVG(FILE * f, clp::Path &path, bool isContour, double scalingFa
     auto pathend = path.end();
     if (path.front() == path.back()) --pathend;
     for (auto point = path.begin(); point != path.end(); ++point) {
-        fprintf(f, "%s%f,%f", firstTime ? "" : " ", point->X*scalingFactor - minx, point->Y*scalingFactor - miny);
+        fprintf(f, "%s%.20g,%.20g", firstTime ? "" : " ", point->X*scalingFactor - minx, point->Y*scalingFactor - miny);
         firstTime = false;
     }
     fprintf(f, R"(" style="fill:%s" />)" "\n", isContour ? "black" : "white");
@@ -63,7 +63,7 @@ void writeSVG(const char * filename, HoledPolygons &hps, double scalingFactor, c
     fprintf(f,
         R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>)" "\n"
         R"(<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">)" "\n"
-        R"(<svg width="%f%s" height="%f%s" viewBox="%f %f %f %f" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:slicer="http://slicer.org/namespaces/slicer">)" "\n"
+        R"(<svg width="%.20g%s" height="%.20g%s" viewBox="%g %g %.20g %.20g" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:slicer="http://slicer.org/namespaces/slicer">)" "\n"
         R"(  <g id="only_one_slice">)" "\n",
         viewBoxSize.X, units, viewBoxSize.Y, units, 0.0, 0.0, viewBoxSize.X, viewBoxSize.Y);
     writePolygonSVG(f, hps, scalingFactor, polOffset.X, polOffset.Y);
