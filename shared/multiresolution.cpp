@@ -321,8 +321,14 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
 }
 
 //error messages from this function can be queried from the StateHandle argument
-LIBRARY_API void receiveInputSlice(InputSliceHandle slice, StateHandle state) {
+LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice) {
     state->sched->rm.receiveNextRawSlice(*slice->paths);
+    if (state->sched->has_err) {
+        state->err = state->sched->err;
+    }
+}
+
+LIBRARY_API void computeOutputSlices(StateHandle state) {
     state->sched->computeNextInputSlices();
     if (state->sched->has_err) {
         state->err = state->sched->err;

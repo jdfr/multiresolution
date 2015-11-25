@@ -128,7 +128,10 @@ extern "C" {
     LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax);
 
     //error messages from this function can be queried from the StateHandle argument
-    LIBRARY_API void receiveInputSlice(InputSliceHandle slice, StateHandle state);
+    LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice);
+
+    //compute more slices, if possible
+    LIBRARY_API void computeOutputSlices(StateHandle state);
 
     /*may return NULL to mean that no output is ready yet. Because of that,
     error strings can be queried from the InputSliceHandle argument*/
