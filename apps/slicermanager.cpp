@@ -40,6 +40,9 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.execpath = execpath;
     subp.workdir = workdir;
     subp.args.clear();
+#ifdef SLICER_USE_DEBUG_FILE
+    subp.args.push_back("debug.standalone.txt");
+#endif
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
     subp.args.push_back(std::string(incremental ? "incremental " : "noincremental "));
     subp.args.push_back(stlfilename);

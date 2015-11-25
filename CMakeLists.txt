@@ -1,5 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.0)
 
+option(ENABLE_SLICER_LOGGING "enable slicer debug output to file" ON) #this option has to be coordinated with the one used in the slicer!!!!
 option(USE_PYTHON_DEBUG      "add support for viewing contours in python for debugging" ON)
 option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
 option(GENERATE_LIBRARY      "generate shared library"  ON)
@@ -218,6 +219,9 @@ if(GENERATE_EXECUTABLE)
   endif()
   ADD_EXECUTABLE(multiresolution_executable ${EXECSOURCES})
   set_target_properties(multiresolution_executable PROPERTIES OUTPUT_NAME multires)
+  if (ENABLE_SLICER_LOGGING)
+      set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "SLICER_USE_DEBUG_FILE")
+  endif()
   if (USE_PYTHON_DEBUG AND USE_PYTHON_VIEWER)
     set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "STANDALONE_USEPYTHON")
   endif()
