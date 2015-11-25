@@ -19,10 +19,6 @@ typedef struct ResultSingleTool : public virtual SingleProcessOutput {
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
 } ResultSingleTool;
 
-//enum ZRemoveMode { RemoveAboveZ, RemoveBelowZ };
-
-//typedef void (*ResultConsumer)(SeparateResult &result, bool computeResult, MultiSpec &spec);
-
 class SimpleSlicingScheduler;
 
 /*this class applies multislicing, keeping track of generated slices at different heights,
@@ -50,10 +46,6 @@ public:
     Multislicer multi;
     ToolpathManager(MultiSpec &s) : spec(s), slicess(s.numspecs), multi(s) {}
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
-    //std::vector<std::vector<int>> getOverlappingSlices(double z);
-    //void removeSlicesInRange(double zmin, double zmax);
-    //void removeSlicesZ(double z, ZRemoveMode mode);
-    void removeUsedSlicesNotReachableInZ(double z);
     void removeUsedSlicesBelowZ(double z);
 };
 

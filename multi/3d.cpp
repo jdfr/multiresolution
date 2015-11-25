@@ -23,17 +23,6 @@
 }
 
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
-void ToolpathManager::removeUsedSlicesNotReachableInZ(double z) {
-    auto profile = spec.profiles.begin();
-    for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
-        slices->erase(std::remove_if(slices->begin(), slices->end(),
-            [z, profile](std::shared_ptr<ResultSingleTool> sz) { return sz->used && ((*profile)->getWidth(sz->z - z) == 0.0); }
-        ), slices->end());
-        ++profile;
-    }
-}
-
-//if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesBelowZ(double z) {
     auto profile = spec.profiles.begin();
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
