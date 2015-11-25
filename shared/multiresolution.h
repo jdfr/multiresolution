@@ -3,7 +3,10 @@
 #ifndef MULTIRESOLUTION_HEADER
 #define MULTIRESOLUTION_HEADER
 
-#if ( defined(_WIN32) || defined(_WIN64) ) //THIS COVERS BOTH MSVS AND MINGW
+#if ( defined(_WIN32) || defined(_WIN64) ) 
+#    if (!(defined(_MSC_VER) || defined(__GNUC__))) //THIS IS VALID ONLY FOR MSVS AND MINGW
+#    error Compiler not supported for now
+#endif
 #    ifdef LIBRARY_EXPORTS
 #        define LIBRARY_API __declspec(dllexport)
 #    else
@@ -11,11 +14,15 @@
 #    endif
 #    include <comutil.h>
      typedef long long int coord_type;
-#elif defined(__GNUC__) //NO NEED FOR __declspec IN GCC LAND
-#    define LIBRARY_API
+#elif defined(__GNUC__)
      typedef const char * BSTR;
      //"long long"=="long" in x64 land, but we use "long long" because GCC is horribly pedantic about types
      typedef long long int coord_type;
+#    if __GNUC__ >= 4
+#        define LIBRARY_API __attribute__ ((visibility ("default")))
+#    else
+#        define LIBRARY_API
+#    endif
 #else
 #    error Compiler not supported for now
 #endif
