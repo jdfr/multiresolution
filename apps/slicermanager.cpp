@@ -14,6 +14,9 @@ seems to be fairly small, we keep it this way for all platforms.*/
 class ExternalSlicerManager : public SlicerManager {
     SubProcessManager subp;
     IOPaths iopIN, iopOUT;
+#ifdef SLICER_USE_DEBUG_FILE
+    std::string debugfile;
+#endif
     std::string execpath;
     std::string workdir;
     std::string err;
@@ -21,7 +24,15 @@ class ExternalSlicerManager : public SlicerManager {
     long scale;
     int numSlice;
 public:
-    ExternalSlicerManager(std::string &&_execpath, std::string &&_workdir, bool _repair, bool _incremental, long _scale) : subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scale(_scale) {}
+    ExternalSlicerManager(
+#ifdef SLICER_USE_DEBUG_FILE
+        std::string &&_debugfile,
+#endif
+    std::string &&_execpath, std::string &&_workdir, bool _repair, bool _incremental, long _scale) :
+#ifdef SLICER_USE_DEBUG_FILE
+    debugfile(std::move(_debugfile)),
+#endif
+    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scale(_scale) {}
     virtual ~ExternalSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
     virtual bool finalize();
@@ -41,7 +52,7 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.workdir = workdir;
     subp.args.clear();
 #ifdef SLICER_USE_DEBUG_FILE
-    subp.args.push_back("debug.standalone.txt");
+    subp.args.push_back(debugfile);
 #endif
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
     subp.args.push_back(std::string(incremental ? "incremental " : "noincremental "));
@@ -151,6 +162,9 @@ SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
         long sc = strtol(scale.c_str(), NULL, 10);
 
         return new ExternalSlicerManager(
+#ifdef SLICER_USE_DEBUG_FILE
+            config.getValue("SLICER_DEBUGFILE"),
+#endif
             config.getValue("SLICER_EXEC"),
             config.getValue("SLICER_PATH"),
             config.getValue("SLICER_REPAIR").compare("true") == 0,
