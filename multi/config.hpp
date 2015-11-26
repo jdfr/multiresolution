@@ -22,6 +22,7 @@ public:
     bool has_err;
     std::string err;
     Configuration(const char *filename);
+    template<typename S1, typename S2> void update(S1 key, S2 value) { store[std::string(std::move(key))] = std::move(value); }
     bool hasKey(const std::string key);
     bool hasKey(const char *      key);
     std::string getValue(const std::string key);
