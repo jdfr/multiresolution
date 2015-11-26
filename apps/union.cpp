@@ -38,6 +38,12 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
         std::string err = fileheaders_i[i].readFromFile(is[i]);
         if (!err.empty()) { closeAll(is, NULL); return str("Error reading file header for ", inputs[i], ": ", err); }
         fileheader_o.numRecords += fileheaders_i[i].numRecords;
+        if (fileheader_o.numtools < fileheaders_i[i].numtools) {
+            fileheader_o.numtools = fileheaders_i[i].numtools;
+            fileheader_o.useSched = fileheaders_i[i].useSched;
+            fileheader_o.radiusX  = fileheaders_i[i].radiusX;
+            fileheader_o.radiusZ  = fileheaders_i[i].radiusZ;
+        }
     }
 
     FILE * o = fopen(output, "wb");
