@@ -1,6 +1,7 @@
 *.vcxproj
 *.user
 *.filters
+*.paths
 obj*
 bin*
 buildr.bat
