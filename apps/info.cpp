@@ -11,7 +11,8 @@
 #include <ctype.h>
 #include <sstream>
 #include <string>
-
+#include <math.h>
+#include <limits>
 
 std::string printPathInfo(const char * filename, bool verbose) {
     FILE * f = fopen(filename, "rb");
@@ -90,6 +91,21 @@ std::string printPathInfo(const char * filename, bool verbose) {
                     return str("Error reading ", currentRecord, "-th double clipperpaths: could not read record ", currentRecord, " data!");
                 }
                 numpaths = (int)paths.size();
+                double minx =  std::numeric_limits<double>::infinity();
+                double maxx = -std::numeric_limits<double>::infinity();
+                double miny =  std::numeric_limits<double>::infinity();
+                double maxy = -std::numeric_limits<double>::infinity();
+                for (auto &path : paths) {
+                    for (auto &point : path) {
+                        minx = fmin(minx, point.X);
+                        maxx = fmax(maxx, point.X);
+                        miny = fmin(miny, point.Y);
+                        maxy = fmax(maxy, point.Y);
+                    }
+                }
+                fprintf(stdout, "          bounding box:\n");
+                fprintf(stdout, "       X: min=%.20g, max=%.20g\n", minx, maxx);
+                fprintf(stdout, "       Y: min=%.20g, max=%.20g\n", miny, maxy);
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
                 Paths3D paths;
                 if (!read3DPaths(iop_f, paths)) {
