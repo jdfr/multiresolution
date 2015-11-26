@@ -35,12 +35,102 @@ template<typename Function, typename... Args> std::string applyToAllFilesWithIOP
     return std::string();
 }
 
+std::string applyFeedback(Arguments &args, MetricFactors &factors, SimpleSlicingScheduler &sched, bool feedbackMesh, const char *feedback_file, std::vector<double> &zs, std::vector<double> &scaled_zs) {
+    if (feedbackMesh) {
+
+#ifdef SLICER_USE_DEBUG_FILE
+        //make sure that the log file is not the same as for the other slicer instance!
+        const char * feedbackKey = "SLICER_DEBUGFILE_FEEDBACK";
+        std::string feedbackdebugfile = args.config->hasKey(feedbackKey) ? args.config->getValue(feedbackKey) : "slicerlog.feedback.txt";
+        args.config->update("SLICER_DEBUGFILE", feedbackdebugfile);
+#endif
+
+        SlicerManager *feedbackSlicer = getSlicerManager(*args.config, SlicerManagerExternal);
+
+        char *meshfullpath = fullPath(feedback_file);
+        if (meshfullpath == NULL) {
+            return std::string("Error trying to resolve canonical path to the feedback mesh file");
+        }
+
+        if (!feedbackSlicer->start(meshfullpath)) {
+            free(meshfullpath);
+            std::string err = feedbackSlicer->getErrorMessage();
+            return str("Error while trying to start the slicer manager: ", err, "!!!\n");
+        }
+        free(meshfullpath);
+
+        double minz_nevermind, maxz_nevermind;
+        feedbackSlicer->getZLimits(&minz_nevermind, &maxz_nevermind);
+
+        feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
+
+        clp::Paths rawslice;
+
+        for (int k = 0; k < zs.size(); ++k) {
+            rawslice.clear();
+
+            feedbackSlicer->readNextSlice(rawslice); {
+                std::string err = feedbackSlicer->getErrorMessage();
+                if (!err.empty()) {
+                    return str("Error while trying to read the ", k, "-th slice from the slicer manager: ", err, "!!!\n");
+                }
+            }
+
+            sched.tm.takeAdditionalAdditiveContours(scaled_zs[k], rawslice);
+
+        }
+
+        if (!feedbackSlicer->finalize()) {
+            std::string err = feedbackSlicer->getErrorMessage();
+            return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
+        }
+
+        delete feedbackSlicer;
+        return std::string();
+    } else {
+
+        FILE * f = fopen(feedback_file, "rb");
+        if (f == NULL) { return str("Could not open input file ", feedback_file); }
+        IOPaths iop_f(f);
+
+        FileHeader fileheader;
+        std::string err = fileheader.readFromFile(f);
+        if (!err.empty()) { fclose(f); return str("Error reading file header for ", feedback_file, ": ", err); }
+
+        SliceHeader sliceheader;
+        for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
+            std::string e = sliceheader.readFromFile(f);
+            if (!e.empty())                   { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": ", err); break; }
+            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": header is too short!"); break; }
+            if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
+                if (sliceheader.saveFormat == PATHFORMAT_INT64) {
+                    clp::Paths paths;
+                    if (!iop_f.readClipperPaths(paths)) {
+                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
+                        break;
+                    }
+                    sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
+                } else {
+                    err = str("Error reading feedback from pathsfile ", feedback_file, ": path save format for all processed contours must be Int64!!!!");
+                    break;
+                }
+            } else {
+                fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+            }
+        }
+
+        fclose(f);
+        return err;
+    }
+
+}
+
 inline std::string writeSlices(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
     return applyToAllFiles(files, writeSlice, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
 }
 
 const char *ERR =
-"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d (spec SPEC_3D | nspec) | 2d (spec SPEC_2D | nspec | debug)) | nshow) (save (float | integer) OUTPUTFILENAME | nsave) MULTISLICING_PARAMETERS\n\n"
+"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d (spec SPEC_3D | nspec) | 2d (spec SPEC_2D | nspec | debug)) | nshow) (save (float | integer) OUTPUTFILENAME | nsave) (dry | feedback MODE FEEDBACKFILENAME | nfeedback) MULTISLICING_PARAMETERS\n\n"
 "This list of arguments can be read from the command line, or a single argument can specify a text file from which tha arguments are read.\n\n"
 "    -CONFIGFILENAME is required (config file name).\n\n"
 "    -MESHFILENAME is required (input mesh file name).\n\n"
@@ -50,6 +140,8 @@ const char *ERR =
 "    -If 'show 2d spec SPEC_2D' is the same as the previous one, but SPEC_2D is a python expression for specifying the viewing parameters\n\n"
 "    -If 'show 2d debug' is specified, 2D views of contours will be generated as they are computed (computation will be interrumpted until the viewing window is closed)\n\n"
 "    -If 'save MODE OUTPUTFILENAME' is specified, MODE is either 'float' (or just 'f') or 'integer' (or just 'i'), meaning the format of the points: contours in 'float' are ready to be consumed by other applications but should not be converted back and forth to raw data to avoid data degradation, 'integer' saves the raw data to avoid , but the config file is needed to scale the contours accurately. OUTPUTFILENAME is the name of the file to save all toolpaths\n\n"
+"    -If 'dry' is specified, the system only shows the Z values of the slices to be received from the MESHFILENAME, then terminates without doing anything else\n\n"
+"    -If 'feedback MODE FILENAME' is specified, feedback about actual contours can be added to the multislicing engine. MODE is either 'mesh' (meaning a file contaning a mesh, like an STL file) or 'paths' (meaning a pathsfile as created by this tool, from which all paths of type 'contour' are used), and FEEDBACKFILENAME is the name of the file containing the data for feedback\n\n"
 "    -MULTISLICING_PARAMETERS represents the parameters specifying the multislicing process all further arguments, which are evaluated verbatim by the multislicing engine (in particular, metric arguments execept z_uniform_step must be supplied in the engine's native unit)\n\n";
 
 void printError(ParamReader &rd) {
@@ -121,7 +213,7 @@ int main(int argc, const char** argv) {
     bool save;
     int64 saveFormat;
     const char *savemode, *saveformat, *singleoutputfilename=NULL;
-    if (!rd.readParam(savemode, "save mode (save/multisave/nsave)")) { printError(rd); return -1; }
+    if (!rd.readParam(savemode, "save mode (save/nsave)")) { printError(rd); return -1; }
     save = strcmp(savemode, "save")==0;
     if (save) {
         if (!rd.readParam(saveformat, "save format (f[loat]/i[nteger])")) { printError(rd); return -1; }
@@ -139,9 +231,33 @@ int main(int argc, const char** argv) {
         saveFormat = PATHFORMAT_DOUBLE;
     }
 
-    if (!save && !show) {
-        fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
-        return -1;
+    const char* feedback_flag, *feedback_mode, *feedback_file;
+    bool feedback, feedbackMesh, dryrun;
+
+    if (!rd.readParam(feedback_flag, "feedback flag (feedback/nfeedback)")) { printError(rd); return -1; }
+    dryrun   = strcmp(feedback_flag, "dry") == 0;
+    feedback = strcmp(feedback_flag, "feedback")==0;
+    if (feedback) {
+        if (!rd.readParam(feedback_mode, "feedback mode (mesh/paths)")) { printError(rd); return -1; }
+        feedbackMesh = strcmp(feedback_mode, "mesh")==0;
+        if ((!feedbackMesh) && (strcmp(feedback_mode, "paths") != 0)) {
+            fprintf(stderr, "Error: feedback mode must be either 'mesh' or 'paths', but it was <%s>\n", feedback_mode);
+            return -1;
+        }
+        if (!rd.readParam(feedback_file, "FEEDBACKFILENAME")) { printError(rd); return -1; }
+        if (!fileExists(feedback_file)) {
+            fprintf(stderr, "Error: feedback file <%s> does not exist!", feedback_file);
+            return -1;
+        }
+    }
+
+    if (dryrun) {
+        save = show = false;
+    } else {
+        if (!save && !show) {
+            fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
+            return -1;
+        }
     }
 
     Arguments args(configfilename);
@@ -154,6 +270,18 @@ int main(int argc, const char** argv) {
     //skip app name and mesh filename
     if (!args.readArguments(true, rd)) {
         fprintf(stderr, "Error while parsing and populating arguments: %s", args.err.c_str());
+        return -1;
+    }
+
+    if (feedback && (!args.multispec->global.useScheduler)) {
+        const char *schedmode;
+        switch (args.multispec->global.schedMode) {
+        case SimpleScheduler:   schedmode = "sched"; break;
+        case UniformScheduling: schedmode = "uniform"; break;
+        case ManualScheduling:  schedmode = "manual"; break;
+        default:                schedmode = "unknown"; 
+        }
+        fprintf(stderr, "Error: feedback file was specified (%s), but the scheduling mode '%s' does not allow feedback!!!!", feedback_file, schedmode);
         return -1;
     }
 
@@ -207,8 +335,10 @@ int main(int argc, const char** argv) {
     if (!slicer->start(meshfullpath)) {
         std::string err = slicer->getErrorMessage();
         fprintf(stderr, "Error while trying to start the slicer manager: %s!!!\n", err.c_str());
+        free(meshfullpath);
         return -1;
     }
+    free(meshfullpath);
 
     bool alsoContours = args.multispec->global.alsoContours;
     clp::Paths rawslice, dummy;
@@ -245,6 +375,31 @@ int main(int argc, const char** argv) {
         int schednuminputslices = (int)sched.rm.raw.size();
         int schednumoutputslices = (int)sched.output.size();
 
+        std::vector<double> rawZs = sched.rm.rawZs;
+        for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
+            *z *= factors.internal_to_input;
+        }
+
+        if (dryrun) {
+            printf("dry run: these are the Z values of the required slices, in request order:\n");
+            for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
+                printf("%.20g\n", *z);
+            }
+            slicer->terminate();
+            delete slicer;
+            return 0;
+        }
+
+        if (feedback) {
+            std::string err = applyFeedback(args, factors, sched, feedbackMesh, feedback_file, rawZs, sched.rm.rawZs);
+            if (!err.empty()) {
+                fprintf(stderr, err.c_str());
+                return -1;
+            }
+        }
+
+        slicer->sendZs(&(rawZs[0]), schednuminputslices);
+
         if (write) {
             numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
             std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
@@ -254,12 +409,6 @@ int main(int argc, const char** argv) {
             }
         }
 
-        std::vector<double> rawZs = sched.rm.rawZs;
-        for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
-            *z *= factors.internal_to_input;
-        }
-        slicer->sendZs(&(rawZs[0]), schednuminputslices);
-
         if (saveContours) {
             results.reserve(schednumoutputslices);
         }
@@ -268,7 +417,12 @@ int main(int argc, const char** argv) {
             printf("reading raw slice %d/%d\n", i, schednuminputslices - 1);
             rawslice.clear();
 
-            slicer->readNextSlice(rawslice);
+            slicer->readNextSlice(rawslice); {
+                std::string err = slicer->getErrorMessage();
+                if (!err.empty()) {
+                    fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
+                }
+            }
 
             if (write && alsoContours) {
                 std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
@@ -333,6 +487,16 @@ int main(int argc, const char** argv) {
         //std::vector<double> zs = slicer->prepareSTLSimple(zstep, zstep);
         std::vector<double> zs = slicer->prepareSTLSimple(zstep);
 
+        if (dryrun) {
+            printf("dry run: these are the Z values of the required slices, in request order:\n");
+            for (auto z = zs.begin(); z != zs.end(); ++z) {
+                printf("%.20g\n", *z);
+            }
+            slicer->terminate();
+            delete slicer;
+            return 0;
+        }
+
         numsteps = (int64)zs.size();
         int numresults = (int) (numsteps * numtools);
 
@@ -372,7 +536,12 @@ int main(int argc, const char** argv) {
                 }
             }
 
-            slicer->readNextSlice(rawslice);
+            slicer->readNextSlice(rawslice); {
+                std::string err = slicer->getErrorMessage();
+                if (!err.empty()) {
+                    fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
+                }
+            }
 #           ifdef STANDALONE_USEPYTHON
                 //SHOWCONTOURS(args.multispec->global.config, "raw", &rawslice);
 #           endif
@@ -434,8 +603,6 @@ int main(int argc, const char** argv) {
         fprintf(stderr, "Error while finalizing the slicer manager: %s!!!!", err.c_str());
     }
     delete slicer;
-
-    free(meshfullpath);
 
     return 0;
 }

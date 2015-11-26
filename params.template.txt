@@ -17,6 +17,12 @@
   #save double all.paths               #save in one file, in double floating-point format
   save integer all.paths               #save in one file, in int64 format
 
+#feedback parameters
+  #dry
+  nfeedback
+  #feedback mesh feedback.stl
+  #feedback paths feedback.paths
+
 #multislicing parameters
 
 #  global parameters
