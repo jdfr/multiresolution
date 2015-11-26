@@ -320,6 +320,16 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
     return ret;
 }
 
+//important: after using the slice here, it is "spent" (cannot be used in another context), but you still have to use freeInputSlice on it!!!
+LIBRARY_API void receiveAdditionalAdditiveContours(StateHandle state, double z, InputSliceHandle slice) {
+    //this method uses std::move in the second argument!
+    state->sched->tm.takeAdditionalAdditiveContours(z, *slice->paths);
+}
+
+LIBRARY_API void purgueAdditionalAdditiveContours(StateHandle state) {
+    state->sched->tm.purgeAdditionalAdditiveContours();
+}
+
 //error messages from this function can be queried from the StateHandle argument
 LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice) {
     state->sched->rm.receiveNextRawSlice(*slice->paths);

@@ -127,6 +127,11 @@ extern "C" {
 
     LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax);
 
+    //important: after using the slice here, it is "spent" (cannot be used in another context), but you still have to use freeInputSlice on it!!!
+    LIBRARY_API void receiveAdditionalAdditiveContours(StateHandle state, double z, InputSliceHandle slice);
+
+    LIBRARY_API void purgueAdditionalAdditiveContours(StateHandle state);
+
     //error messages from this function can be queried from the StateHandle argument
     LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice);
 
