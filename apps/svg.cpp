@@ -82,44 +82,51 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
     SliceHeader sliceheader;
     int index = 0;
     IOPaths iop(f);
+    clp::Paths output;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
-        if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
+        std::string e = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
+        if (!e.empty()) { err = str("Error reading file ", filename, ": ", e); break; }
         if (currentRecord >= fileheader.numRecords) break;
 
         if (sliceheader.saveFormat == PATHFORMAT_INT64) {
-            clp::Paths output;
-            if (!iop.readClipperPaths(output)) return str("error reading paths from record ", currentRecord, " in file ", filename, ": error <", iop.errs[0].message, "> in ", iop.errs[0].function);
-            err = std::string();
-            for (int n = 0; n < output.size(); ++n) {
-                if (output[n].front() != output[n].back()) {
-                    err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but path ", n, "-th inside it is not closed!!!");
-                    break;
-                }
-            }
-            HoledPolygons hps;
-            AddPathsToHPs(output, hps);
-
-            std::string svgname;
-            if (matchFirst) {
-                svgname = str(svgfilename, ".svg");
-            } else {
-                svgname = str(svgfilename, '.', std::setfill('0'), std::setw(3), index++, ".svg");
-            }
-
-            writeSVG(svgname.c_str(), hps, sliceheader.scaling, "mm");
-
-            if (matchFirst) {
+            if (!iop.readClipperPaths(output)) {
+                err = str("error reading integer paths from record ", currentRecord, " in file ", filename, ": error <", iop.errs[0].message, "> in ", iop.errs[0].function);
                 break;
             }
-
         } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
-            err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but it was saved in DOUBLE format (if you know what you are doing, you can convert it back to INT64 format)");
-            //fprintf(stderr, "WARNING: in file %s, path %d matches specification, but it was saved in DOUBLE format. This may cause (hard to debug) errors in some cases because of the required conversion to INT64\n", filename, currentRecord);
-            //readDoublePaths(f, output, 1/sliceheader.scaling);
-            //err = std::string();
+            //TODO: modify the code so we do not have to convert back and forth the coordinates in this case!
+            if (!iop.readDoublePaths(output, 1 / sliceheader.scaling)) {
+                err = str("error reading double paths from record ", currentRecord, " in file ", filename, ": error <", iop.errs[0].message, "> in ", iop.errs[0].function);
+                break;
+            }
+        } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
+            err = str("In file ", filename, ", for path ", currentRecord, ", save mode is 3D, but we cannot save 3D paths to SVG\n");
+            break;
         } else {
             err = str("In file ", filename, ", for path ", currentRecord, ", save mode not understood: ", sliceheader.saveFormat, "\n");
+            break;
+        }
+        for (int n = 0; n < output.size(); ++n) {
+            if (output[n].front() != output[n].back()) {
+                err = str("In file ", filename, ", pathset ", currentRecord, " matches specification, but path ", n, "-th inside it is not closed!!!");
+                break;
+            }
+        }
+        HoledPolygons hps;
+        AddPathsToHPs(output, hps);
+        output.clear();
+
+        std::string svgname;
+        if (matchFirst) {
+            svgname = str(svgfilename, ".svg");
+        } else {
+            svgname = str(svgfilename, '.', std::setfill('0'), std::setw(3), index++, ".svg");
+        }
+
+        writeSVG(svgname.c_str(), hps, sliceheader.scaling, "mm");
+
+        if (matchFirst) {
+            break;
         }
     }
     fclose(f);
