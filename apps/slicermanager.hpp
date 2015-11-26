@@ -10,6 +10,7 @@ class SlicerManager {
 public:
     virtual ~SlicerManager() {}
     virtual bool start(const char * stlfilename) { throw std::runtime_error("start not implemented!!!"); }
+    virtual bool terminate() { throw std::runtime_error("terminate not implemented!!!"); }
     virtual bool finalize() { throw std::runtime_error("finalize not implemented!!!"); }
     virtual std::string getErrorMessage() { throw std::runtime_error("getErrorMessage not implemented!!!"); }
     virtual void getZLimits(double *minz, double *maxz) { throw std::runtime_error("getZLimits not implemented!!!"); }

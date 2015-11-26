@@ -35,6 +35,7 @@ public:
     subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scale(_scale) {}
     virtual ~ExternalSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
+    virtual bool terminate();
     virtual bool finalize();
     virtual std::string getErrorMessage() { return err; }
     virtual void getZLimits(double *minz, double *maxz);
@@ -64,6 +65,11 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     iopOUT.f = subp.pipeOUT;
 
     return err.empty();
+}
+
+bool ExternalSlicerManager::terminate() {
+    subp.kill();
+    return true;
 }
 
 bool ExternalSlicerManager::finalize() {
