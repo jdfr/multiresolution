@@ -30,23 +30,25 @@ class ToolpathManager {
     clp::Clipper clipper2; //we need this in addition to the multislicer's clipper in order to conduct more than one clipping in parallel
     //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
     void applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
-    void inline applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth) {
-        for (auto contours = contourss.begin(); contours != contourss.end(); ++contours) {
-            if (!contours->empty()) applyContours(*contours, k, processIsAdditive, computeContoursAlreadyFilled, diffwidth);
-        }
-
-    }
+    void applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
 public:
     friend class SimpleSlicingScheduler;
     std::string err;
     //the outer vector has one element for each process. The inner vectors are previous slices with their z values
     std::vector<std::vector<std::shared_ptr<ResultSingleTool>>> slicess;
+    std::map<double, clp::Paths> additionalAdditiveContours; //this is 
+    /*this method is to add feedback to the multislicing process:
+      let the system know the contours of the object generated with
+      low-res processes, measured with some scanning technology.*/
+    void takeAdditionalAdditiveContours(double z, clp::Paths &additional) { additionalAdditiveContours.emplace(z, std::move(additional)); }
     void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool);
     MultiSpec &spec;
     Multislicer multi;
     ToolpathManager(MultiSpec &s) : spec(s), slicess(s.numspecs), multi(s) {}
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
     void removeUsedSlicesBelowZ(double z);
+    void removeAdditionalContoursBelowZ(double z);
+    void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }
 };
 
 typedef struct InputSliceData {

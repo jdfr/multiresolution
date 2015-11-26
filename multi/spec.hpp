@@ -125,6 +125,7 @@ typedef struct GlobalSpec {
     SchedulerMode schedMode;
     bool useScheduler;
     bool addsubWorkflowMode;
+    bool ignoreRedundantAdditiveContours; //TODO: make this an explicit parameter, if necessary (used only by 3d scheduling)
     bool alsoContours;
     bool applyMotionPlanner;
     bool avoidVerticalOverwriting;
@@ -138,7 +139,7 @@ typedef struct GlobalSpec {
     clp::Paths inputSub; //this is used if flag "addsubWorkflowMode" is set
     bool substractiveOuter;
     clp::cInt outerLimitX, outerLimitY;
-    GlobalSpec(Configuration &_config) : config(_config), inputSub(0) { }
+    GlobalSpec(Configuration &_config) : config(_config), inputSub(0), ignoreRedundantAdditiveContours(true) {}
     std::string readFromCommandLine(ParamReader &rd, double scale=0.0);
 } GlobalSpec;
 

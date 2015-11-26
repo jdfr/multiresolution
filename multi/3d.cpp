@@ -25,6 +25,7 @@
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesBelowZ(double z) {
     auto profile = spec.profiles.begin();
+    //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
         slices->erase(std::remove_if(slices->begin(), slices->end(),
             [z](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sz->z < z); }
@@ -33,8 +34,24 @@ void ToolpathManager::removeUsedSlicesBelowZ(double z) {
     }
 }
 
+void ToolpathManager::removeAdditionalContoursBelowZ(double z) {
+    for (auto additional = additionalAdditiveContours.begin(); additional != additionalAdditiveContours.end();) {
+        if (additional->first < z) {
+            additionalAdditiveContours.erase(additional++);
+        } else {
+            ++additional;
+        }
+    }
+}
+
+void ToolpathManager::applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth) {
+    for (auto contours = contourss.begin(); contours != contourss.end(); ++contours) {
+        if (!contours->empty()) applyContours(*contours, k, processIsAdditive, computeContoursAlreadyFilled, diffwidth);
+    }
+}
+
 //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
-void ToolpathManager::applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth) {
+void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, bool processToComputeIsAdditive, bool computeContoursAlreadyFilled, double diffwidth) {
 
     if (diffwidth == 0.0) {
         auxUpdate.clear();
@@ -45,16 +62,18 @@ void ToolpathManager::applyContours(clp::Paths &contours, int k, bool processIsA
     if (auxUpdate.empty()) return;
     if (spec.global.addsubWorkflowMode) {
         //here, computeContoursAlreadyFilled will always be false
-        if (k == 0) {
+        if (ntool_contour == 0) {
             //contour auxUpdate is additive
-            multi.clipper.AddPaths(auxUpdate, processIsAdditive ? clp::ptClip : clp::ptSubject, true);
+            multi.clipper.AddPaths(auxUpdate, processToComputeIsAdditive ? clp::ptClip : clp::ptSubject, true);
         } else {
             //contour auxUpdate is subtractive
-            if (!processIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+            if (!processToComputeIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+            // processToComputeIsAdditive should never be true here, because of the current way we structure add/sub processes (first 'add', all subsequent 'sub')
         }
     } else {
         //contour auxUpdate is additive
-        if (processIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+        if (processToComputeIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+        // processToComputeIsAdditive should always be true here
         if (computeContoursAlreadyFilled) clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
     }
     //SHOWCONTOURS(spec.global.config, "deflating_contour", &contours, &auxUpdate);
@@ -63,7 +82,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int k, bool processIsA
 //remove from the input contours the parts that are already there from previous slices
 void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool) {
 
-    bool processIsAdditive = !spec.global.addsubWorkflowMode || ntool == 0;
+    bool processToComputeIsAdditive = !spec.global.addsubWorkflowMode || ntool == 0;
     bool computeContoursAlreadyFilled = spec.useContoursAlreadyFilled(ntool);
 
     /*the following logic for getting parts to add and parts to substract hinges on
@@ -73,27 +92,54 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //for subtractive process: initialContour <- previously_computed_additive_contours - rawSlice - previously_computed_subtractive_contours
     //for additive process:    initialContour <- rawSlice - previously_computed_additive_contours
 
-    multi.clipper.AddPaths(rawSlice, processIsAdditive ? clp::ptSubject : clp::ptClip, true);
-    for (int k = 0; k < spec.numspecs; ++k) {
-        multi.offset.ArcTolerance = (double)spec.arctolGs[k];
-        for (auto slice = slicess[k].begin(); slice != slicess[k].end(); ++slice) {
+    //process the raw slice
+    multi.clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
+
+    bool doNotUseStoredAdditiveContours = false;
+
+    //process additional additive contours: for applyContours() logic to take them as additive, we earmark them as coming from ntool=0
+    //OF COURSE, THIS WORKS ONLY AS LONG AS WE HAVE THE CONVENTION THAT add/sub PROCESSES ARE ADDITIVE FOR ntool=0 AND SUBTRACTIVE FOR ntool>0
+    for (auto & additional : additionalAdditiveContours) {
+        if (std::fabs(additional.first - z) < spec.global.z_epsilon) {
+            applyContours(additional.second, 0, processToComputeIsAdditive, computeContoursAlreadyFilled, 0.0);
+            //we have received feedback for additional contours.
+            //If flag ignoreRedundantAdditiveContours is true, ignore stored additive contours
+            doNotUseStoredAdditiveContours = spec.global.ignoreRedundantAdditiveContours;
+            //we suppose that we are not getting more than one additional additive contour at each Z.
+            break;
+        }
+    }
+
+    //process previously computed contours
+    for (int ntool_contour = 0; ntool_contour < spec.numspecs; ++ntool_contour) {
+        
+        //do not use any stored additive contour if we have received feedback
+        if (doNotUseStoredAdditiveContours) {
+            bool contourIsAdditive = !spec.global.addsubWorkflowMode || ntool_contour == 0;
+            if (contourIsAdditive) continue;
+        }
+
+        multi.offset.ArcTolerance = (double)spec.arctolGs[ntool_contour];
+        for (auto slice = slicess[ntool_contour].begin(); slice != slicess[ntool_contour].end(); ++slice) {
             if (!(*slice)->contours.empty()) { 
-                double currentWidth = spec.profiles[k]->getWidth((*slice)->z - z);
+                double currentWidth = spec.profiles[ntool_contour]->getWidth((*slice)->z - z);
                 if (currentWidth > 0) {
-                    double diffwidth = spec.radiuses[k] - currentWidth;
+                    double diffwidth = spec.radiuses[ntool_contour] - currentWidth;
                     if ((*slice)->infillingsIndependentContours.empty()) {
                         //if infilling contours were not generated, we make do with the contours, which are actually cheaper to handle!
                         auto &contours = (*slice)->contours;
-                        if (!contours.empty()) applyContours(contours, k, processIsAdditive, computeContoursAlreadyFilled, diffwidth);
+                        if (!contours.empty()) applyContours(contours, ntool_contour, processToComputeIsAdditive, computeContoursAlreadyFilled, diffwidth);
                     } else {
                         //OK, this previous slice was meant to have recursive infilling, so we have to handle the infillings!
-                        applyContours((*slice)->infillingsIndependentContours, k, processIsAdditive, computeContoursAlreadyFilled, diffwidth);
+                        applyContours((*slice)->infillingsIndependentContours, ntool_contour, processToComputeIsAdditive, computeContoursAlreadyFilled, diffwidth);
                     }
-                    applyContours((*slice)->medialAxisIndependentContours, k, processIsAdditive, computeContoursAlreadyFilled, diffwidth);
+                    applyContours((*slice)->medialAxisIndependentContours, ntool_contour, processToComputeIsAdditive, computeContoursAlreadyFilled, diffwidth);
                 }
             }
         }
     }
+
+    //apply operations
     multi.clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
     multi.clipper.Clear();
     if (computeContoursAlreadyFilled) {
@@ -459,6 +505,7 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
                 double zlimit = input[input_idx].z - tm.spec.profiles[0]->sliceHeight;
                 tm.removeUsedSlicesBelowZ(zlimit);
                 rm.removeUsedRawSlicesBelowZ(zlimit);
+                tm.removeAdditionalContoursBelowZ(zlimit);
             }
             ++input_idx;
             if (input_idx >= input.size()) break;
