@@ -25,8 +25,10 @@ public:
     virtual std::string start();
     virtual bool started() { return inUse; }
     virtual void wait();
+    virtual void kill();
 protected:
     bool inUse;
+    virtual void closePipes();
 #ifdef INWINDOWS
     STARTUPINFO si;
     PROCESS_INFORMATION pi;

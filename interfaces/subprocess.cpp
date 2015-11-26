@@ -12,6 +12,7 @@
 #else
 #  include <unistd.h>
 #  include <stdlib.h>
+#  include <signal.h>
 #  include <sys/types.h>
 #  include <sys/wait.h>
 #  define PIPE_READ  0
@@ -183,27 +184,45 @@ std::string SubProcessManager::start() {
     return std::string();
 }
 
+void SubProcessManager::closePipes() {
+    if (pipeInput) {
+        fclose(pipeIN);
+#ifdef INWINDOWS
+        CloseHandle(INR);
+#endif
+    }
+    if (pipeOutput) {
+        fclose(pipeOUT);
+#ifdef INWINDOWS
+        CloseHandle(OUTW);
+#endif
+    }
+}
+
 void SubProcessManager::wait() {
     if (inUse) {
         inUse = false;
-        if (pipeInput) {
-            fclose(pipeIN);
-#ifdef INWINDOWS
-            CloseHandle(INR);
-#endif
-        }
-        if (pipeOutput) {
-            fclose(pipeOUT);
-#ifdef INWINDOWS
-            CloseHandle(OUTW);
-#endif
-        }
+        closePipes();
 #ifdef INWINDOWS
         WaitForSingleObject(pi.hProcess, INFINITE);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
 #else
         waitpid(pid, &status, 0);
+#endif
+    }
+}
+
+void SubProcessManager::kill() {
+    if (inUse) {
+        inUse = false;
+        closePipes();
+#ifdef INWINDOWS
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+#else
+        ::kill(pid, SIGKILL);
 #endif
     }
 }
