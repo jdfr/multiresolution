@@ -35,8 +35,6 @@ std::string printPathInfo(const char * filename, bool verbose) {
         }
         fprintf(stdout, "Number of Records: %d\n", fileheader.numRecords);
         fprintf(stdout, "\n\n");
-    } else {
-        fprintf(stdout, "number of tools (processes): %d\n", fileheader.numtools);
     }
 
     SliceHeader sliceheader;
@@ -49,19 +47,19 @@ std::string printPathInfo(const char * filename, bool verbose) {
         if (verbose) {
             fprintf(stdout, "Record %d\n", currentRecord);
             switch (sliceheader.type) {
-            case PATHTYPE_RAW_CONTOUR:       fprintf(stdout, "               type: raw slice (sliced from mesh file)\n"); break;
-            case PATHTYPE_PROCESSED_CONTOUR: fprintf(stdout, "               type: contours for tool %d\n", sliceheader.ntool); break;
-            case PATHTYPE_TOOLPATH:          fprintf(stdout, "               type: toolpaths for tool %d\n", sliceheader.ntool); break;
-            default:                         fprintf(stdout, "               type: unknown (%d) for tool %d\n", sliceheader.type, sliceheader.ntool);
+            case PATHTYPE_RAW_CONTOUR:       fprintf(stdout, "                  type: raw slice (sliced from mesh file)\n"); break;
+            case PATHTYPE_PROCESSED_CONTOUR: fprintf(stdout, "                  type: contours for tool %d\n", sliceheader.ntool); break;
+            case PATHTYPE_TOOLPATH:          fprintf(stdout, "                  type: toolpaths for tool %d\n", sliceheader.ntool); break;
+            default:                         fprintf(stdout, "                  type: unknown (%d) for tool %d\n", sliceheader.type, sliceheader.ntool);
             }
             fprintf(stdout, "                  z: %.20g\n", sliceheader.z);
             switch (sliceheader.saveFormat) {
-            case PATHFORMAT_INT64:     fprintf(stdout, "  coordinate format: 64-bit integers\n"); break;
-            case PATHFORMAT_DOUBLE:    fprintf(stdout, "  coordinate format: double floating point\n"); break;
-            case PATHFORMAT_DOUBLE_3D: fprintf(stdout, "  coordinate format: double floating point (3D paths)\n"); break;
-            default:                   fprintf(stdout, "  coordinate format: unknown (%d)\n", sliceheader.saveFormat);
+            case PATHFORMAT_INT64:     fprintf(stdout, "     coordinate format: 64-bit integers\n"); break;
+            case PATHFORMAT_DOUBLE:    fprintf(stdout, "     coordinate format: double floating point\n"); break;
+            case PATHFORMAT_DOUBLE_3D: fprintf(stdout, "     coordinate format: double floating point (3D paths)\n"); break;
+            default:                   fprintf(stdout, "     coordinate format: unknown (%d)\n", sliceheader.saveFormat);
             }
-            fprintf(stdout, "   %s scaling: %.20g\n", sliceheader.saveFormat == PATHFORMAT_INT64 ? "original" : "        ", sliceheader.scaling);
+            fprintf(stdout, "      %s scaling: %.20g\n", sliceheader.saveFormat == PATHFORMAT_INT64 ? "original" : "        ", sliceheader.scaling);
         } else {
             fprintf(stdout, "Record %d: ", currentRecord);
             switch (sliceheader.type) {
@@ -82,9 +80,9 @@ std::string printPathInfo(const char * filename, bool verbose) {
                 }
                 numpaths = (int)paths.size();
                 BBox bb = getBB(paths);
-                fprintf(stdout, "       bounding box:\n");
-                fprintf(stdout, "          X: min=%.20g, max=%.20g\n", bb.minx*sliceheader.scaling, bb.maxx*sliceheader.scaling);
-                fprintf(stdout, "          Y: min=%.20g, max=%.20g\n", bb.miny*sliceheader.scaling, bb.maxy*sliceheader.scaling);
+                fprintf(stdout, "          bounding box:\n");
+                fprintf(stdout, "       X: min=%.20g, max=%.20g\n", bb.minx*sliceheader.scaling, bb.maxx*sliceheader.scaling);
+                fprintf(stdout, "       Y: min=%.20g, max=%.20g\n", bb.miny*sliceheader.scaling, bb.maxy*sliceheader.scaling);
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
                 DPaths paths;
                 if (!iop_f.readDoublePaths(paths)) {
@@ -100,7 +98,16 @@ std::string printPathInfo(const char * filename, bool verbose) {
                 }
                 numpaths = (int)paths.size();
             }
-            fprintf(stdout, " number of elements: %d\n", numpaths);
+            int payload   = (sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64);
+            int numpoints = (payload - numpaths - 1) / (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D ? 3 : 2);
+            fprintf(stdout, "    number of elements: %d\n", numpaths);
+            fprintf(stdout, "      number of points: %d\n", numpoints);
+            /*
+            fprintf(stdout, "   total size in bytes: %d\n", sliceheader.totalSize);
+            fprintf(stdout, "  header size in bytes: %d\n", sliceheader.headerSize);
+            fprintf(stdout, " payload size in bytes: %d\n", sliceheader.totalSize - sliceheader.headerSize);
+            fprintf(stdout, "    \"  in 8-byte words: %d\n", (sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64));
+            */
             fprintf(stdout, "\n\n");
         } else {
             fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
