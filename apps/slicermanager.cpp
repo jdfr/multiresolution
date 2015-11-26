@@ -53,6 +53,9 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.workdir = workdir;
     subp.args.clear();
 #ifdef SLICER_USE_DEBUG_FILE
+    if (debugfile.empty()) {
+        debugfile = "slicerlog.standalone.txt";
+    }
     subp.args.push_back(debugfile);
 #endif
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
