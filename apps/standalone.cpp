@@ -103,17 +103,25 @@ std::string applyFeedback(Arguments &args, MetricFactors &factors, SimpleSlicing
             if (!e.empty())                   { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": ", err); break; }
             if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": header is too short!"); break; }
             if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
+                clp::Paths paths;
                 if (sliceheader.saveFormat == PATHFORMAT_INT64) {
-                    clp::Paths paths;
                     if (!iop_f.readClipperPaths(paths)) {
                         err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
                         break;
                     }
-                    sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
+                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
+                    if (!iop_f.readDoublePaths(paths, 1 / sliceheader.scaling)) {
+                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
+                        break;
+                    }
+                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
+                    err = str("Error reading feedback from pathsfile ", feedback_file, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
+                    break;
                 } else {
-                    err = str("Error reading feedback from pathsfile ", feedback_file, ": path save format for all processed contours must be Int64!!!!");
+                    err = str("Error reading feedback from pathsfile ", feedback_file, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
                     break;
                 }
+                sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
             } else {
                 fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             }
