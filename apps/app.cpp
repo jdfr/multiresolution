@@ -1,6 +1,7 @@
 #include "app.hpp"
 #include <stdio.h>
 #include <ctype.h>
+#include <math.h>
 
 bool fileExists(const char *filename) {
     FILE *test = fopen(filename, "rb");
@@ -127,7 +128,7 @@ bool PathInFileSpec::matchesHeader(SliceHeader &h) {
     return (h.alldata.size()>=5) &&
             ((!usetype)  || (type == h.type)) &&
             ((!usentool) || (ntool == h.ntool)) &&
-            ((!usez)     || (z == h.z));
+            ((!usez)     || (fabs(z - h.z)<1e-6));
 }
 
 std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, bool furtherArgs) {
