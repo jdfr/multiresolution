@@ -11,12 +11,6 @@
 #include <sstream>
 #include <string>
 
-
-//const int mlen = 16; //for true matrix
-const int mlen = 12; //do not care about the last row of the transformation matrix
-//the matrix is specified row-wise
-typedef double TransformationMatrix[mlen];
-
 //some examples of transformations for debugging:
 //just translation: 1 0 0 5 0 1 0 -10 0 0 1 3
 //rotation over Z axis: 0.469426929951 -0.882971346378 0.000000000000 0.000000000000 0.882971346378 0.469426929951 0.000000000000 0.000000000000 0.000000000000 0.000000000000 1.000000000000 0.000000000000 0.000000000000 0.000000000000 0.000000000000 1.000000000000
@@ -24,23 +18,12 @@ typedef double TransformationMatrix[mlen];
 //0.952031 0.180332 0.247219 -0.000000 -0.301287 0.693675 0.654249 -0.000000 -0.053507 -0.697349 0.714732 0.000000 0.000000 0.000000 0.000000 1.000000
 
 
-bool transformationIs2DCOmpatible(TransformationMatrix matrix) {
-    return ((matrix[2] == 0.0) && (matrix[6] == 0.0) && (matrix[8] == 0.0) && (matrix[9] == 0.0));
-}
-
-bool transformationSurelyIsAffine(TransformationMatrix matrix) {
-    return (matrix[12] != 0.0) || (matrix[13] != 0.0) || (matrix[14] != 0.0) || (matrix[15] != 1.0);
-}
-
 std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2DCompatible, SliceHeader &sliceheader, DPaths &paths) {
     if (is2DCompatible) {
-        sliceheader.z = sliceheader.z*matrix[10] + matrix[11];
+        sliceheader.z = applyTransform2DCompatibleZ(sliceheader.z, matrix);
         for (auto path = paths.begin(); path != paths.end(); ++path) {
             for (auto point = path->begin(); point != path->end(); ++point) {
-                double x = (matrix[0] * point->X) + (matrix[1] * point->Y) + matrix[3];
-                double y = (matrix[4] * point->X) + (matrix[5] * point->Y) + matrix[7];
-                point->X = x;
-                point->Y = y;
+                applyTransform2DCompatibleXY(*point, matrix);
             }
         }
         std::string err = sliceheader.writeToFile(iop.f);
@@ -55,12 +38,7 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2
             paths3.push_back(Path3D());
             paths3.back().reserve(path->size());
             for (auto point = path->begin(); point != path->end(); ++point) {
-                double xx = point->X;
-                double yy = point->Y;
-                double x = (matrix[0] * point->X) + (matrix[1] * point->Y) + (matrix[2]  * sliceheader.z) + matrix[3];
-                double y = (matrix[4] * point->X) + (matrix[5] * point->Y) + (matrix[6]  * sliceheader.z) + matrix[7];
-                double z = (matrix[8] * point->X) + (matrix[9] * point->Y) + (matrix[10] * sliceheader.z) + matrix[11];
-                paths3.back().push_back(Point3D(x, y, z));
+                paths3.back().push_back(applyTransformFull3D(*point, sliceheader.z, matrix));
             }
         }
 
@@ -79,12 +57,7 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2
 std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, SliceHeader &sliceheader, Paths3D &paths) {
     for (auto path = paths.begin(); path != paths.end(); ++path) {
         for (auto point = path->begin(); point != path->end(); ++point) {
-            double x = (matrix[0] * point->x) + (matrix[1] * point->y) + (matrix[2] *  point->z) + matrix[3];
-            double y = (matrix[4] * point->x) + (matrix[5] * point->y) + (matrix[6] *  point->z) + matrix[7];
-            double z = (matrix[8] * point->x) + (matrix[9] * point->y) + (matrix[10] * point->z) + matrix[11];
-            point->x = x;
-            point->y = y;
-            point->z = z;
+            applyTransformFull3D(*point, matrix);
         }
     }
     std::string err = sliceheader.writeToFile(iop.f);
@@ -190,11 +163,11 @@ int main(int argc, const char** argv) {
 
     TransformationMatrix matrix;
 
-    for (int i = 0; i < mlen; ++i) {
+    for (int i = 0; i < TransformationMatrixLength; ++i) {
         if (!rd.readParam(matrix[i], i, "-th coefficient of the transformation matrix")) { printError(rd); return -1; }
     }
 
-    if ((mlen==16) && transformationSurelyIsAffine(matrix)) {
+    if (transformationSurelyIsAffine(matrix)) {
         fprintf(stderr, "The specified transformation matrix is not rigid!!!!");
         return -1;
     }

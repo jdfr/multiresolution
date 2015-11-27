@@ -159,6 +159,56 @@ template<DoTransform fun> void transformAllPaths(Transformation &t, HoledPolygon
     }
 }
 
+typedef struct Point3D {
+    double x, y, z;
+    Point3D() {}
+    Point3D(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
+} Point3D;
+
+typedef std::vector<Point3D> Path3D;
+typedef std::vector<Path3D> Paths3D;
+
+//const int mlen = 16; //for true matrix
+const int TransformationMatrixLength = 12; //do not care about the last row of the transformation matrix
+//the matrix is specified row-wise
+typedef double TransformationMatrix[TransformationMatrixLength];
+
+inline bool transformationIs2DCOmpatible(TransformationMatrix matrix) {
+    return ((matrix[2] == 0.0) && (matrix[6] == 0.0) && (matrix[8] == 0.0) && (matrix[9] == 0.0));
+}
+
+inline bool transformationSurelyIsAffine(TransformationMatrix matrix) {
+    return (TransformationMatrixLength == 16) && ((matrix[12] != 0.0) || (matrix[13] != 0.0) || (matrix[14] != 0.0) || (matrix[15] != 1.0));
+}
+
+inline void applyTransform2DCompatibleXY(clp::DoublePoint &p, TransformationMatrix matrix) {
+    double x = (matrix[0] * p.X) + (matrix[1] * p.Y) + matrix[3];
+    double y = (matrix[4] * p.X) + (matrix[5] * p.Y) + matrix[7];
+    p.X = x;
+    p.Y = y;
+}
+
+inline double applyTransform2DCompatibleZ(double z, TransformationMatrix matrix) {
+    return z*matrix[10] + matrix[11];
+}
+
+inline Point3D applyTransformFull3D(clp::DoublePoint &p, double iz, TransformationMatrix matrix) {
+    double x = (matrix[0] * p.X) + (matrix[1] * p.Y) + (matrix[2] * iz) + matrix[3];
+    double y = (matrix[4] * p.X) + (matrix[5] * p.Y) + (matrix[6] * iz) + matrix[7];
+    double z = (matrix[8] * p.X) + (matrix[9] * p.Y) + (matrix[10] * iz) + matrix[11];
+    return Point3D(x, y, z);
+}
+
+inline void applyTransformFull3D(Point3D &p, TransformationMatrix matrix) {
+    double x = (matrix[0] * p.x) + (matrix[1] * p.y) + (matrix[2] * p.z) + matrix[3];
+    double y = (matrix[4] * p.x) + (matrix[5] * p.y) + (matrix[6] * p.z) + matrix[7];
+    double z = (matrix[8] * p.x) + (matrix[9] * p.y) + (matrix[10] * p.z) + matrix[11];
+    p.x = x;
+    p.y = y;
+    p.z = z;
+}
+
+
 typedef struct BBox {
     clp::cInt minx;
     clp::cInt maxx;

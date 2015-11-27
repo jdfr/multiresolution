@@ -4,6 +4,7 @@
 #include "common.hpp"
 #include "iopaths.hpp"
 #include "spec.hpp"
+#include "auxgeom.hpp"
 #include "multiresolution.h" //this is needed just to import the definitions for fields saveFormat and type in SliceHeader
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
@@ -69,15 +70,6 @@ typedef struct PathInFileSpec {
 } PathInFileSpec;
 
 std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int &currentRecord, PathInFileSpec &spec, SliceHeader &sliceheader);
-
-typedef struct Point3D {
-    double x, y, z;
-    Point3D() {}
-    Point3D(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
-} Point3D;
-
-typedef std::vector<Point3D> Path3D;
-typedef std::vector<Path3D> Paths3D;
 
 bool read3DPaths(IOPaths &iop, Paths3D &paths);
 bool write3DPaths(IOPaths &iop, Paths3D &paths, PathCloseMode mode);
