@@ -19,7 +19,8 @@ typedef struct ShowContoursInfo {
         //usePipe = false;
         filesep = config.getValue("FILESEP");
         showContoursDir = config.getValue("SHOWCONTOURS_SCRIPTPATH");
-        showContoursScriptPath = showContoursDir + filesep + config.getValue("SHOWCONTOURS_SCRIPTNAME");
+        //showContoursScriptPath = showContoursDir + filesep + config.getValue("SHOWCONTOURS_SCRIPTNAME");
+        showContoursScriptPath = config.getValue("SHOWCONTOURS_SCRIPTNAME");
         pythonExecutablePath = config.getValue("PYPATH");
     }
 } ShowContoursInfo;
