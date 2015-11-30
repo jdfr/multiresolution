@@ -96,18 +96,25 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     multi.clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
 
     bool doNotUseStoredAdditiveContours = false;
+    bool appliedAdditional = false;
 
     //process additional additive contours: for applyContours() logic to take them as additive, we earmark them as coming from ntool=0
     //OF COURSE, THIS WORKS ONLY AS LONG AS WE HAVE THE CONVENTION THAT add/sub PROCESSES ARE ADDITIVE FOR ntool=0 AND SUBTRACTIVE FOR ntool>0
     for (auto & additional : additionalAdditiveContours) {
         if (std::fabs(additional.first - z) < spec.global.z_epsilon) {
-            applyContours(additional.second, 0, processToComputeIsAdditive, computeContoursAlreadyFilled, 0.0);
-            //we have received feedback for additional contours.
-            //If flag ignoreRedundantAdditiveContours is true, ignore stored additive contours
-            doNotUseStoredAdditiveContours = spec.global.ignoreRedundantAdditiveContours;
-            //we suppose that we are not getting more than one additional additive contour at each Z.
-            break;
+            if (appliedAdditional) {
+                printf("WARNING: tried to apply more than one instance of additional additive contours for raw slice at z=%f, for tool=%d!\n", z, ntool);
+            } else {
+                applyContours(additional.second, 0, processToComputeIsAdditive, computeContoursAlreadyFilled, 0.0);
+                //we have received feedback for additional contours.
+                //If flag ignoreRedundantAdditiveContours is true, ignore stored additive contours
+                doNotUseStoredAdditiveContours = spec.global.ignoreRedundantAdditiveContours;
+                appliedAdditional = true;
+            }
         }
+    }
+    if ((!additionalAdditiveContours.empty()) && (!appliedAdditional)) {
+        printf("WARNING: there are additional additive contours, but none was applied for raw slice at z=%f, for tool=%d!\n", z, ntool);
     }
 
     //process previously computed contours
