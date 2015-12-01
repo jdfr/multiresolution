@@ -24,13 +24,11 @@
 
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesBelowZ(double z) {
-    auto profile = spec.profiles.begin();
     //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
         slices->erase(std::remove_if(slices->begin(), slices->end(),
             [z](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sz->z < z); }
         ), slices->end());
-        ++profile;
     }
 }
 

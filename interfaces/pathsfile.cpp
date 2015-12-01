@@ -1,4 +1,4 @@
-#include "app.hpp"
+#include "pathsfile.hpp"
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
@@ -136,25 +136,20 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, b
         const char * spectype;
         if (!rd.readParam(spectype, "SPECTYPE (type/ntool/z)")) break;
         if (strcmp(spectype, "type") == 0) {
-            this->usetype = true;
-            const char * typ=NULL;
+            usetype          = true;
+            const char * typ = NULL;
             if (!rd.readParam(typ, "value for type specification")) { return std::string(rd.fmt.str()); };
             char t = tolower(typ[0]);
-            if ((t == 'r') || (typ[0] == '0')) {
-                this->type = PATHTYPE_RAW_CONTOUR;
-            } else if ((t == 'c') || (typ[0] == '1')) {
-                this->type = PATHTYPE_PROCESSED_CONTOUR;
-            } else if ((t == 't') || (typ[0] == '2')) {
-                this->type = PATHTYPE_TOOLPATH;
-            } else {
-                return str("Could not understand this type value: ", typ, "\n");
-            }
+            if      ((t == 'r') || (typ[0] == '0')) { type = PATHTYPE_RAW_CONTOUR; }
+            else if ((t == 'c') || (typ[0] == '1')) { type = PATHTYPE_PROCESSED_CONTOUR; }
+            else if ((t == 't') || (typ[0] == '2')) { type = PATHTYPE_TOOLPATH; }
+            else                                    { return str("Could not understand this type value: ", typ, "\n"); }
         } else if (strcmp(spectype, "ntool") == 0) {
-            this->usentool = true;
-            if (!rd.readParam(this->ntool, "value for ntool specification")) { return std::string(rd.fmt.str()); };
+            usentool = true;
+            if (!rd.readParam(ntool, "value for ntool specification")) { return std::string(rd.fmt.str()); };
         } else if (strcmp(spectype, "z") == 0) {
-            this->usez = true;
-            if (!rd.readParam(this->z, "value for z specification")) { return std::string(rd.fmt.str()); };
+            usez = true;
+            if (!rd.readParam(z,     "value for z specification"))     { return std::string(rd.fmt.str()); };
         } else if (furtherArgs) {
             --rd.argidx;
             break;
@@ -164,6 +159,7 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, b
     }
     return std::string();
 }
+
 
 std::string seekNextMatchingPathsFromFile(FILE * f, FileHeader &fileheader, int &currentRecord, PathInFileSpec &spec, SliceHeader &sliceheader) {
     for (; currentRecord < fileheader.numRecords; ++currentRecord) {

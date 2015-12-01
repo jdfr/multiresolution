@@ -3,9 +3,8 @@
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #define STANDALONE_USEPYTHON
 
-#include "app.hpp"
-#include "config.hpp"
-#include "spec.hpp"
+#include "pathsfile.hpp"
+#include "simpleparsing.hpp"
 #include "auxgeom.hpp"
 #include <stdio.h>
 #include <sstream>
@@ -149,7 +148,7 @@ void printError(ParamReader &rd) {
 }
 
 int main(int argc, const char** argv) {
-    ParamReader rd = getParamReader(argc, argv);
+    ParamReader rd = ParamReader::getParamReaderWithOptionalResponseFile(argc, argv);
 
     if (!rd.err.empty()) {
         fprintf(stderr, "ParamReader error: %s\n", rd.err.c_str());

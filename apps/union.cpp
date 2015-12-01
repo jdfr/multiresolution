@@ -3,9 +3,7 @@
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #define STANDALONE_USEPYTHON
 
-#include "app.hpp"
-#include "config.hpp"
-#include "spec.hpp"
+#include "pathsfile.hpp"
 #include "auxgeom.hpp"
 #include <stdio.h>
 #include <ctype.h>

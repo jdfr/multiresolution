@@ -229,7 +229,7 @@ MetricFactors::MetricFactors(Configuration &config) {
     internal_to_input = 1 / input_to_internal;
 }
 
-Configuration::Configuration(const char *filename) {
+void Configuration::load(const char *filename) {
     bool ok = true;
     std::string contents = get_file_contents(filename, ok);
     has_err = !ok;
@@ -244,11 +244,11 @@ Configuration::Configuration(const char *filename) {
         *pair = ltrim(*pair, '#', '\n');
         size_t pos = pair->find_first_of(':');
         if (pos != std::string::npos) {
-            std::string key   = pair->substr(0, pos);
-                        key   = trim(key);
+            std::string key = pair->substr(0, pos);
+            key = trim(key);
             if (key.empty() || hasKey(key)) continue;
             std::string value = pair->substr(pos + 1);
-                        value = trim(value);
+            value = trim(value);
             store.emplace(std::move(key), std::move(value));
         }
     }

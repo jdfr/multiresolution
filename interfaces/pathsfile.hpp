@@ -1,11 +1,16 @@
-#ifndef APP_HEADER
-#define APP_HEADER
+#ifndef PATHSFILE_HEADER
+#define PATHSFILE_HEADER
 
 #include "common.hpp"
+#include "simpleparsing.hpp"
 #include "iopaths.hpp"
 #include "spec.hpp"
 #include "auxgeom.hpp"
 #include "multiresolution.h" //this is needed just to import the definitions for fields saveFormat and type in SliceHeader
+
+/********************************************************
+FUNCTIONALITY TO READ/WRITE PATHSFILES
+*********************************************************/
 
 static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
 
@@ -50,6 +55,7 @@ typedef struct SliceHeader {
 
 std::string writeSlice(FILE *f, SliceHeader header, clp::Paths &paths, PathCloseMode mode);
 
+//this is a utility class to pattern-match the records of a pathsfile
 typedef struct PathInFileSpec {
     int64 type;
     int64 ntool;

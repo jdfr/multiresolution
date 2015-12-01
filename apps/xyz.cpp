@@ -1,4 +1,5 @@
-#include "spec.hpp"
+#include "pathsfile.hpp"
+#include "simpleparsing.hpp"
 #include <string>
 #include <fstream>
 #include <limits>
@@ -127,7 +128,7 @@ void printError(ParamReader &rd) {
 
 
 int main(int argc, const char **argv) {
-    ParamReader rd = getParamReader(argc, argv);
+    ParamReader rd = ParamReader::getParamReaderWithOptionalResponseFile(argc, argv);
 
     if (!rd.err.empty()) {
         fprintf(stderr, "ParamReader error: %s\n", rd.err.c_str());

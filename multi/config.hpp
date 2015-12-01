@@ -11,6 +11,8 @@ std::string get_file_contents(const char *filename, bool &ok);
 
 std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars);
 std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars, char startComment, char endComment);
+inline std::vector<std::string> normalizedSplit(std::string &input) {return split(input, "", " \t\n\v\f\r", "\"", '#', '\n');}
+
 
 /*this is a class to read key/value configuration pairs from a file with the following format (whitespace is trimmed both from keys and values):
     key1 : value1 ;
@@ -21,7 +23,8 @@ class Configuration {
 public:
     bool has_err;
     std::string err;
-    Configuration(const char *filename);
+    Configuration() : has_err(false) {}
+    void load(const char *filename);
     template<typename S1, typename S2> void update(S1 key, S2 value) { store[std::string(std::move(key))] = std::move(value); }
     bool hasKey(const std::string key);
     bool hasKey(const char *      key);
@@ -35,7 +38,7 @@ typedef struct MetricFactors {
     MetricFactors(Configuration &config);
 } MetricFactors;
 
-//this si a hack to convert a series of things to a string
+//this is a hack to convert a series of things to a string
 template<typename... Args> std::string str(Args... args) {
     std::ostringstream fmt;
     int dummy[sizeof...(Args)] = { (fmt << args, 0)... };

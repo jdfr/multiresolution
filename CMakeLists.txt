@@ -51,11 +51,11 @@ else()
   set(CLIPPER_BASE_DIR "" CACHE PATH "path to clipper library")
 endif()
 
-if(EXISTS ${SRC}/../boost)
-  set(BOOST_BASE_DIR ${SRC}/..)
+if(EXISTS ${SRC}/../boost/include/boost)
+  set(BOOST_INCLUDE_DIR ${SRC}/../boost/include)
 else()
   #as far as I understand, this will enable users of cmake-gui to set this directory
-  set(BOOST_BASE_DIR "" CACHE PATH "path to boost library")
+  set(BOOST_INCLUDE_DIR "" CACHE PATH "path to boost library")
 endif()
 
 set(clipper_include_dir ${CLIPPER_BASE_DIR}/clipper)
@@ -80,7 +80,9 @@ SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type")
 
 ADD_DEFINITIONS(-DCLIPPER_USE_INTRINSIC_128)
 if (MSVC)
-  ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
+  #_CRT_SECURE_NO_WARNINGS: disable annoying warnings
+  #BOOST_ALL_NO_LIB: disable autolink feature in BOOST causing trouble because we are brewing outside of BOOST infrastructure just what we need
+  ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DBOOST_ALL_NO_LIB)
   if (FALSE)
     #The high amount of warnings while building with this block enabled
     #suggests that I currently do not know how to properly pass optimization
@@ -120,7 +122,7 @@ endif()
 set (INCLUDE_DIRS
   ${clipper_include_dir}
   ${iopaths_include_dir}
-  ${BOOST_BASE_DIR}
+  ${BOOST_INCLUDE_DIR}
   ${SRC}/multi
   ${SRC}/interfaces
   ${SRC}/python
@@ -153,17 +155,17 @@ set(CORESOURCES
   multi/snapToGrid.cpp
   multi/spec.hpp
   multi/spec.cpp
-  apps/app.hpp
-  apps/app.cpp
+  interfaces/simpleparsing.hpp
+  interfaces/simpleparsing.cpp
+  interfaces/parsing.hpp
+  interfaces/parsing.cpp
+  interfaces/pathsfile.hpp
+  interfaces/pathsfile.cpp
+  interfaces/slicermanager.hpp
+  interfaces/slicermanager.cpp
+  interfaces/subprocess.hpp
+  interfaces/subprocess.cpp
   )
-
-if (USEPYTHON OR GENERATE_EXECUTABLE)
-  set(CORESOURCES
-    ${CORESOURCES}
-    interfaces/subprocess.hpp
-    interfaces/subprocess.cpp
-    )
-endif()
 
 if (USE_PYTHON_DEBUG)
   set(CORESOURCES
@@ -173,10 +175,38 @@ if (USE_PYTHON_DEBUG)
     )
 endif()
 
+if(EXISTS ${SRC}/../boost/program_options/src)
+  set(BOOST_PROGRAMOPTIONS_DIR ${SRC}/../boost/program_options/src)
+else()
+  #as far as I understand, this will enable users of cmake-gui to set this directory
+  set(BOOST_PROGRAMOPTIONS_DIR "" CACHE PATH "path to boost::program_options source files")
+endif()
+
+set(BOOSTSOURCES
+    ${BOOST_PROGRAMOPTIONS_DIR}/cmdline.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/options_description.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/parsers.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/variables_map.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/value_semantic.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/positional_options.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/utf8_codecvt_facet.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/convert.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/winmain.cpp
+    ${BOOST_PROGRAMOPTIONS_DIR}/split.cpp
+    )
+
+set(CORESOURCES ${CORESOURCES})
+
 if (NOT LINKING_OPTIMIZATION)
-  ADD_LIBRARY(corelib STATIC  ${CORESOURCES})
+  ADD_LIBRARY(corelib      STATIC ${CORESOURCES})
+  ADD_LIBRARY(miniboostlib STATIC ${BOOSTSOURCES})
+  if (ENABLE_SLICER_LOGGING)
+      set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "SLICER_USE_DEBUG_FILE")
+  endif()
   if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
-    target_compile_options(corelib PUBLIC "-fPIC")
+    target_compile_options(corelib      PUBLIC "-fPIC")
+    target_compile_options(miniboostlib PUBLIC "-fPIC" "-Wno-deprecated-declarations")
   endif()
 endif()
   
@@ -189,20 +219,21 @@ if(GENERATE_LIBRARY)
     set(LIBRARY_SOURCES
       ${LIBRARY_SOURCES}
       ${CORESOURCES}
+      ${BOOSTSOURCES}
       )
   endif()
   ADD_LIBRARY(multiresolution_library SHARED ${LIBRARY_SOURCES})
   set_target_properties(multiresolution_library PROPERTIES COMPILE_DEFINITIONS "LIBRARY_EXPORTS")
   set_target_properties(multiresolution_library PROPERTIES OUTPUT_NAME multires)
-  if(NOT LINKING_OPTIMIZATION)
-    target_link_libraries(multiresolution_library corelib)
+  if(LINKING_OPTIMIZATION)
+    target_compile_options(multiresolution_library PUBLIC "-Wno-deprecated-declarations")
+  else()
+    target_link_libraries(multiresolution_library corelib miniboostlib)
   endif()
 endif()
   
 if(GENERATE_EXECUTABLE)
   set(EXECSOURCES
-    apps/slicermanager.hpp
-    apps/slicermanager.cpp
     apps/standalone.cpp
     )
   if(USE_PYTHON_VIEWER)
@@ -216,18 +247,21 @@ if(GENERATE_EXECUTABLE)
     set(EXECSOURCES
       ${EXECSOURCES}
       ${CORESOURCES}
+      ${BOOSTSOURCES}
       )
   endif()
   ADD_EXECUTABLE(multiresolution_executable ${EXECSOURCES})
   set_target_properties(multiresolution_executable PROPERTIES OUTPUT_NAME multires)
-  if (ENABLE_SLICER_LOGGING)
-      set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "SLICER_USE_DEBUG_FILE")
-  endif()
   if (USE_PYTHON_DEBUG AND USE_PYTHON_VIEWER)
     set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "STANDALONE_USEPYTHON")
   endif()
-  if(NOT LINKING_OPTIMIZATION)
-    target_link_libraries(multiresolution_executable corelib)
+  if(LINKING_OPTIMIZATION)
+  if (ENABLE_SLICER_LOGGING)
+      set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "SLICER_USE_DEBUG_FILE")
+  endif()
+    target_compile_options(multiresolution_executable PUBLIC "-Wno-deprecated-declarations")
+  else()
+    target_link_libraries(multiresolution_executable corelib miniboostlib)
   endif()
 endif()
 
@@ -235,12 +269,14 @@ function(SINGLESOURCE_EXECUTABLE GENERATE_OPTION TARGETNAME SOURCEFILE EXENAME)
   if(GENERATE_OPTION)
     set(SINGLESOURCE ${SOURCEFILE})
     if(LINKING_OPTIMIZATION)
-      set(SINGLESOURCE ${SINGLESOURCE} ${CORESOURCES})
+      set(SINGLESOURCE ${SINGLESOURCE} ${CORESOURCES} ${BOOSTSOURCES})
     endif()
     ADD_EXECUTABLE(${TARGETNAME} ${SINGLESOURCE})
     set_target_properties(${TARGETNAME} PROPERTIES OUTPUT_NAME ${EXENAME})
-    if(NOT LINKING_OPTIMIZATION)
-      target_link_libraries(${TARGETNAME} corelib)
+    if(LINKING_OPTIMIZATION)
+      target_compile_options(${TARGETNAME} PUBLIC "-Wno-deprecated-declarations")
+    else()
+      target_link_libraries(${TARGETNAME} corelib miniboostlib)
     endif()
   endif()
 endfunction(SINGLESOURCE_EXECUTABLE)
@@ -307,14 +343,14 @@ if (SET_CONFIGURE_FILE)
       message(FATAL_ERROR "if SET_CONFIGURE_FILE is ON, you must supply to CMake the abolute path to the python executable in the variable PYPATH")
     endif()
     if (NOT SHOW_RESULT_PARAMETERS)
-      set(SHOW_RESULT_PARAMETERS show\ 2d\ nspec)
+      set(SHOW_RESULT_PARAMETERS --show\ 2d)
     endif()
   else()
     if (NOT PYPATH)
       set(PYPATH "python")
     endif()
     if (NOT SHOW_RESULT_PARAMETERS)
-      set(SHOW_RESULT_PARAMETERS nshow)
+      set(SHOW_RESULT_PARAMETERS )
     endif()
   endif()
   configure_file(${SRC}/config.template.txt ${CONFIGURE_OUTPUT_PATH}/config.txt)

@@ -1,44 +1,81 @@
 #Example parameters file for the multiresolution engine.
-#Parameters must be strictly ordered, and can be given in the command line or in a parameter file like this.
+#Parameters can be given in the command line or in a parameter file like this.
+#Parameter files may be nested. They are included with
+#     --response-file params.txt
+#or
+#     @params.txt
 
-#config file
-  config.txt
+#command-line configuration options
 
-#input file
-  "${INITIAL_MESH_FILE}"
-
-#view parameters
-  #nshow         #show nothing
-  #show 2d nspec #requires python with numpy and matplotlib
-  #show 3d nspec #requires python with numpy and mayavi
+  --config config.txt              #config file
+  --load "${INITIAL_MESH_FILE}"    #input file
+  #--show 2d                       #view parameters, requires python with numpy and matplotlib
+  #--show 3d                       #view parameters, requires python with numpy and mayavi
   ${SHOW_RESULT_PARAMETERS}
 
-#save parameters
-  #save double all.paths               #save in one file, in double floating-point format
-  save integer all.paths               #save in one file, in int64 format
+  --save all.paths                 #save file
+  #--save-format integer           #default value
+  #--save-format double            #this should not be used if the file specified in --save will be re-used
 
-#feedback parameters
-  #dry
-  nfeedback
-  #feedback mesh feedback.stl
-  #feedback paths feedback.paths
+  #--dry-run                       #use this to show the Z values of the required slices
 
-#multislicing parameters
+  #--feedback mesh   feedback.stl  #use this to specify feedback from a mesh file
+  #--feedback paths feedback.paths #use this to specify feedback from a pathsfile
 
-#  global parameters
-     contours ncorrect motion_opt -1 -1
+#global parameters for the multislicing process
 
-#  scheduling parameters
-     #manual nvcorrect 1e-6 2 0 0 0.08 1
-     #uniform 0.1
-     #sched nvcorrect 1e-6 1 1
-     sched nvcorrect 1e-6 all
+  #--correct-input #this is not necessary if using the standalone executable, since input is always provided by Slic3r::TriangleMeshSlicer, which always provides correct input
 
-#  addsub flag
-     simple
-#  number of processes
-     2
-#    parameters for process 0
-       75 constant 75 67.5 0.1 0.75 0.01 0.01 0 snap safestep clearance 1 1.0 ninfill
-#    parameters for process 1
-       10 constant 10 9 0.1 0.1 0.001 0.1 0 snap safestep clearance 1 1.0 ninfill
+  --save-contours #The output will always include toolpaths. If this option is specified, the output will also include raw and processed contours
+
+  --motion-planner #use a very simple motion planner
+
+  #--subtractive-box-mode 10000 10000 #this enables simple support for generation of subtractive toolpaths
+
+  #scheduling parameters: exactly one of the following must be specified
+    #--slicing-uniform 0.1 #slice the input file at exactly this step in Z
+    --slicing-scheduler #uses the 3D scheduler
+    #--slicing-scheduler 0 1 #uses the 3D scheduler, but only uses the tools whose ntool is explicitly specified
+    #--slicing-manual 0 0 0.08 1 #"Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i
+
+  #--vertical-correction #If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)
+
+  #--z-epsilon 1e-6 #For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units (default value 1e-6)
+
+  #--addsub #If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)
+
+#per-process parameters
+
+  --process 0
+    --radx 75
+    --voxel-profile constant
+    --voxel-z 75 67.5
+    --gridstep 0.1
+    --snap
+    --smoothing 0.01
+    --tolerances 0.75 0.01
+    --safestep
+    --clearance
+    --medialaxis-radius 1.0 
+    #--radius-removecommon 0
+    #--nosnap
+    #--infill lines
+    #--infill-recursive
+    #--infill-medialaxis-radius 1.0 0.5
+
+  --process 1
+    --radx 10
+    --voxel-profile constant
+    --voxel-z 10 9
+    --gridstep 0.1
+    --snap
+    --smoothing 0.1
+    --tolerances 0.1 0.001
+    --safestep
+    --clearance
+    --medialaxis-radius 1.0
+    #--radius-removecommon 0
+    #--nosnap
+    #--infill lines
+    #--infill-recursive
+    #--infill-medialaxis-radius 1.0 0.5

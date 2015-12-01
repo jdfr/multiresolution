@@ -4,12 +4,13 @@
 #include "multiresolution.h"
 #include "common.hpp"
 static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface.h so typedef coord_type resolves to the same type as typedef ClipperLib::cInt");
-#include "app.hpp"
+#include "pathsfile.hpp"
 
 //THIS FILE IMPLEMENTS THE SHARED LIBRARY INTERFACE
 
 #include "config.hpp"
 #include "spec.hpp"
+#include "parsing.hpp"
 #include "3d.hpp"
 
 #include <fcntl.h>
@@ -31,15 +32,15 @@ typedef struct SharedLibraryConfig {
     std::string err;
     Configuration config;
 
-    SharedLibraryConfig(char * configfile) : config(configfile) {}
+    SharedLibraryConfig(char * configfile) { config.load(configfile); }
 } SharedLibraryConfig;
 
 typedef struct SharedLibraryState {
     std::string err;
-    Arguments args;
+    MultiSpec spec;
     SimpleSlicingScheduler * sched;
     Multislicer * multi;
-    SharedLibraryState(Configuration *config) : args(config), sched(NULL), multi(NULL) {}
+    SharedLibraryState(Configuration *config) : spec(*config), sched(NULL), multi(NULL) {}
     ~SharedLibraryState() {
         if (this->sched) {
             delete this->sched;
@@ -141,44 +142,43 @@ LIBRARY_API  BSTR getErrorText(void* value) {
 #endif
 }
 
-StateHandle initState(Configuration *config, ParamReader &rd, bool doscale) {
+StateHandle initState(Configuration *config, std::vector<std::string> &args, bool doscale) {
     SharedLibraryState *state = new SharedLibraryState(config);
-    if (state->args.config->has_err) {
-        state->err = state->args.err = state->args.config->err;
+    if (state->spec.global.config.has_err) {
+        state->err = state->spec.global.config.err;
         return state;
     }
-    state->args.readArguments(doscale, rd);
-    if (state->args.err.empty()) {
-        if (state->args.multispec->global.useScheduler) {
-            bool removeUnused = true;
-            state->sched = new SimpleSlicingScheduler(removeUnused, *state->args.multispec);
-        } else {
-            state->multi = new Multislicer(*state->args.multispec);
-        }
+    double scale;
+    std::string err = Parser::getScale(doscale, *config, scale);
+    if (!err.empty()) { state->err = err; return state; }
+    err = Parser::parseAll(state->spec, NULL, args, scale);
+    if (!err.empty()) { state->err = err; return state; }
+    if (state->spec.global.useScheduler) {
+        bool removeUnused = true;
+        state->sched = new SimpleSlicingScheduler(removeUnused, state->spec);
     } else {
-        state->err = state->args.err;
+        state->multi = new Multislicer(state->spec);
     }
     //state->args.err = "hellooooooooo"; return args;
     return state;
 }
 
 LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* arguments) {
-    ParamReader rd(arguments, ParamString);
-    if (!rd.err.empty()) {
-        config->err = rd.err;
-        return NULL;
-    }
-    return initState(&config->config, rd, doscale!=0);
+    std::string argl(arguments);
+    auto args = normalizedSplit(argl);
+    return initState(&config->config, args, doscale != 0);
 }
 
 LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv) {
-    int argidx = 0;
-    ParamReader rd(argidx, argc, argv);
-    if (!rd.err.empty()) {
-        config->err = rd.err;
-        return NULL;
-    }
-    return initState(&config->config, rd, doscale!=0);
+    auto args = Parser::getArgs(argc, argv);
+    return initState(&config->config, args, doscale!=0);
+}
+
+LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
+    ParamsExtractInfo ret;
+    ret.numProcesses    = (int)state->spec.numspecs;
+    ret.processRadiuses = &(state->spec.radiuses.front());
+    return ret;
 }
 
 LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
@@ -188,6 +188,15 @@ LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
     }
     return config;
 }
+
+std::string helpstr;
+LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int showExample) {
+    if (helpstr.empty()) {
+        Parser::composeParameterHelp(showGlobals != 0, showPerProcess != 0, showExample != 0, helpstr);
+    }
+    return (char *)helpstr.c_str();
+}
+
 
 LIBRARY_API  void freeState(StateHandle state) {
     if (state != NULL) delete state;
@@ -217,10 +226,10 @@ LIBRARY_API  clp::cInt** getPathsArray(SharedLibrarySlice* slice) {
 
 LIBRARY_API  ResultsHandle computeResult(SharedLibrarySlice* slice, StateHandle state) {
     clp::Paths dummy;
-    size_t numspecs = state->args.multispec->numspecs;
+    size_t numspecs = state->spec.numspecs;
     SharedLibraryResult * result = new SharedLibraryResult(numspecs);
         
-    GlobalSpec &global = state->args.multispec->global;
+    GlobalSpec &global = state->spec.global;
     if (slice->paths->size() > 0) {
         //this is a very ugly hack to compromise between part of the code requiring vector<shared_ptr<T>>
         //because of convoluted co-ownership requirements and other part happily using vector<T>
@@ -307,7 +316,7 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
         ret.zs = NULL;
         return ret;
     }
-    state->sched->createSlicingSchedule(zmin, zmax, state->args.multispec->global.z_epsilon, ScheduleTwoPhotonSimple);
+    state->sched->createSlicingSchedule(zmin, zmax, state->spec.global.z_epsilon, ScheduleTwoPhotonSimple);
     if (state->sched->has_err) {
         state->err = state->sched->err;
         ret.numinputslices = ret.numoutputslices = -1;

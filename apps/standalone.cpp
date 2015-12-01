@@ -1,10 +1,18 @@
 //this is a simple command line application that organizes the execution of the multislicer
 
+#include <string>
+#include <stdexcept>
+#include <iostream>
+#include <vector>
+#include <map>
+#include <stdexcept>
+
 #include "spec.hpp"
+#include "parsing.hpp"
 #include "slicermanager.hpp"
 #include "multislicer.hpp"
 #include "3d.hpp"
-#include "app.hpp"
+#include "pathsfile.hpp"
 #include <stdio.h>
 #include <ctype.h>
 #include <sstream>
@@ -35,17 +43,17 @@ template<typename Function, typename... Args> std::string applyToAllFilesWithIOP
     return std::string();
 }
 
-std::string applyFeedback(Arguments &args, MetricFactors &factors, SimpleSlicingScheduler &sched, bool feedbackMesh, const char *feedback_file, std::vector<double> &zs, std::vector<double> &scaled_zs) {
+std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, bool feedbackMesh, const char *feedback_file, std::vector<double> &zs, std::vector<double> &scaled_zs) {
     if (feedbackMesh) {
 
 #ifdef SLICER_USE_DEBUG_FILE
         //make sure that the log file is not the same as for the other slicer instance!
         const char * feedbackKey = "SLICER_DEBUGFILE_FEEDBACK";
-        std::string feedbackdebugfile = args.config->hasKey(feedbackKey) ? args.config->getValue(feedbackKey) : "slicerlog.feedback.txt";
-        args.config->update("SLICER_DEBUGFILE", feedbackdebugfile);
+        std::string feedbackdebugfile = config.hasKey(feedbackKey) ? config.getValue(feedbackKey) : "slicerlog.feedback.txt";
+        config.update("SLICER_DEBUGFILE", feedbackdebugfile);
 #endif
 
-        SlicerManager *feedbackSlicer = getSlicerManager(*args.config, SlicerManagerExternal);
+        SlicerManager *feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
 
         char *meshfullpath = fullPath(feedback_file);
         if (meshfullpath == NULL) {
@@ -137,130 +145,164 @@ inline std::string writeSlices(FILES &files, clp::Paths &paths, PathCloseMode mo
     return applyToAllFiles(files, writeSlice, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
 }
 
-const char *ERR =
-"\nArguments: CONFIGFILENAME MESHFILENAME (show (3d (spec SPEC_3D | nspec) | 2d (spec SPEC_2D | nspec | debug)) | nshow) (save (float | integer) OUTPUTFILENAME | nsave) (dry | feedback MODE FEEDBACKFILENAME | nfeedback) MULTISLICING_PARAMETERS\n\n"
-"This list of arguments can be read from the command line, or a single argument can specify a text file from which tha arguments are read.\n\n"
-"    -CONFIGFILENAME is required (config file name).\n\n"
-"    -MESHFILENAME is required (input mesh file name).\n\n"
-"    -If 'show 3d nspec' is specified, a 3D view of the contours will be generated with mayavi after all is computed (viewing parameters are set in the config file)\n\n"
-"    -If 'show 3d spec SPEC_3D' is the same as the previous one, but SPEC_3D is a python expression for specifying the viewing parameters\n\n"
-"    -If 'show 2d nspec' is specified, Z-navigable 2D views of contours will be generated with matplotlib after they are computed (viewing parameters are set in the config file)\n\n"
-"    -If 'show 2d spec SPEC_2D' is the same as the previous one, but SPEC_2D is a python expression for specifying the viewing parameters\n\n"
-"    -If 'show 2d debug' is specified, 2D views of contours will be generated as they are computed (computation will be interrumpted until the viewing window is closed)\n\n"
-"    -If 'save MODE OUTPUTFILENAME' is specified, MODE is either 'float' (or just 'f') or 'integer' (or just 'i'), meaning the format of the points: contours in 'float' are ready to be consumed by other applications but should not be converted back and forth to raw data to avoid data degradation, 'integer' saves the raw data to avoid , but the config file is needed to scale the contours accurately. OUTPUTFILENAME is the name of the file to save all toolpaths\n\n"
-"    -If 'dry' is specified, the system only shows the Z values of the slices to be received from the MESHFILENAME, then terminates without doing anything else\n\n"
-"    -If 'feedback MODE FILENAME' is specified, feedback about actual contours can be added to the multislicing engine. MODE is either 'mesh' (meaning a file contaning a mesh, like an STL file) or 'paths' (meaning a pathsfile as created by this tool, from which all paths of type 'contour' are used), and FEEDBACKFILENAME is the name of the file containing the data for feedback\n\n"
-"    -MULTISLICING_PARAMETERS represents the parameters specifying the multislicing process all further arguments, which are evaluated verbatim by the multislicing engine (in particular, metric arguments execept z_uniform_step must be supplied in the engine's native unit)\n\n";
+typedef std::pair<po::options_description, po::positional_options_description> MainSpec;
 
-void printError(ParamReader &rd) {
-    rd.fmt << ERR;
-    std::string err = rd.fmt.str();
-    fprintf(stderr, err.c_str());
+MainSpec mainOptions() {
+    po::options_description opts("Main options");
+    opts.add_options()
+        ("help,h", "produce help message")
+        ("config,q", po::value<std::string>()->default_value("config.txt"), "configuration input file (if no file is provided, it is assumed to be config.txt)")
+        (RESPONSE_FILE_OPTION, po::value<std::string>(), "file with additional parameters, can be specified with '@filename', too")
+        ("load", po::value<std::string>(), "input mesh file")
+        ("save", po::value<std::string>(), "output file in *.paths format")
+        ("save-format", po::value<std::string>()->default_value("integer"), "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
+        ("show,w", po::value<std::vector<std::string>>()->multitoken(), "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
+        ("dry-run,y", "if this option is specified, the system only shows the Z values of the slices to be received from the input mesh file, then terminates without doing anything else")
+        ("feedback,b", po::value<std::vector<std::string>>()->multitoken(), "this option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file itself.")
+        ;
+    po::positional_options_description positional;
+    positional.add("load", 1).add("save", 1);
+    return MainSpec(opts, positional);
 }
 
+const int mainOptsIdx    = 0;
+const int globalOptsIdx  = 1;
+const int perProcOptsIdx = 2;
+std::vector<po::parsed_options> slurpAllOptions(MainSpec &mainSpec, int argc, const char ** argv) {
+    std::vector<const po::options_description*> optss;
+    optss.reserve(3);
+    optss.push_back(&mainSpec.first);
+    optss.push_back(&Parser::globalOptions);
+    optss.push_back(&Parser::perProcessOptions);
+    auto args = Parser::getArgs(argc, argv);
+    return Parser::sortOptions(optss, mainSpec.second, mainOptsIdx, NULL, args);
+}
+
+void usage(MainSpec &mainSpec) {
+    std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n"
+              << mainSpec.first            << '\n'
+              << Parser::globalOptions     << '\n'
+              << Parser::perProcessOptions << '\n';
+}
 
 int main(int argc, const char** argv) {
-    ParamReader rd = getParamReader(argc, argv);
+    double scale;
 
-    if (!rd.err.empty()) {
-        fprintf(stderr, "ParamReader error: %s\n", rd.err.c_str());
-        return -1;
-    }
-
-    const char *configfilename, *meshfilename;
     char *meshfullpath;
-    
-    if (!rd.readParam(configfilename,  "CONFIGFILENAME"))         { printError(rd); return -1; }
-    if (!rd.readParam(meshfilename,    "MESHFILENAME"))           { printError(rd); return -1; }
-
-    if (!fileExists(configfilename)) { fprintf(stderr, "Could not open config file %s!!!!",   configfilename); return -1; }
-    if (!fileExists(  meshfilename)) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename); return -1; }
-
-    //this is necessary because the slicer has a different working directory
-    meshfullpath = fullPath(meshfilename);
-    if (meshfullpath == NULL) {
-        fprintf(stderr, "Error trying to resolve canonical path to the input mesh file");
-        return -1;
-    }
 
     bool show, use2d, showAtEnd, useviewparams;
-    const char *viewmode, *viewparams=NULL;
-    if (!rd.readParam(show, "show",    "show flag (show/nshow)")) { printError(rd); return -1; }
-    if (show) {
-        if (!rd.readParam(use2d, "2d", "view mode flag (2d/3d)")) { printError(rd); return -1; }
-        if (!rd.readParam(viewmode,    "viewing parameters flag (spec/nspec/debug)")) { printError(rd); return -1; }
-        useviewparams = strcmp(viewmode, "spec") == 0;
-        if (useviewparams) {
-          if (!rd.readParam(viewparams,"python viewing parameters")) { printError(rd); return -1; }
-        }
-        showAtEnd = strcmp(viewmode, "debug") != 0;
-        if ((!use2d) && (!showAtEnd)) {
-            fprintf(stderr, "'3d debug' cannot be specified!!!");
-            return -1;
-        }
-        if (use2d) {
-            if (showAtEnd) {
-#               ifndef STANDALONE_USEPYTHON
-                    fprintf(stderr, "ERROR: 'show 2d all' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
-                    return -1;
-#               endif
-            } else {
-#               ifndef STANDALONE_USEPYTHON
-                    fprintf(stderr, "ERROR: 'show 2d nall' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
-                    return -1;
-#               endif
-            }
-        } else {
-#           ifndef STANDALONE_USEPYTHON
-                fprintf(stderr, "ERROR: 'show 3d' VIEWING MODE UNAVAILABLE. PLEASE RECONFIGURE AND REBUILD TO ADD SUPPORT!!!!\n\n");
-                return -1;
-#           endif
-        }
-    }
+    std::string viewparams;
 
     bool save;
     int64 saveFormat;
-    const char *savemode, *saveformat, *singleoutputfilename=NULL;
-    if (!rd.readParam(savemode, "save mode (save/nsave)")) { printError(rd); return -1; }
-    save = strcmp(savemode, "save")==0;
-    if (save) {
-        if (!rd.readParam(saveformat, "save format (f[loat]/i[nteger])")) { printError(rd); return -1; }
-        char t = tolower(saveformat[0]);
-        if        (t == 'i') {
-            saveFormat = PATHFORMAT_INT64;
-        } else if (t == 'f') {
-            saveFormat = PATHFORMAT_DOUBLE;
-        } else {
-            fprintf(stderr, "save format parameter must start by either 'i' (integer) or 'f' (float)\n");
+
+    std::string singleoutputfilename;
+
+    bool dryrun, feedback, feedbackMesh;
+    std::string feedback_file;
+    
+    Configuration config;
+    MultiSpec multispec(config);
+
+    try {
+        MainSpec mainSpec = mainOptions();
+        if (argc == 1) {
+            usage(mainSpec);
+            return 1;
+        }
+        std::vector<po::parsed_options> optsBySystem = slurpAllOptions(mainSpec, argc, argv);
+
+        po::variables_map mainOpts;
+        po::store(optsBySystem[mainOptsIdx], mainOpts);
+
+        if (mainOpts.count("help")) {
+            usage(mainSpec);
+            return 1;
+        }
+
+        dryrun   = mainOpts.count("dry-run")  != 0;
+        feedback = mainOpts.count("feedback") != 0;
+        save     = mainOpts.count("save")     != 0;
+
+        std::string meshfilename;
+        if (mainOpts.count("load")) {
+            meshfilename = std::move(mainOpts["load"].as<std::string>());
+        } else if (!dryrun) {
+            fprintf(stderr, "Error: load parameter has not been specified!");
+        }
+
+        std::string configfilename = std::move(mainOpts["config"].as<std::string>());
+
+        if (!fileExists(configfilename.c_str())) { fprintf(stderr, "Could not open config file %s!!!!", configfilename.c_str()); return -1; }
+
+        config.load(configfilename.c_str());
+
+        if (config.has_err) { fprintf(stderr, config.err.c_str()); return -1; }
+
+        std::string err = Parser::getScale(true, config, scale);
+        if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
+
+        err = Parser::parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], scale);
+        if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
+
+        if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
+
+        //this is necessary because the slicer may have a different working directory
+        meshfullpath = fullPath(meshfilename.c_str());
+        if (meshfullpath == NULL) {
+            fprintf(stderr, "Error trying to resolve canonical path to the input mesh file: %s", meshfilename.c_str());
             return -1;
         }
-        if (!rd.readParam(singleoutputfilename, "OUTPUTFILENAME")) { printError(rd); return -1; }
-    } else {
+
+        showAtEnd = true; //this option is not exposed for now as an argument...
+
+        show = mainOpts.count("show") != 0;
+        if (show) {
+            const std::vector<std::string> &vals = mainOpts["show"].as<std::vector<std::string>>();
+            use2d = vals[0].compare("2d") == 0;
+            useviewparams = vals.size() > 1;
+            if (useviewparams) {
+                viewparams = std::move(vals[1]);
+            }
+        }
+
         saveFormat = PATHFORMAT_DOUBLE;
-    }
-
-    const char* feedback_flag, *feedback_mode, *feedback_file;
-    bool feedback, feedbackMesh, dryrun;
-
-    if (!rd.readParam(feedback_flag, "feedback flag (feedback/nfeedback)")) { printError(rd); return -1; }
-    dryrun   = strcmp(feedback_flag, "dry") == 0;
-    feedback = strcmp(feedback_flag, "feedback")==0;
-    if (feedback) {
-        if (!rd.readParam(feedback_mode, "feedback mode (mesh/paths)")) { printError(rd); return -1; }
-        feedbackMesh = strcmp(feedback_mode, "mesh")==0;
-        if ((!feedbackMesh) && (strcmp(feedback_mode, "paths") != 0)) {
-            fprintf(stderr, "Error: feedback mode must be either 'mesh' or 'paths', but it was <%s>\n", feedback_mode);
-            return -1;
+        if (save) {
+            singleoutputfilename = std::move(mainOpts["save"].as<std::string>());
+            std::string savef = std::move(mainOpts["save-format"].as<std::string>());
+            char t = tolower(savef[0]);
+            if (t == 'i') {
+                saveFormat = PATHFORMAT_INT64;
+            } else if (t == 'f') {
+                saveFormat = PATHFORMAT_DOUBLE;
+            } else {
+                fprintf(stderr, "save format parameter must start by either 'i' (integer) or 'f' (float): <%s>\n", savef.c_str());
+                return -1;
+            }
         }
-        if (!rd.readParam(feedback_file, "FEEDBACKFILENAME")) { printError(rd); return -1; }
-        if (!fileExists(feedback_file)) {
-            fprintf(stderr, "Error: feedback file <%s> does not exist!", feedback_file);
-            return -1;
+
+        if (feedback) {
+            const std::vector<std::string> &vals = mainOpts["feedback"].as<std::vector<std::string>>();
+            feedbackMesh = strcmp(vals[0].c_str(), "mesh") == 0;
+            if ((!feedbackMesh) && (strcmp(vals[0].c_str(), "paths") != 0)) {
+                fprintf(stderr, "Error: If feedback option is specified, the first value is the feedback mode, either 'mesh' or 'paths', but it was <%s>\n", vals[0].c_str());
+                return -1;
+            }
+            if (vals.size() == 1) { fprintf(stderr, "Error: If feedback is specified, the second value must be the feedback file name, but it was not present"); return -1; }
+            feedback_file = std::move(vals[1]);
+            if (!fileExists(feedback_file.c_str())) {
+                fprintf(stderr, "Error: feedback file <%s> does not exist!", feedback_file.c_str());
+                return -1;
+            }
         }
+
+        mainOpts = po::variables_map();
+    } catch (std::exception &e) {
+        fprintf(stderr, e.what()); return -1;
     }
 
     if (dryrun) {
-        save = show = false;
+        feedback = save = show = false;
     } else {
         if (!save && !show) {
             fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
@@ -268,42 +310,21 @@ int main(int argc, const char** argv) {
         }
     }
 
-    Arguments args(configfilename);
-
-    if (args.config->has_err) {
-        fprintf(stderr, "Error reading configuration file: %s", args.config->err.c_str());
-        return -1;
-    }
-
-    //skip app name and mesh filename
-    if (!args.readArguments(true, rd)) {
-        fprintf(stderr, "Error while parsing and populating arguments: %s", args.err.c_str());
-        return -1;
-    }
-
-    if (feedback && (!args.multispec->global.useScheduler)) {
+    if (feedback && (!multispec.global.useScheduler)) {
         const char *schedmode;
-        switch (args.multispec->global.schedMode) {
+        switch (multispec.global.schedMode) {
         case SimpleScheduler:   schedmode = "sched"; break;
         case UniformScheduling: schedmode = "uniform"; break;
         case ManualScheduling:  schedmode = "manual"; break;
-        default:                schedmode = "unknown"; 
+        default:                schedmode = "unknown";
         }
-        fprintf(stderr, "Error: feedback file was specified (%s), but the scheduling mode '%s' does not allow feedback!!!!", feedback_file, schedmode);
+        fprintf(stderr, "Error: feedback file was specified (%s), but the scheduling mode '%s' does not allow feedback!!!!", feedback_file.c_str(), schedmode);
         return -1;
     }
 
-    MetricFactors factors(*args.config);
+    MetricFactors factors(config);
     if (!factors.err.empty()) {
         fprintf(stderr, factors.err.c_str());
-        return -1;
-    }
-
-    if (rd.argidx != rd.argc) {
-        fprintf(stderr, "ERROR: SOME REMAINING PARAMETERS HAVE NOT BEEN USED: \n");
-        for (int k = rd.argidx; k < rd.argc; ++k) {
-            fprintf(stderr, "   %d/%d: %s\n", k, rd.argc - 1, rd.argv[k]);
-        }
         return -1;
     }
 
@@ -317,20 +338,20 @@ int main(int argc, const char** argv) {
     FILE *singleoutput = NULL;
     IOPaths iop;
     if (save) {
-        singleoutput = fopen(singleoutputfilename, "wb");
+        singleoutput = fopen(singleoutputfilename.c_str(), "wb");
         if (singleoutput == NULL) {
-            fprintf(stderr, "Error trying to open this file for output: %s\n", singleoutputfilename);
+            fprintf(stderr, "Error trying to open this file for output: %s\n", singleoutputfilename.c_str());
             return -1;
         }
         all_files.push_back(singleoutput);
     }
 
-    SlicerManager *slicer = getSlicerManager(*args.config, SlicerManagerExternal);
+    SlicerManager *slicer = getSlicerManager(config, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
     SlicesViewer *slicesViewer=NULL;
     if (shownotinline) {
-        slicesViewer = new SlicesViewer(*args.config, "view slices", use2d, viewparams);
+        slicesViewer = new SlicesViewer(config, "view slices", use2d, viewparams.c_str());
         std::string err = slicesViewer->start();
         if (!err.empty()) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
@@ -348,32 +369,32 @@ int main(int argc, const char** argv) {
     }
     free(meshfullpath);
 
-    bool alsoContours = args.multispec->global.alsoContours;
+    bool alsoContours = multispec.global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
-    int numtools = (int)args.multispec->numspecs;
+    int numtools = (int)multispec.numspecs;
     if (write) {
-        FileHeader header(*args.multispec, factors);
+        FileHeader header(multispec, factors);
         applyToAllFiles(all_files, [&header](FILE *f) { return header.writeToFile(f, false); });
     }
 
     std::vector<std::shared_ptr<ResultSingleTool>> results;
 
-    if (args.multispec->global.useScheduler) {
+    if (multispec.global.useScheduler) {
 
-        SimpleSlicingScheduler sched(removeUnused, *args.multispec);
+        SimpleSlicingScheduler sched(removeUnused, multispec);
 
         double minz = 0, maxz = 0;
 
         slicer->getZLimits(&minz, &maxz);
 
-        if (args.multispec->global.schedMode == ManualScheduling) {
-            for (auto pair = args.multispec->global.schedSpec.begin(); pair != args.multispec->global.schedSpec.end(); ++pair) {
+        if (multispec.global.schedMode == ManualScheduling) {
+            for (auto pair = multispec.global.schedSpec.begin(); pair != multispec.global.schedSpec.end(); ++pair) {
                 pair->z *= factors.input_to_internal;
             }
         }
 
-        sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, args.multispec->global.z_epsilon, ScheduleTwoPhotonSimple);
+        sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec.global.z_epsilon, ScheduleTwoPhotonSimple);
 
         if (sched.has_err) {
             fprintf(stderr, "Error while trying to create the slicing schedule: %s\n", sched.err.c_str());
@@ -399,7 +420,7 @@ int main(int argc, const char** argv) {
         }
 
         if (feedback) {
-            std::string err = applyFeedback(args, factors, sched, feedbackMesh, feedback_file, rawZs, sched.rm.rawZs);
+            std::string err = applyFeedback(config, factors, sched, feedbackMesh, feedback_file.c_str(), rawZs, sched.rm.rawZs);
             if (!err.empty()) {
                 fprintf(stderr, err.c_str());
                 return -1;
@@ -439,7 +460,7 @@ int main(int argc, const char** argv) {
 
 #           ifdef STANDALONE_USEPYTHON
                 if (showInline) {
-                    //SHOWCONTOURS(args.multispec->global.config, str("raw contour at Z ", sched.rm.raw[sched.rm.raw_idx].z), &rawslice);
+                    //SHOWCONTOURS(multispec.global.config, str("raw contour at Z ", sched.rm.raw[sched.rm.raw_idx].z), &rawslice);
                 }
 #           endif
 
@@ -476,7 +497,7 @@ int main(int argc, const char** argv) {
                 }
 #               ifdef STANDALONE_USEPYTHON
                     if (showInline) {
-                        SHOWCONTOURS(args.multispec->global.config,
+                        SHOWCONTOURS(multispec.global.config,
                             str("processed contours at Z ", single->z, ", tool ", single->ntool),
                             &(single->contoursToShow), &(single->toolpaths));
                     }
@@ -487,10 +508,10 @@ int main(int argc, const char** argv) {
 
     } else {
 
-        Multislicer multi(*args.multispec);
+        Multislicer multi(multispec);
         std::vector<ResultSingleTool> res;
         std::vector<SingleProcessOutput*> ress(numtools);
-        double zstep = args.multispec->global.z_uniform_step;
+        double zstep = multispec.global.z_uniform_step;
 
         //std::vector<double> zs = slicer->prepareSTLSimple(zstep, zstep);
         std::vector<double> zs = slicer->prepareSTLSimple(zstep);
@@ -551,7 +572,7 @@ int main(int argc, const char** argv) {
                 }
             }
 #           ifdef STANDALONE_USEPYTHON
-                //SHOWCONTOURS(args.multispec->global.config, "raw", &rawslice);
+                //SHOWCONTOURS(multispec.global.config, "raw", &rawslice);
 #           endif
 
             if (write && alsoContours) {
@@ -582,7 +603,7 @@ int main(int argc, const char** argv) {
                     for (int k = 0; k < numtools; ++k) {
                         toshowv.push_back(&(ress[k]->toolpaths));
                     }
-                    ShowContoursInfo info(args.multispec->global.config, str("slices at Z ", zs[i]));
+                    ShowContoursInfo info(multispec.global.config, str("slices at Z ", zs[i]));
                     showContours(toshowv, info);
                 }
 #           endif

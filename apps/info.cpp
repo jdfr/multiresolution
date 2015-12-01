@@ -3,9 +3,8 @@
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #define STANDALONE_USEPYTHON
 
-#include "app.hpp"
-#include "config.hpp"
-#include "spec.hpp"
+#include "pathsfile.hpp"
+#include "simpleparsing.hpp"
 #include "auxgeom.hpp"
 #include <stdio.h>
 #include <ctype.h>
@@ -114,7 +113,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
                 }
                 numpaths = (int)paths.size();
             }
-            int payload   = (sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64);
+            int payload   = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64));
             int numpoints = (payload - numpaths - 1) / (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D ? 3 : 2);
             fprintf(stdout, "    number of elements: %d\n", numpaths);
             fprintf(stdout, "      number of points: %d\n", numpoints);

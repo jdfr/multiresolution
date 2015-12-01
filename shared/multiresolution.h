@@ -88,6 +88,11 @@ typedef struct LoadPathFileInfo {
     int ntools;
 } LoadPathFileInfo;
 
+typedef struct ParamsExtractInfo {
+    int numProcesses;
+    coord_type * processRadiuses;
+} ParamsExtractInfo;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -99,9 +104,13 @@ extern "C" {
 
     LIBRARY_API  ConfigHandle readConfiguration(char *configfilename);
 
+    LIBRARY_API  char * getParameterHelp(int showGlobals, int showPerProcess, int showExample); //ATTENTION: THIS METHOD IS NOT THREAD-SAFE!!!!
+
     LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv);
 
     LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* arguments);
+
+    LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state);
 
     LIBRARY_API  void freeState(StateHandle arguments);
 
