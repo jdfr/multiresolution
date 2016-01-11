@@ -172,17 +172,17 @@ std::vector<po::parsed_options> slurpAllOptions(MainSpec &mainSpec, int argc, co
     std::vector<const po::options_description*> optss;
     optss.reserve(3);
     optss.push_back(&mainSpec.first);
-    optss.push_back(&Parser::globalOptions);
-    optss.push_back(&Parser::perProcessOptions);
-    auto args = Parser::getArgs(argc, argv);
-    return Parser::sortOptions(optss, mainSpec.second, mainOptsIdx, NULL, args);
+    optss.push_back(globalOptions());
+    optss.push_back(perProcessOptions());
+    auto args = getArgs(argc, argv);
+    return sortOptions(optss, mainSpec.second, mainOptsIdx, NULL, args);
 }
 
 void usage(MainSpec &mainSpec) {
     std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n"
-              << mainSpec.first            << '\n'
-              << Parser::globalOptions     << '\n'
-              << Parser::perProcessOptions << '\n';
+              << mainSpec.first         << '\n'
+              << *(globalOptions())     << '\n'
+              << *(perProcessOptions()) << '\n';
 }
 
 int main(int argc, const char** argv) {
@@ -239,10 +239,10 @@ int main(int argc, const char** argv) {
 
         if (config.has_err) { fprintf(stderr, config.err.c_str()); return -1; }
 
-        std::string err = Parser::getScale(true, config, scale);
+        std::string err = getScale(true, config, scale);
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
-        err = Parser::parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], scale);
+        err = parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], scale);
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }

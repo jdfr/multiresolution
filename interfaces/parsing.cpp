@@ -1,6 +1,51 @@
 #include "parsing.hpp"
 #include <algorithm>
 
+po::options_description globalOptionsGenerator() {
+    po::options_description opts("Slicing engine options (global)");
+    opts.add_options()
+        ("save-contours,j", "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
+        ("correct-input", "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
+        ("motion-planner,k", "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
+        ("subtractive-box-mode", po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"), "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
+        ("slicing-uniform,u", po::value<double>()->value_name("z_step"), "The input mesh will be sliced uniformly at the specified slicing step. All processed will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing.")
+        ("slicing-scheduler,s", po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"), "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
+        ("slicing-manual,m", po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"), "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
+        ("vertical-correction", "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
+        ("z-epsilon,l", po::value<double>()->default_value(1e-6)->value_name("z_epsilon"), "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
+        ("addsub", "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
+        ;
+    return opts;
+}
+
+po::options_description perProcessOptionsGenerator() {
+    po::options_description opts("Slicing engine options (per process)");
+    opts.add_options()
+        ("process,p", po::value<int>()->required()->value_name("ntool"), "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
+        ("radx,x", po::value<double>()->required()->value_name("length"), "radius of the voxel for the current process in the XY plane")
+        ("voxel-profile,v", po::value<std::string>()->value_name("(constant|ellipsoid)"), "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
+        ("voxel-z,z", po::value<std::vector<double>>()->multitoken()->value_name("length extent"), "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
+        ("gridstep,g", po::value<double>()->required()->value_name("step"), "grid step for the current process (this is the minimal amount the head can be moved in XY)")
+        ("snap,n", "If this is specified, contours are snapped to a grid centered in the origin and with the step specified in gridstep. Otherwise, no snapping is done.")
+        ("safestep,f", "If specified, and gridstep is specified, the engine tries to minimize the resolution loss caused by snapping")
+        ("clearance,c", "If specified, the current process is computed such that toolpaths cannot overlap")
+        ("smoothing,o", po::value<double>()->value_name("length"), "If snap is not specified and clearance is not specified for the current process, this MUST be specified, and it is the smoothing radius for the computed contours")
+        ("tolerances,t", po::value<std::vector<double>>()->multitoken()->value_name("tol_radx tol_gridstep"), "Values of the roundness parameters for the current process. The first value is for the XY radius scale, the second for the gridstep scale (if the second value is omitted, it is copied from the first one).")
+        ("radius-removecommon,e", po::value<double>()->default_value(0.0)->value_name("length"), "If a positive value is specified, contours are clipped in zones where already-computed low-res contours are nearer than this value")
+        ("medialaxis-radius,a", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
+        ("infill,i", po::value<std::string>()->value_name("(lines|concentric)"), "If specified, the value must be either 'lines' (infilling is done with lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
+        ("infill-recursive,r", "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only if --infill lines or --infill concentric is specified)")
+        ("infill-medialaxis-radius,d", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if infill and infill-recursive are specified")
+        ;
+    return opts;
+}
+
+//it would be good practice to have these variables as state in a thread-safe singleton, to be created only if needed.
+static const po::options_description     globalOptionsStatic = globalOptionsGenerator();
+static const po::options_description perProcessOptionsStatic = perProcessOptionsGenerator();
+
+const po::options_description *     globalOptions() { return &globalOptionsStatic; }
+const po::options_description * perProcessOptions() { return &perProcessOptionsStatic; }
 
 // Additional command line parser which interprets '@something' as a
 // option "config-file" with the value "something"
@@ -31,7 +76,7 @@ std::string parseAndInsertResponseFileOptions(po::options_description &opts, con
     return std::string();
 }
 
-po::parsed_options Parser::parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args) {
+po::parsed_options parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args) {
     po::parsed_options result(&opts);
     if (CommandLineOrigin == NULL) CommandLineOrigin = "while parsing parameters";
     std::string res = parseAndInsertResponseFileOptions(opts, posit, args, CommandLineOrigin, result);
@@ -41,7 +86,7 @@ po::parsed_options Parser::parseCommandLine(po::options_description &opts, const
 
 bool charArrayComparer(const char *a, const char *b) { return strcmp(a, b) < 0; }
 
-std::vector<po::parsed_options> Parser::sortOptions(std::vector<const po::options_description*> &optss, const po::positional_options_description &posit, int positionalArgumentsIdx, const char *CommandLineOrigin, std::vector<std::string> &args) {
+std::vector<po::parsed_options> sortOptions(std::vector<const po::options_description*> &optss, const po::positional_options_description &posit, int positionalArgumentsIdx, const char *CommandLineOrigin, std::vector<std::string> &args) {
     po::options_description cmdline_options;
     for (auto &opts : optss) {
         cmdline_options.add(*opts);
@@ -88,49 +133,7 @@ std::vector<po::parsed_options> Parser::sortOptions(std::vector<const po::option
     return sortedoptions;
 }
 
-po::options_description globalOptionsGenerator() {
-    po::options_description opts("Slicing engine options (global)");
-    opts.add_options()
-        ("save-contours,j", "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
-        ("correct-input", "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
-        ("motion-planner,k", "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
-        ("subtractive-box-mode", po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"), "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
-        ("slicing-uniform,u", po::value<double>()->value_name("z_step"), "The input mesh will be sliced uniformly at the specified slicing step. All processed will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing.")
-        ("slicing-scheduler,s", po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"), "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
-        ("slicing-manual,m", po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"), "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
-        ("vertical-correction", "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
-        ("z-epsilon,l", po::value<double>()->default_value(1e-6)->value_name("z_epsilon"), "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
-        ("addsub", "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
-        ;
-    return opts;
-}
-
-po::options_description perProcessOptionsGenerator() {
-    po::options_description opts("Slicing engine options (per process)");
-    opts.add_options()
-        ("process,p", po::value<int>()->required()->value_name("ntool"), "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
-        ("radx,x", po::value<double>()->required()->value_name("length"), "radius of the voxel for the current process in the XY plane")
-        ("voxel-profile,v", po::value<std::string>()->value_name("(constant|ellipsoid)"), "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
-        ("voxel-z,z", po::value<std::vector<double>>()->multitoken()->value_name("length extent"), "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
-        ("gridstep,g", po::value<double>()->required()->value_name("step"), "grid step for the current process (this is the minimal amount the head can be moved in XY)")
-        ("snap,n", "If this is specified, contours are snapped to a grid centered in the origin and with the step specified in gridstep. Otherwise, no snapping is done.")
-        ("safestep,f", "If specified, and gridstep is specified, the engine tries to minimize the resolution loss caused by snapping")
-        ("clearance,c", "If specified, the current process is computed such that toolpaths cannot overlap")
-        ("smoothing,o", po::value<double>()->value_name("length"), "If snap is not specified and clearance is not specified for the current process, this MUST be specified, and it is the smoothing radius for the computed contours")
-        ("tolerances,t", po::value<std::vector<double>>()->multitoken()->value_name("tol_radx tol_gridstep"), "Values of the roundness parameters for the current process. The first value is for the XY radius scale, the second for the gridstep scale (if the second value is omitted, it is copied from the first one).")
-        ("radius-removecommon,e", po::value<double>()->default_value(0.0)->value_name("length"), "If a positive value is specified, contours are clipped in zones where already-computed low-res contours are nearer than this value")
-        ("medialaxis-radius,a", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
-        ("infill,i", po::value<std::string>()->value_name("(lines|concentric)"), "If specified, the value must be either 'lines' (infilling is done with lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
-        ("infill-recursive,r", "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only if --infill lines or --infill concentric is specified)")
-        ("infill-medialaxis-radius,d", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if infill and infill-recursive are specified")
-        ;
-    return opts;
-}
-
-const po::options_description Parser::    globalOptions =     globalOptionsGenerator();
-const po::options_description Parser::perProcessOptions = perProcessOptionsGenerator();
-
-std::string Parser::parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double scale) {
+std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double scale) {
     bool doscale = scale != 0.0;
     po::variables_map vm;
     try {
@@ -197,7 +200,7 @@ std::string Parser::parseGlobal(GlobalSpec &spec, po::parsed_options &optionList
 }
 
 //this method CANNOT be called until GlobalSpec::parseOptions has been called
-std::string Parser::parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, double scale) {
+std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, double scale) {
     typedef std::pair<int, po::parsed_options> OptionsByTool;
     std::vector<OptionsByTool> optionsByTool;
     optionsByTool.reserve(3); //reasonable number to reserve
@@ -211,7 +214,7 @@ std::string Parser::parsePerProcess(MultiSpec &spec, po::parsed_options &optionL
             if (param<0) return std::string("process option cannot have negative value: ", param);
             if ((*endptr) != 0) return str("process option value must be a non-negative integer: ", option.value[0]);
             processIds.push_back(param);
-            optionsByTool.push_back(OptionsByTool(param, po::parsed_options(&perProcessOptions, optionList.m_options_prefix)));
+            optionsByTool.push_back(OptionsByTool(param, po::parsed_options(perProcessOptions(), optionList.m_options_prefix)));
             if (maxProcess < processIds.back()) maxProcess = processIds.back();
         }
         if (optionsByTool.empty()) {
@@ -317,15 +320,15 @@ std::string Parser::parsePerProcess(MultiSpec &spec, po::parsed_options &optionL
     return spec.populateParameters();
 }
 
-std::string Parser::parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, double scale) {
+std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, double scale) {
     std::string err = parseGlobal(spec.global, globalOptionList, scale);
     if (!err.empty()) return err;
     return parsePerProcess(spec, perProcOptionList, scale);
 }
 
-std::string Parser::parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, double scale) {
+std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, double scale) {
     try {
-        std::vector<const po::options_description*> optss = { &globalOptions, &perProcessOptions };
+        std::vector<const po::options_description*> optss = { globalOptions(), perProcessOptions() };
         po::positional_options_description emptypos;
         auto sorted = sortOptions(optss, emptypos, 0, CommandLineOrigin, args);
         return parseAll(spec, sorted[0], sorted[1], scale);
@@ -334,10 +337,10 @@ std::string Parser::parseAll(MultiSpec &spec, const char *CommandLineOrigin, std
     }
 }
 
-void Parser::composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output) {
+void composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output) {
     if (globals || perProcess) output << "The multislicing engine is very flexible.\n  It takes parameters as if it were a command line application.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
-    if (globals)        globalOptions.print(output);
-    if (perProcess) perProcessOptions.print(output);
+    if (globals)        globalOptions()->print(output);
+    if (perProcess) perProcessOptions()->print(output);
     if (example && (globals || perProcess)) {
         output << "\nExample:";
         if (globals) output << " --save-contours --motion-planner --slicing-scheduler";
@@ -346,13 +349,13 @@ void Parser::composeParameterHelp(bool globals, bool perProcess, bool example, s
     }
 }
 
-void Parser::composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output) {
+void composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output) {
     std::ostringstream fmt;
     composeParameterHelp(globals, perProcess, example, fmt);
     output = fmt.str();
 }
 
-std::vector<std::string> Parser::getArgs(int argc, const char ** argv, int numskip) {
+std::vector<std::string> getArgs(int argc, const char ** argv, int numskip) {
     std::vector<std::string> args;
     if (argc > numskip) {
         args.reserve(argc - numskip);
@@ -361,7 +364,7 @@ std::vector<std::string> Parser::getArgs(int argc, const char ** argv, int numsk
     return args;
 }
 
-std::string Parser::getScale(bool doscale, Configuration &config, double &scale) {
+std::string getScale(bool doscale, Configuration &config, double &scale) {
     scale = 0.0;
     if (doscale) {
         if (config.hasKey("PARAMETER_TO_INTERNAL_FACTOR")) {

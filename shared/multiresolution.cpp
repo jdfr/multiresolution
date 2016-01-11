@@ -149,9 +149,9 @@ StateHandle initState(Configuration *config, std::vector<std::string> &args, boo
         return state;
     }
     double scale;
-    std::string err = Parser::getScale(doscale, *config, scale);
+    std::string err = getScale(doscale, *config, scale);
     if (!err.empty()) { state->err = err; return state; }
-    err = Parser::parseAll(state->spec, NULL, args, scale);
+    err = parseAll(state->spec, NULL, args, scale);
     if (!err.empty()) { state->err = err; return state; }
     if (state->spec.global.useScheduler) {
         bool removeUnused = true;
@@ -170,7 +170,7 @@ LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* 
 }
 
 LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv) {
-    auto args = Parser::getArgs(argc, argv);
+    auto args = getArgs(argc, argv);
     return initState(&config->config, args, doscale!=0);
 }
 
@@ -192,7 +192,7 @@ LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
 std::string helpstr;
 LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int showExample) {
     if (helpstr.empty()) {
-        Parser::composeParameterHelp(showGlobals != 0, showPerProcess != 0, showExample != 0, helpstr);
+        composeParameterHelp(showGlobals != 0, showPerProcess != 0, showExample != 0, helpstr);
     }
     return (char *)helpstr.c_str();
 }
