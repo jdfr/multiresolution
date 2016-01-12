@@ -17,9 +17,6 @@ EXPLICIT (THIS IS INEFFICIENT, COMPARED TO A
 FULLY-FLEDGED SUBSTRACTIVE IMPLEMENTATION, BUT EASIER)*/
 /////////////////////////////////////////////////
 
-#define min(a,b) ( ((a)<(b)) ? (a) : (b) )
-#define max(a,b) ( ((a)>(b)) ? (a) : (b) )
-
 typedef struct InOuter {
     clp::cInt limitX, limitY;
     
@@ -31,10 +28,10 @@ typedef struct InOuter {
         minx = maxx = path[0].X;
         miny = maxy = path[0].X;
         for (clp::Path::iterator point = path.begin()+1; point!=path.end(); ++point) {
-            minx = min(minx, point->X);
-            maxx = max(maxx, point->X);
-            miny = min(miny, point->Y);
-            maxy = max(maxy, point->Y);
+            minx = std::min(minx, point->X);
+            maxx = std::max(maxx, point->X);
+            miny = std::min(miny, point->Y);
+            maxy = std::max(maxy, point->Y);
         }
         return ((abs(minx)>=this->limitX) ||
                 (abs(maxx)>=this->limitX) ||
