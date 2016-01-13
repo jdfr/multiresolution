@@ -95,6 +95,7 @@ typedef struct MultiSpec {
     std::vector<std::vector<double>> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
     std::vector<std::vector<double>> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
     std::vector<InfillingMode> infillingModes;    //how to deal with infillings
+    std::vector<bool> infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
     std::vector<bool> infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
 
     VerticalProfilePolyVector profiles;

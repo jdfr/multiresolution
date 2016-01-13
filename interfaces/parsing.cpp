@@ -34,6 +34,7 @@ po::options_description perProcessOptionsGenerator() {
         ("radius-removecommon,e", po::value<double>()->default_value(0.0)->value_name("length"), "If a positive value is specified, contours are clipped in zones where already-computed low-res contours are nearer than this value")
         ("medialaxis-radius,a", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
         ("infill,i", po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"), "If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
+        ("infill-byregion", "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
         ("infill-recursive,r", "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only for --infill (linesh|linesv|concentric))")
         ("infill-medialaxis-radius,d", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
         ;
@@ -311,6 +312,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             else if (val.compare("justcontour") == 0) spec.infillingModes[k] = InfillingJustContours;
             else                                      return str("For process ", k, ": invalid infill mode: ", val);
             spec.infillingRecursive[k] = vm.count("infill-recursive") != 0;
+            spec.infillingWhole    [k] = vm.count("infill-byregion")  == 0;
             if (vm.count("infill-medialaxis-radius")) {
                 spec.medialAxisFactorsForInfillings[k] = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
             }

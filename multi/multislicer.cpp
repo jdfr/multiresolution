@@ -289,8 +289,6 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
     return true;
 }
 
-#define WHOLE_REGION_RECTILINEAR
-
 bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::Paths &contoursToBeInfilled) {
     infillingRadius = (double)spec.radiuses[k];
     infillingUseClearance = spec.addInternalClearances[k];
@@ -313,19 +311,19 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
         break;
     } case InfillingRectilinearV:
       case InfillingRectilinearH:
-#ifdef WHOLE_REGION_RECTILINEAR
-        processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec.infillingModes[k] == InfillingRectilinearH);
-#else
-        HoledPolygons hps;
-        AddPathsToHPs(infillingAreas, hps);
-        clp::Paths subinfillings;
-        for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
-            subinfillings.clear();
-            BBox bb = getBB(*hp);
-            hp->moveToPaths(subinfillings);
-            processInfillingsRectilinear(k, subinfillings, bb, spec.infillingModes[k] == InfillingRectilinearH);
+        if (spec.infillingWhole[k]) {
+            processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec.infillingModes[k] == InfillingRectilinearH);
+        } else {
+            HoledPolygons hps;
+            AddPathsToHPs(infillingAreas, hps);
+            clp::Paths subinfillings;
+            for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
+                subinfillings.clear();
+                BBox bb = getBB(*hp);
+                hp->moveToPaths(subinfillings);
+                processInfillingsRectilinear(k, subinfillings, bb, spec.infillingModes[k] == InfillingRectilinearH);
+            }
         }
-#endif
         break;
     }
     return true;

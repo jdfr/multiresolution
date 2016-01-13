@@ -83,6 +83,7 @@ void MultiSpec::initializeVectors(size_t n) {
     medialAxisFactors.resize(numspecs);
     medialAxisFactorsForInfillings.resize(numspecs);
     infillingModes.resize(numspecs);
+    infillingWhole.resize(numspecs);
     infillingRecursive.resize(numspecs);
     profiles.resize(numspecs);
     substeps.resize(numspecs);
