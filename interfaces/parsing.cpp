@@ -22,6 +22,7 @@ po::options_description perProcessOptionsGenerator() {
     po::options_description opts("Slicing engine options (per process)");
     opts.add_options()
         ("process,p", po::value<int>()->required()->value_name("ntool"), "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
+        ("no-preprocessing,c", "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("radx,x", po::value<double>()->required()->value_name("length"), "radius of the voxel for the current process in the XY plane")
         ("voxel-profile,v", po::value<std::string>()->value_name("(constant|ellipsoid)"), "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
         ("voxel-z,z", po::value<std::vector<double>>()->multitoken()->value_name("length extent"), "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
@@ -290,6 +291,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
         spec.applysnaps[k]            = vm.count("snap")      != 0;
         spec.snapSmallSafeSteps[k]    = vm.count("safestep")  != 0;
         spec.addInternalClearances[k] = vm.count("clearance") != 0;
+        spec.doPreprocessing[k]       = vm.count("no-preprocessing,") == 0;
 
         //if (vm.count("smoothing")) {
         //    spec.burrLengths[k] = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);

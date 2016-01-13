@@ -435,7 +435,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     bool notthelast = (k + 1) < spec.numspecs;
 
     //this only makes sense if there is a tool with higher resolution down the line
-    if (notthelast) {
+    if (spec.doPreprocessing[k] && notthelast) {
         if (nextProcessSameKind) {
             removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
         } else {

@@ -85,6 +85,7 @@ void MultiSpec::initializeVectors(size_t n) {
     infillingModes.resize(numspecs);
     infillingWhole.resize(numspecs);
     infillingRecursive.resize(numspecs);
+    doPreprocessing.resize(numspecs);
     profiles.resize(numspecs);
     substeps.resize(numspecs);
     dilatesteps.resize(numspecs);
