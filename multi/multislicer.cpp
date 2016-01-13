@@ -196,22 +196,28 @@ template<typename T, typename INFLATEDACCUM> void Multislicer::operateInflatedLi
 //INFILL HELPERS
 /////////////////////////////////////////////////
 
-void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAreas, BBox bb) {
+void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAreas, BBox bb, bool horizontal) {
     //SEGUIR POR AQUI
     double epsilon_start = 0;// infillingRadius * 0.01; //do not start the lines exactly on the boundary, but a little bit past it
     double epsilon_erode = infillingRadius * 0.01; //do not erode a full radius, but keep a small offset
     double erode_value = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
     clp::cInt minLineSize = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
-    clp::cInt start = bb.miny + (clp::cInt)epsilon_start;
+    clp::cInt start = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
     clp::cInt delta = (clp::cInt)(2*infillingRadius*0.999); //space the lines a little bit closer than the line width
-    clp::cInt numlines = (bb.maxy - start)/delta + 1; //add one line to be sure
+    clp::cInt numlines = ((horizontal ? bb.maxy : bb.maxx) - start) / delta + 1; //add one line to be sure
     clp::cInt accum = start;
     clp::Paths lines(numlines, clp::Path(2));
-    for (auto line = lines.begin(); line != lines.end(); ++line) {
-        line->front().X = bb.minx;
-        line->back().X = bb.maxx;
-        line->back().Y = line->front().Y = accum;
-        accum += delta;
+    for (auto &line : lines) {
+        if (horizontal) {
+            line.front().X = bb.minx;
+            line.back().X  = bb.maxx;
+            line.back().Y  = line.front().Y = accum;
+        } else { //vertical
+            line.front().Y = bb.miny;
+            line.back().Y  = bb.maxy;
+            line.back().X  = line.front().X = accum;
+        }
+        accum             += delta;
     }
     if (erode_value != 0.0) {
         clp::Paths aux;
@@ -230,10 +236,14 @@ void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAr
     if (spec.applysnaps[k]) {
         verySimpleSnapPathsToGrid(lines, spec.snapspecs[k]);
     }
-    //IMPORTANT: if the lines are not horizontal, this lambda must be tweaked accordingly!!!! It tests if the line distance is above the threshold
-    lines.erase(
-        std::remove_if(lines.begin(), lines.end(), [minLineSize](clp::Path &line){return abs(line.front().X - line.back().X) < minLineSize; }),
-        lines.end());
+    //IMPORTANT: these lambdas test if the line distance is below the threshold. If diagonal lines are possible, a new lambda must be added to handle them!
+    if (horizontal) {
+        auto test = [minLineSize](clp::Path &line) {return abs(line.front().X - line.back().X) < minLineSize; };
+        lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
+    } else { //vertical
+        auto test = [minLineSize](clp::Path &line) {return abs(line.front().Y - line.back().Y) < minLineSize; };
+        lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
+    }
     COPYTO(lines, *accumInfillings);
     if (infillingRecursive) {
         offsetDo(offset, lines, infillingRadius, lines, clp::jtRound, clp::etOpenRound);
@@ -301,9 +311,10 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
             if (!processInfillingsConcentricRecursive(*hp)) return false;
         }
         break;
-    } case InfillingRectilinear:
+    } case InfillingRectilinearV:
+      case InfillingRectilinearH:
 #ifdef WHOLE_REGION_RECTILINEAR
-        processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas));
+        processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec.infillingModes[k] == InfillingRectilinearH);
 #else
         HoledPolygons hps;
         AddPathsToHPs(infillingAreas, hps);
@@ -312,7 +323,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
             subinfillings.clear();
             BBox bb = getBB(*hp);
             hp->moveToPaths(subinfillings);
-            processInfillingsRectilinear(subinfillings, bb);
+            processInfillingsRectilinear(k, subinfillings, bb, spec.infillingModes[k] == InfillingRectilinearH);
         }
 #endif
         break;
@@ -413,7 +424,9 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         previousProcessSameKind = !spec.global.addsubWorkflowMode;
     }
 
-    bool CUSTOMINFILLINGS = (spec.infillingModes[k] == InfillingConcentric) || (spec.infillingModes[k] == InfillingRectilinear);
+    bool CUSTOMINFILLINGS = (spec.infillingModes[k] == InfillingConcentric)   ||
+                            (spec.infillingModes[k] == InfillingRectilinearH) ||
+                            (spec.infillingModes[k] == InfillingRectilinearV);
 
     clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
     infillingAreas->clear();

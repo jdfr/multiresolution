@@ -74,7 +74,7 @@ typedef std::vector<std::shared_ptr<VerticalProfile>> VerticalProfilePolyVector;
 GLOBAL AND LOCAL PARAMETERS
 *********************************************************/
 
-enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinear };
+enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearV, InfillingRectilinearH };
 
 typedef struct MultiSpec {
     GlobalSpec global;

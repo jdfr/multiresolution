@@ -58,7 +58,7 @@ protected:
 
     bool processInfillings(size_t k, clp::Paths &infillingAreas, clp::Paths &contoursToBeInfilled);
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
-    void processInfillingsRectilinear(size_t k, clp::Paths &infillingAreas, BBox bb);
+    void processInfillingsRectilinear(size_t k, clp::Paths &infillingAreas, BBox bb, bool horizontal);
 
     void applyMedialAxisNotAggregated(size_t k, std::vector<std::vector<double>> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator);
 
