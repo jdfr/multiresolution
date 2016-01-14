@@ -13,11 +13,19 @@ GLOBAL PARAMETERS
 
 enum SchedulerMode { SimpleScheduler, UniformScheduling, ManualScheduling };
 
+typedef struct FeedbackSpec {
+    bool feedback;
+    bool feedbackMesh;
+    std::string feedbackFile;
+    FeedbackSpec() : feedback(false) {}
+} FeedbackSpec;
+
 typedef struct GlobalSpec {
     typedef struct ZNTool { double z; unsigned int ntool; ZNTool() {}; ZNTool(double _z, unsigned int _ntool) : z(_z), ntool(_ntool) {} } ZNTool;
     //currently, having a reference to the Configuration here is useful only for debugging with showContours
     Configuration &config;
     SchedulerMode schedMode;
+    FeedbackSpec fb;
     bool useScheduler;
     bool sliceUpwards; //if slicing is not manual, this sets the direction of the slicing (if true: from bottom to top)
     bool addsubWorkflowMode;

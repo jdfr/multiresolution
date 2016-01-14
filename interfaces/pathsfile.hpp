@@ -6,6 +6,7 @@
 #include "iopaths.hpp"
 #include "spec.hpp"
 #include "auxgeom.hpp"
+#define INCLUDE_MULTIRESOLUTION_ONLY_FOR_DEFINITIONS //hack to avoid using shared library machinery from multiresolution.h
 #include "multiresolution.h" //this is needed just to import the definitions for fields saveFormat and type in SliceHeader
 
 /********************************************************

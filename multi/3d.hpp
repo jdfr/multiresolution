@@ -152,4 +152,6 @@ public:
     std::shared_ptr<ResultSingleTool> giveNextOutputSlice(); //this method will return slices in the correct order
 };
 
+std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs);
+
 #endif

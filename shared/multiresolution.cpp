@@ -308,21 +308,47 @@ LIBRARY_API  void freeResult(SharedLibraryResult* result) {
     if (result!=NULL) delete result;
 }
 
+void voidSlices3DSpecInfo(Slices3DSpecInfo &info) {
+    info.numinputslices = info.numoutputslices = -1;
+    info.zs = NULL;
+}
+
 LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax) {
     Slices3DSpecInfo ret;
     if (state->sched == NULL) {
         state->err = "Cannot use computeSlicesZs if the scheduler was not configured in the arguments!!!!";
-        ret.numinputslices = ret.numoutputslices = -1;
-        ret.zs = NULL;
+        voidSlices3DSpecInfo(ret);
         return ret;
     }
     state->sched->createSlicingSchedule(zmin, zmax, state->spec.global.z_epsilon, ScheduleTwoPhotonSimple);
     if (state->sched->has_err) {
         state->err = state->sched->err;
-        ret.numinputslices = ret.numoutputslices = -1;
-        ret.zs = NULL;
+        voidSlices3DSpecInfo(ret);
         return ret;
     }
+    if (state->spec.global.fb.feedback) {
+        //MetricFactors is not needed anywhere else in the shared library interface, so we can create it here as an one-off
+        MetricFactors factors(state->spec.global.config);
+        if (!factors.err.empty()) {
+            state->err = factors.err;
+            voidSlices3DSpecInfo(ret);
+            return ret;
+        }
+
+        //un-scale the z values for raw slices, since they are needed by applyFeedback()
+        std::vector<double> rawZs = state->sched->rm.rawZs;
+        for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
+            *z *= factors.internal_to_input;
+        }
+
+        std::string err = applyFeedback(state->spec.global.config, factors, *state->sched, rawZs, state->sched->rm.rawZs);
+        if (!err.empty()) {
+            state->err = err;
+            voidSlices3DSpecInfo(ret);
+            return ret;
+        }
+    }
+
     ret.numinputslices = (int)state->sched->rm.raw.size();
     ret.numoutputslices = (int)state->sched->output.size();
     ret.zs = &state->sched->rm.rawZs.front();

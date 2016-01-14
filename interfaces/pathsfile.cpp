@@ -1,7 +1,6 @@
 #include "pathsfile.hpp"
 #include <stdio.h>
 #include <ctype.h>
-#include <math.h>
 
 bool fileExists(const char *filename) {
     FILE *test = fopen(filename, "rb");

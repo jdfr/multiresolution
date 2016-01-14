@@ -1,4 +1,5 @@
 #include "parsing.hpp"
+#include "pathsfile.hpp"
 #include <algorithm>
 
 po::options_description globalOptionsGenerator() {
@@ -35,6 +36,9 @@ po::options_description globalOptionsGenerator() {
             "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
         ("addsub",
             "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
+        ("feedback,b",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
         ;
     return opts;
 }
@@ -197,6 +201,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     spec.applyMotionPlanner       = vm.count("motion-planner")      != 0;
     spec.addsubWorkflowMode       = vm.count("addsub")              != 0;
     spec.avoidVerticalOverwriting = vm.count("vertical-correction") != 0;
+
     if (vm.count("subtractive-box-mode")) {
         auto &vals = vm["subtractive-box-mode"].as<std::vector<int>>();
         if (vals.size() == 0) {
@@ -257,6 +262,30 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     if      (direction.compare("up")   == 0) spec.sliceUpwards = true;
     else if (direction.compare("down") == 0) spec.sliceUpwards = false;
     else                                     return str("value for option slicing-direction must be either 'up' or 'down', but it was '", direction, "'");
+
+    spec.fb.feedback = vm.count("feedback") != 0;
+    if (spec.fb.feedback) {
+        const std::vector<std::string> &vals = vm["feedback"].as<std::vector<std::string>>();
+        spec.fb.feedbackMesh = strcmp(vals[0].c_str(), "mesh") == 0;
+        if ((!spec.fb.feedbackMesh) && (strcmp(vals[0].c_str(), "paths") != 0)) {
+            return str("Error: If feedback option is specified, the first value is the feedback mode, either 'mesh' or 'paths', but it was <", vals[0], ">\n");
+        }
+        if (vals.size() == 1) { return std::string("Error: If feedback is specified, the second value must be the feedback file name, but it was not present"); }
+        spec.fb.feedbackFile = std::move(vals[1]);
+        if (!fileExists(spec.fb.feedbackFile.c_str())) {
+            return str("Error: feedback file <", spec.fb.feedbackFile, "> does not exist!");
+        }
+        if (!spec.useScheduler) {
+            const char *schedmode;
+            switch (spec.schedMode) {
+            case SimpleScheduler:   schedmode = "sched"; break;
+            case UniformScheduling: schedmode = "uniform"; break;
+            case ManualScheduling:  schedmode = "manual"; break;
+            default:                schedmode = "unknown";
+            }
+            return str("Error: feedback file was specified (", spec.fb.feedbackFile, "), but the scheduling mode '", schedmode, "' does not allow feedback!!!!");
+        }
+    }
 
     return std::string();
 }

@@ -3,6 +3,27 @@
 #ifndef MULTIRESOLUTION_HEADER
 #define MULTIRESOLUTION_HEADER
 
+//this is used in struct LoadPathInfo
+typedef int LoadPathInfo_PathType;
+#define PATHTYPE_RAW_CONTOUR       0
+#define PATHTYPE_PROCESSED_CONTOUR 1
+#define PATHTYPE_TOOLPATH          2
+
+//this is used in struct LoadPathInfo
+typedef int LoadPathInfo_PathFormat;
+#define PATHFORMAT_INT64     0
+#define PATHFORMAT_DOUBLE    1
+#define PATHFORMAT_DOUBLE_3D 2
+
+//this is used by getDesiredPaths()
+typedef int OutputSliceInfo_PathType;
+#define PathToolPath 0
+#define PathProcessed 1
+#define PathContour 2
+
+//do not declare the shared library definitions if we only want the above definitions
+#ifndef INCLUDE_MULTIRESOLUTION_ONLY_FOR_DEFINITIONS 
+
 #if ( defined(_WIN32) || defined(_WIN64) ) 
 #    if (!(defined(_MSC_VER) || defined(__GNUC__))) //THIS IS VALID ONLY FOR MSVS AND MINGW
 #    error Compiler not supported for now
@@ -44,12 +65,6 @@ typedef struct InputSliceInfo {
     int* numpointsArray;
 } InputSliceInfo;
 
-//this is used by getDesiredPaths()
-typedef int OutputSliceInfo_PathType;
-#define PathToolPath 0
-#define PathProcessed 1
-#define PathContour 2
-
 typedef struct OutputSliceInfo {
     int numpaths;
     int *numpointsArray;
@@ -57,18 +72,6 @@ typedef struct OutputSliceInfo {
     double z;
     int ntool;
 } OutputSliceInfo;
-
-//this is used in struct LoadPathInfo
-typedef int LoadPathInfo_PathType;
-#define PATHTYPE_RAW_CONTOUR       0
-#define PATHTYPE_PROCESSED_CONTOUR 1
-#define PATHTYPE_TOOLPATH          2
-
-//this is used in struct LoadPathInfo
-typedef int LoadPathInfo_PathFormat;
-#define PATHFORMAT_INT64     0
-#define PATHFORMAT_DOUBLE    1
-#define PATHFORMAT_DOUBLE_3D 2
 
 typedef struct LoadPathInfo {
     int numpaths;
@@ -136,11 +139,6 @@ extern "C" {
 
     LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax);
 
-    //important: after using the slice here, it is "spent" (cannot be used in another context), but you still have to use freeInputSlice on it!!!
-    LIBRARY_API void receiveAdditionalAdditiveContours(StateHandle state, double z, InputSliceHandle slice);
-
-    LIBRARY_API void purgueAdditionalAdditiveContours(StateHandle state);
-
     //error messages from this function can be queried from the StateHandle argument
     LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice);
 
@@ -150,6 +148,13 @@ extern "C" {
     /*may return NULL to mean that no output is ready yet. Because of that,
     error strings can be queried from the InputSliceHandle argument*/
     LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state);
+
+    // FUNCTIONS FOR ONLINE FEEDBACK IN 3D SCHEDULING
+
+    //important: after using the slice here, it is "spent" (cannot be used in another context), but you still have to use freeInputSlice on it!!!
+    LIBRARY_API void receiveAdditionalAdditiveContours(StateHandle state, double z, InputSliceHandle slice);
+
+    LIBRARY_API void purgueAdditionalAdditiveContours(StateHandle state);
 
     // PATH LOADING FUNCTIONS
 
@@ -161,4 +166,6 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif //INCLUDE_MULTIRESOLUTION_ONLY_FOR_DEFINITIONS
+
+#endif //MULTIRESOLUTION_HEADER

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <sstream>
 #include <cmath>
+#include "pathsfile.hpp"
+#include "slicermanager.hpp"
 
 #include "showcontours.hpp"
 
@@ -197,7 +199,6 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
 
 void RawSlicesManager::removeUsedRawSlices() {
     bool sliceUpwards = sched.tm.spec.global.sliceUpwards;
-    int a = 0;
     for (int k = 0; k < raw.size(); ++k) {
         if (raw[k].inUse) {
             if (raw[k].numRemainingUses < 0) {
@@ -207,11 +208,9 @@ void RawSlicesManager::removeUsedRawSlices() {
             if (raw[k].numRemainingUses == 0) {
                 raw[k].slice = clp::Paths(); //completely free memory (clear won't cut it!)
                 raw[k].inUse = false;
-                a++;
             }
         }
     }
-    printf("In removeUsedRawSlicesPastZ: %d\n", a);
 }
 
 
@@ -567,4 +566,108 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
     err = "Could not find the expected output slice!!!";
     return std::shared_ptr<ResultSingleTool>(NULL);
     //return NULL;
+}
+
+
+std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
+    if (sched.tm.spec.global.fb.feedbackMesh) {
+
+#ifdef SLICER_USE_DEBUG_FILE
+        //make sure that the log file is not the same as for the other slicer instance!
+        const char * feedbackKey = "SLICER_DEBUGFILE_FEEDBACK";
+        std::string feedbackdebugfile = config.hasKey(feedbackKey) ? config.getValue(feedbackKey) : "slicerlog.feedback.txt";
+        std::string oldValue = config.getValue("SLICER_DEBUGFILE");
+        config.update("SLICER_DEBUGFILE", feedbackdebugfile);
+#endif
+
+        SlicerManager *feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
+
+#ifdef SLICER_USE_DEBUG_FILE
+        config.update("SLICER_DEBUGFILE", oldValue);
+#endif
+
+        char *meshfullpath = fullPath(sched.tm.spec.global.fb.feedbackFile.c_str());
+        if (meshfullpath == NULL) {
+            return std::string("Error trying to resolve canonical path to the feedback mesh file");
+        }
+
+        if (!feedbackSlicer->start(meshfullpath)) {
+            free(meshfullpath);
+            std::string err = feedbackSlicer->getErrorMessage();
+            return str("Error while trying to start the slicer manager: ", err, "!!!\n");
+        }
+        free(meshfullpath);
+
+        double minz_nevermind, maxz_nevermind;
+        feedbackSlicer->getZLimits(&minz_nevermind, &maxz_nevermind);
+
+        feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
+
+        clp::Paths rawslice;
+
+        for (int k = 0; k < zs.size(); ++k) {
+            rawslice.clear();
+
+            feedbackSlicer->readNextSlice(rawslice); {
+                std::string err = feedbackSlicer->getErrorMessage();
+                if (!err.empty()) {
+                    return str("Error while trying to read the ", k, "-th slice from the slicer manager: ", err, "!!!\n");
+                }
+            }
+
+            sched.tm.takeAdditionalAdditiveContours(scaled_zs[k], rawslice);
+
+        }
+
+        if (!feedbackSlicer->finalize()) {
+            std::string err = feedbackSlicer->getErrorMessage();
+            return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
+        }
+
+        delete feedbackSlicer;
+        return std::string();
+    } else {
+
+        FILE * f = fopen(sched.tm.spec.global.fb.feedbackFile.c_str(), "rb");
+        if (f == NULL) { return str("Could not open input file ", sched.tm.spec.global.fb.feedbackFile); }
+        IOPaths iop_f(f);
+
+        FileHeader fileheader;
+        std::string err = fileheader.readFromFile(f);
+        if (!err.empty()) { fclose(f); return str("Error reading file header for ", sched.tm.spec.global.fb.feedbackFile, ": ", err); }
+
+        SliceHeader sliceheader;
+        for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
+            std::string e = sliceheader.readFromFile(f);
+            if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec.global.fb.feedbackFile, ": ", err); break; }
+            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec.global.fb.feedbackFile, ": header is too short!"); break; }
+            if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
+                clp::Paths paths;
+                if (sliceheader.saveFormat == PATHFORMAT_INT64) {
+                    if (!iop_f.readClipperPaths(paths)) {
+                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
+                        break;
+                    }
+                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
+                    if (!iop_f.readDoublePaths(paths, 1 / sliceheader.scaling)) {
+                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
+                        break;
+                    }
+                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
+                    err = str("Error reading feedback from pathsfile ", sched.tm.spec.global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
+                    break;
+                } else {
+                    err = str("Error reading feedback from pathsfile ", sched.tm.spec.global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
+                    break;
+                }
+                sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
+            } else {
+                fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+            }
+        }
+
+        fclose(f);
+        return err;
+    }
+
 }

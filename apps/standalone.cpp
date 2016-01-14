@@ -43,104 +43,6 @@ template<typename Function, typename... Args> std::string applyToAllFilesWithIOP
     return std::string();
 }
 
-std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, bool feedbackMesh, const char *feedback_file, std::vector<double> &zs, std::vector<double> &scaled_zs) {
-    if (feedbackMesh) {
-
-#ifdef SLICER_USE_DEBUG_FILE
-        //make sure that the log file is not the same as for the other slicer instance!
-        const char * feedbackKey = "SLICER_DEBUGFILE_FEEDBACK";
-        std::string feedbackdebugfile = config.hasKey(feedbackKey) ? config.getValue(feedbackKey) : "slicerlog.feedback.txt";
-        config.update("SLICER_DEBUGFILE", feedbackdebugfile);
-#endif
-
-        SlicerManager *feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
-
-        char *meshfullpath = fullPath(feedback_file);
-        if (meshfullpath == NULL) {
-            return std::string("Error trying to resolve canonical path to the feedback mesh file");
-        }
-
-        if (!feedbackSlicer->start(meshfullpath)) {
-            free(meshfullpath);
-            std::string err = feedbackSlicer->getErrorMessage();
-            return str("Error while trying to start the slicer manager: ", err, "!!!\n");
-        }
-        free(meshfullpath);
-
-        double minz_nevermind, maxz_nevermind;
-        feedbackSlicer->getZLimits(&minz_nevermind, &maxz_nevermind);
-
-        feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
-
-        clp::Paths rawslice;
-
-        for (int k = 0; k < zs.size(); ++k) {
-            rawslice.clear();
-
-            feedbackSlicer->readNextSlice(rawslice); {
-                std::string err = feedbackSlicer->getErrorMessage();
-                if (!err.empty()) {
-                    return str("Error while trying to read the ", k, "-th slice from the slicer manager: ", err, "!!!\n");
-                }
-            }
-
-            sched.tm.takeAdditionalAdditiveContours(scaled_zs[k], rawslice);
-
-        }
-
-        if (!feedbackSlicer->finalize()) {
-            std::string err = feedbackSlicer->getErrorMessage();
-            return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
-        }
-
-        delete feedbackSlicer;
-        return std::string();
-    } else {
-
-        FILE * f = fopen(feedback_file, "rb");
-        if (f == NULL) { return str("Could not open input file ", feedback_file); }
-        IOPaths iop_f(f);
-
-        FileHeader fileheader;
-        std::string err = fileheader.readFromFile(f);
-        if (!err.empty()) { fclose(f); return str("Error reading file header for ", feedback_file, ": ", err); }
-
-        SliceHeader sliceheader;
-        for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-            std::string e = sliceheader.readFromFile(f);
-            if (!e.empty())                   { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": ", err); break; }
-            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", feedback_file, ": header is too short!"); break; }
-            if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
-                clp::Paths paths;
-                if (sliceheader.saveFormat == PATHFORMAT_INT64) {
-                    if (!iop_f.readClipperPaths(paths)) {
-                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
-                        break;
-                    }
-                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
-                    if (!iop_f.readDoublePaths(paths, 1 / sliceheader.scaling)) {
-                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
-                        break;
-                    }
-                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
-                    err = str("Error reading feedback from pathsfile ", feedback_file, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
-                    break;
-                } else {
-                    err = str("Error reading feedback from pathsfile ", feedback_file, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
-                    break;
-                }
-                sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
-            } else {
-                fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
-            }
-        }
-
-        fclose(f);
-        return err;
-    }
-
-}
-
 inline std::string writeSlices(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
     return applyToAllFiles(files, writeSlice, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
 }
@@ -172,9 +74,6 @@ MainSpec mainOptions() {
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
         ("dry-run,y",
             "if this option is specified, the system only shows the Z values of the slices to be received from the input mesh file, then terminates without doing anything else")
-        ("feedback,b",
-            po::value<std::vector<std::string>>()->multitoken(),
-            "this option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file itself.")
         ;
     po::positional_options_description positional;
     positional.add("load", 1).add("save", 1);
@@ -214,8 +113,7 @@ int main(int argc, const char** argv) {
 
     std::string singleoutputfilename;
 
-    bool dryrun, feedback, feedbackMesh;
-    std::string feedback_file;
+    bool dryrun;
     
     Configuration config;
     MultiSpec multispec(config);
@@ -237,7 +135,6 @@ int main(int argc, const char** argv) {
         }
 
         dryrun   = mainOpts.count("dry-run")  != 0;
-        feedback = mainOpts.count("feedback") != 0;
         save     = mainOpts.count("save")     != 0;
 
         std::string meshfilename;
@@ -297,45 +194,18 @@ int main(int argc, const char** argv) {
             }
         }
 
-        if (feedback) {
-            const std::vector<std::string> &vals = mainOpts["feedback"].as<std::vector<std::string>>();
-            feedbackMesh = strcmp(vals[0].c_str(), "mesh") == 0;
-            if ((!feedbackMesh) && (strcmp(vals[0].c_str(), "paths") != 0)) {
-                fprintf(stderr, "Error: If feedback option is specified, the first value is the feedback mode, either 'mesh' or 'paths', but it was <%s>\n", vals[0].c_str());
-                return -1;
-            }
-            if (vals.size() == 1) { fprintf(stderr, "Error: If feedback is specified, the second value must be the feedback file name, but it was not present"); return -1; }
-            feedback_file = std::move(vals[1]);
-            if (!fileExists(feedback_file.c_str())) {
-                fprintf(stderr, "Error: feedback file <%s> does not exist!", feedback_file.c_str());
-                return -1;
-            }
-        }
-
         mainOpts = po::variables_map();
     } catch (std::exception &e) {
         fprintf(stderr, e.what()); return -1;
     }
 
     if (dryrun) {
-        feedback = save = show = false;
+        save = show = false;
     } else {
         if (!save && !show) {
             fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
             return -1;
         }
-    }
-
-    if (feedback && (!multispec.global.useScheduler)) {
-        const char *schedmode;
-        switch (multispec.global.schedMode) {
-        case SimpleScheduler:   schedmode = "sched"; break;
-        case UniformScheduling: schedmode = "uniform"; break;
-        case ManualScheduling:  schedmode = "manual"; break;
-        default:                schedmode = "unknown";
-        }
-        fprintf(stderr, "Error: feedback file was specified (%s), but the scheduling mode '%s' does not allow feedback!!!!", feedback_file.c_str(), schedmode);
-        return -1;
     }
 
     MetricFactors factors(config);
@@ -435,8 +305,8 @@ int main(int argc, const char** argv) {
             return 0;
         }
 
-        if (feedback) {
-            std::string err = applyFeedback(config, factors, sched, feedbackMesh, feedback_file.c_str(), rawZs, sched.rm.rawZs);
+        if (multispec.global.fb.feedback) {
+            std::string err = applyFeedback(config, factors, sched, rawZs, sched.rm.rawZs);
             if (!err.empty()) {
                 fprintf(stderr, err.c_str());
                 return -1;
