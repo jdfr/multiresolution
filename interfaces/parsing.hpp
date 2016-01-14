@@ -47,6 +47,4 @@ std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector
 void composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output);
 void composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output);
 
-#define RESPONSE_FILE_OPTION "response-file"
-
 #endif

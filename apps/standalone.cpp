@@ -57,9 +57,6 @@ MainSpec mainOptions() {
         ("config,q",
             po::value<std::string>()->default_value("config.txt"),
             "configuration input file (if no file is provided, it is assumed to be config.txt)")
-        (RESPONSE_FILE_OPTION,
-            po::value<std::string>(),
-            "file with additional parameters, can be specified with '@filename', too")
         ("load",
             po::value<std::string>(),
             "input mesh file")

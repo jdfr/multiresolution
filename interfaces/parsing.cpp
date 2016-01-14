@@ -39,6 +39,9 @@ po::options_description globalOptionsGenerator() {
         ("feedback,b",
             po::value<std::vector<std::string>>()->multitoken(),
             "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
+        ("response-file",
+            po::value<std::string>(),
+            "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
         ;
     return opts;
 }
@@ -106,7 +109,7 @@ const po::options_description * perProcessOptions() { return &perProcessOptionsS
 // option "config-file" with the value "something"
 std::pair<std::string, std::string> at_option_parser(std::string const&s) {
     if ('@' == s[0])
-        return std::make_pair(std::string(RESPONSE_FILE_OPTION), s.substr(1));
+        return std::make_pair(std::string("response-file"), s.substr(1));
     else
         return std::pair<std::string, std::string>();
 }
@@ -115,7 +118,7 @@ std::string parseAndInsertResponseFileOptions(po::options_description &opts, con
     po::parsed_options original = po::command_line_parser(args).options(opts).positional(posit).extra_parser(at_option_parser).run();
     result.m_options_prefix = original.m_options_prefix;
     for (auto &option : original.options) {
-        if (strcmp(RESPONSE_FILE_OPTION, option.string_key.c_str()) == 0) {
+        if (strcmp("response-file", option.string_key.c_str()) == 0) {
             if (option.value.empty()) return str("error ", CommandLineOrigin, ": cannot use response-file option without filename value");
             bool ok;
             std::string responsecontents = get_file_contents(option.value[0].c_str(), ok);
