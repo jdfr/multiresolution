@@ -8,9 +8,11 @@ po::options_description globalOptionsGenerator() {
         ("correct-input", "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
         ("motion-planner,k", "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
         ("subtractive-box-mode", po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"), "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
-        ("slicing-uniform,u", po::value<double>()->value_name("z_step"), "The input mesh will be sliced uniformly at the specified slicing step. All processed will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing.")
+        ("slicing-uniform,u", po::value<double>()->value_name("z_step"), "The input mesh will be sliced uniformly at the specified slicing step. All processes will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing. The slicing step may be negative.")
         ("slicing-scheduler,s", po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"), "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
         ("slicing-manual,m", po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"), "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
+        ("slicing-zbase", po::value<double>()->value_name("z_base"), "If --slicing-uniform is specified, and this parameter is specified, it is the position of the first slice.")
+        ("slicing-direction", po::value<std::string>()->default_value("up")->value_name("(up|down)"), "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
         ("vertical-correction", "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
         ("z-epsilon,l", po::value<double>()->default_value(1e-6)->value_name("z_epsilon"), "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
         ("addsub", "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
@@ -170,6 +172,11 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
         spec.schedMode      = UniformScheduling;
         spec.z_uniform_step = vm["slicing-uniform"].as<double>();
         schedSet            = true;
+        if (vm.count("slicing-zbase")) {
+            spec.z_base = vm["slicing-zbase"].as<double>();
+        } else {
+            spec.z_base = NAN;
+        }
     };
     if (vm.count("slicing-scheduler")) {
         if (schedSet) return std::string(schedRepErr);
@@ -198,6 +205,12 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     if (vm.count("z-epsilon")) {
         spec.z_epsilon = getScaled(vm["z-epsilon"].as<double>(), scale, doscale);
     };
+
+    const std::string &direction = vm["slicing-direction"].as<std::string>();
+    if      (direction.compare("up")   == 0) spec.sliceUpwards = true;
+    else if (direction.compare("down") == 0) spec.sliceUpwards = false;
+    else                                     return str("value for option slicing-direction must be either 'up' or 'down', but it was '", direction, "'");
+
     return std::string();
 }
 

@@ -19,6 +19,7 @@ typedef struct GlobalSpec {
     Configuration &config;
     SchedulerMode schedMode;
     bool useScheduler;
+    bool sliceUpwards; //if slicing is not manual, this sets the direction of the slicing (if true: from bottom to top)
     bool addsubWorkflowMode;
     bool ignoreRedundantAdditiveContours; //TODO: make this an explicit parameter, if necessary (used only by 3d scheduling)
     bool alsoContours;
@@ -28,6 +29,7 @@ typedef struct GlobalSpec {
     std::vector < ZNTool > schedSpec; //this is for manual specification of slices
     std::vector<int> schedTools; //this is for manual selection of tools for scheduling slices
     clp::cInt limitX, limitY;
+    double z_base; //when scheduling mode is uniform: if this parameter is not NaN, it represents the position of the first slice
     double z_uniform_step; //this parameter is the uniform step if useScheduler is false. Unlike most other metric parameters, this is in the mesh's native units!!!!
     double z_epsilon; //epsilon to consider that to Z values are the same.
     //not mean to be read from the command line (for internal use)

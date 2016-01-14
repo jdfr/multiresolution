@@ -23,18 +23,21 @@
 }
 
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
-void ToolpathManager::removeUsedSlicesBelowZ(double z) {
+void ToolpathManager::removeUsedSlicesPastZ(double z) {
     //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
+    bool sliceUpwards = spec.global.sliceUpwards;
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
         slices->erase(std::remove_if(slices->begin(), slices->end(),
-            [z](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sz->z < z); }
+            [z, sliceUpwards](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sliceUpwards ? (sz->z < z) : (sz->z > z)); }
         ), slices->end());
     }
 }
 
-void ToolpathManager::removeAdditionalContoursBelowZ(double z) {
+void ToolpathManager::removeAdditionalContoursPastZ(double z) {
+    bool sliceUpwards = spec.global.sliceUpwards;
     for (auto additional = additionalAdditiveContours.begin(); additional != additionalAdditiveContours.end();) {
-        if (additional->first < z) {
+        bool erase = sliceUpwards ? (additional->first < z) : (additional->first > z);
+        if (erase) {
             additionalAdditiveContours.erase(additional++);
         } else {
             ++additional;
@@ -192,13 +195,23 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
 }
 
 
-void RawSlicesManager::removeUsedRawSlicesBelowZ(double z) {
+void RawSlicesManager::removeUsedRawSlices() {
+    bool sliceUpwards = sched.tm.spec.global.sliceUpwards;
+    int a = 0;
     for (int k = 0; k < raw.size(); ++k) {
-        if (raw[k].inUse && (raw[k].numRemainingUses == 0) && (raw[k].z < z)) {
-            raw[k].slice = clp::Paths(); //completely free memory (clear won't cut it!)
-            raw[k].inUse = false;
+        if (raw[k].inUse) {
+            if (raw[k].numRemainingUses < 0) {
+                printf("WARNING: raw slice %d at z=%g has been apparently used more times than it was expected\n", k, raw[k].z);
+                continue;
+            }
+            if (raw[k].numRemainingUses == 0) {
+                raw[k].slice = clp::Paths(); //completely free memory (clear won't cut it!)
+                raw[k].inUse = false;
+                a++;
+            }
         }
     }
+    printf("In removeUsedRawSlicesPastZ: %d\n", a);
 }
 
 
@@ -221,17 +234,19 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
             int num = 0;
             for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.profiles[k]->sliceHeight) + 3;
             input.reserve(num);
-            std::vector<double> minzs(tm.spec.numspecs, minz);
-            recursiveSimpleInputScheduler(0, minzs, zmax);
+            bool sliceUpwards = tm.spec.global.sliceUpwards;
+            std::vector<double> zbase(tm.spec.numspecs, sliceUpwards ? minz : maxz);
+            recursiveSimpleInputScheduler(0, zbase, sliceUpwards ? maxz : minz);
         }
         computeSimpleOutputOrderForInputSlices();
         pruneInputZsAndCreateRawZs(epsilon);
     }
 }
 
-bool testSliceNotNearTop(double z, double ztop, int process, ToolpathManager &tm) {
+bool testSliceNotNearEnd(double z, double zend, int process, ToolpathManager &tm) {
+    double zspan = (tm.spec.global.sliceUpwards) ? (zend - z) : (z - zend);
     //why 0.25: 0.5 because it is the offset when voxels are symmetric respect to their Z slice, 0.2 to give some slack and not discard slices that protude slightly
-    return ztop - tm.spec.profiles[process]->sliceHeight*(0.5-0.2) - z >= 0;
+    return zspan >= tm.spec.profiles[process]->sliceHeight*(0.5 - 0.2);
 }
 
 /*this is adequate for additive processes, as it assumes that voxels are symmetric over the Z axis.
@@ -240,7 +255,7 @@ in the following way: first, Z-slices at Z-distances that enable the use of larg
 then are processed Z-slices in their neighbourhood, which will not be able to accomodate large voxels.*/
 //THIS VERSION GENERATES A MODIFIED IN-PLACE VERSION WHERE AT LEAST TWO HIGHER ORDER SECTIONS ARE COMPUTED *BEFORE* THE NEXT ORDER
 
-void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std::vector<double> &zbottom, double ztop) {
+void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std::vector<double> &zbase, double zend) {
     //ATTENTION: THIS RECURSIVE PROCEDURE CAN GENERATE SLICES THAT ARE AT IDENTICAL OR NEAR IDENTICAL Zs
     //TO AVOID UNNECESARY REPETITIVE SLICING, WE FIX IT IN THE ORDERING STAGE. OF COURSE, THAT DEPENDS CRUCIALLY ON THE ORDERING!
 
@@ -255,26 +270,33 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
         nextpok = nextp < tm.spec.global.schedTools.size();
     }
 
-    double z = zbottom[process] + tm.spec.profiles[process]->sliceHeight / 2.0;
+    double factor = tm.spec.global.sliceUpwards ? 1.0 : -1.0;
+    double z = zbase[process] + tm.spec.profiles[process]->sliceHeight / 2.0 * factor;
     double znext;
     bool atleastone;
 
-    if (atleastone = testSliceNotNearTop(z, ztop, process, tm)) {
+    if (atleastone = testSliceNotNearEnd(z, zend, process, tm)) {
         input.push_back(InputSliceData(z, process));
     }
 
-    while (testSliceNotNearTop(znext = z + tm.spec.profiles[process]->sliceHeight, ztop, process, tm)) {
+    while (testSliceNotNearEnd(znext = z + tm.spec.profiles[process]->sliceHeight * factor, zend, process, tm)) {
         input.push_back(InputSliceData(znext, process));
         if (nextpok) {
-            recursiveSimpleInputScheduler(nextp, zbottom, std::min(zbottom[process] + tm.spec.profiles[process]->sliceHeight, ztop));
+            double next_zend;
+            if (tm.spec.global.sliceUpwards) {
+                next_zend = std::min(zbase[process] + tm.spec.profiles[process]->sliceHeight, zend);
+            } else {
+                next_zend = std::max(zbase[process] - tm.spec.profiles[process]->sliceHeight, zend);
+            }
+            recursiveSimpleInputScheduler(nextp, zbase, next_zend);
         }
-        zbottom[process] += tm.spec.profiles[process]->sliceHeight;
+        zbase[process] += tm.spec.profiles[process]->sliceHeight * factor;
         z = znext;
     }
 
     //add possible high res slices higher than the place where low res slices cannot be placed
     if (nextpok) {
-        recursiveSimpleInputScheduler(nextp, zbottom, ztop);
+        recursiveSimpleInputScheduler(nextp, zbase, zend);
     }
 
 }
@@ -295,7 +317,7 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
     //confusing to implement correctly...
     initialMapInputToRaw[output[0].mapOutputToInput] = (int)remainingUsesRaw_zs_output_order.size() - 1;
     for (int k = 1; k < output.size(); ++k) {
-        double df = output[k].z - output[k - 1].z;
+        double df = std::abs(output[k].z - output[k - 1].z);
         if (df <= epsilon) {
             input[output[k].mapOutputToInput].z = output[k].z = output[k - 1].z;
             useinraw[output[k].mapOutputToInput] = false;
@@ -316,12 +338,13 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
     for (int k = 0; k < input.size(); ++k) {
         if (useinraw[k]) {
             rm.raw[kraw].z = rm.rawZs[kraw] = input[k].z;
-            rm.raw[kraw].numRemainingUses = remainingUsesRaw_zs_output_order[initialMapInputToRaw[k]];
+            //if tm.spec.global.avoidVerticalOverwriting is set, numRemainingUses has to be computed in conjunction with filling requiredRawSlices
+            rm.raw[kraw].numRemainingUses = (tm.spec.global.avoidVerticalOverwriting) ? 0 : remainingUsesRaw_zs_output_order[initialMapInputToRaw[k]];
             rm.raw[kraw].inUse = false;
             rm.raw[kraw].wasUsed = false;
             rm.raw[kraw].slice.clear();
             rm.raw[kraw].mapRawToInput.clear();
-            rm.raw[kraw].mapRawToInput.reserve(rm.raw[kraw].numRemainingUses);
+            rm.raw[kraw].mapRawToInput.reserve(remainingUsesRaw_zs_output_order[initialMapInputToRaw[k]]);
             rm.raw[kraw].mapRawToInput.push_back(k);
             input[k].mapInputToRaw = kraw;
             raw_idx_in_zs_output_order[initialMapInputToRaw[k]] = kraw;
@@ -355,6 +378,7 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
                     auto &inputs = rm.raw[m].mapRawToInput;
                     if ((input[k].mapInputToRaw == m) || std::any_of(inputs.begin(), inputs.end(), [ntool, this](int input_idx) {return this->input[input_idx].ntool > ntool; })) {
                         input[k].requiredRawSlices.push_back(m);
+                        ++rm.raw[m].numRemainingUses;
                     }
                 }
             }
@@ -372,7 +396,11 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
     std::vector<int> order_to_output(input.size());
     std::iota(order_to_output.begin(), order_to_output.end(), 0);
     auto comparator = [this](int a, int b) { double df = input[a].z - input[b].z; return (df < 0.0) || ((df == 0) && (input[a].ntool < input[b].ntool)); };
-    std::sort(order_to_output.begin(), order_to_output.end(), comparator);
+    if (tm.spec.global.sliceUpwards) {
+        std::sort(order_to_output. begin(), order_to_output. end(), comparator);
+    } else {
+        std::sort(order_to_output.rbegin(), order_to_output.rend(), comparator);
+    }
     for (int i = 0; i < order_to_output.size(); ++i) {
         int ii = order_to_output[i];
         output[i].computed = false;
@@ -424,11 +452,12 @@ bool RawSlicesManager::rawReady(int input_idx) {
 }
 
 clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
-    //here, we trust that rawReady() HAS BEEN CALLED PREVIOUSLY, Otherwise... CLUSTERFUCK!!!!
+    //here, we trust that rawReady() has returned TRUE PREVIOUSLY, Otherwise... CLUSTERFUCK!!!!
     if (sched.tm.spec.global.avoidVerticalOverwriting) {
         std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
         if (raw_idxs.size() == 1) {
             //trivial case
+            --raw[raw_idxs[0]].numRemainingUses;
             return &(raw[raw_idxs[0]].slice);
         } else {
             //NAIVE METHOD: JUST INTERSECT ALL CONTOURS.
@@ -449,6 +478,7 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             int ntool = sched.input[input_idx].ntool;
             clp::Paths *previous = NULL, *next = NULL;
             for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
+                --raw[*raw_idx].numRemainingUses;
                 double rawz = raw[*raw_idx].z;
                 if (inputz == rawz) {
                     next = &raw[*raw_idx].slice;
@@ -479,6 +509,7 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             return &auxRawSlice;
         }
     } else {
+        --raw[idx_raw].numRemainingUses;
         return &(raw[idx_raw].slice);
     }
 }
@@ -506,11 +537,12 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
             giveNextOutputSlice();
             }
             }*/
-            if (removeUnused && (input[input_idx].ntool == 0)) {
-                double zlimit = input[input_idx].z - tm.spec.profiles[0]->sliceHeight;
-                tm.removeUsedSlicesBelowZ(zlimit);
-                rm.removeUsedRawSlicesBelowZ(zlimit);
-                tm.removeAdditionalContoursBelowZ(zlimit);
+            if (removeUnused && (tm.spec.global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
+                bool sliceUpwards = tm.spec.global.sliceUpwards;
+                double zlimit = input[input_idx].z - tm.spec.profiles[0]->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
+                tm.removeUsedSlicesPastZ(zlimit);
+                tm.removeAdditionalContoursPastZ(zlimit);
+                rm.removeUsedRawSlices();
             }
             ++input_idx;
             if (input_idx >= input.size()) break;

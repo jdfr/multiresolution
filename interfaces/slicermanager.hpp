@@ -15,7 +15,7 @@ public:
     virtual std::string getErrorMessage() { throw std::runtime_error("getErrorMessage not implemented!!!"); }
     virtual void getZLimits(double *minz, double *maxz) { throw std::runtime_error("getZLimits not implemented!!!"); }
     virtual void sendZs(double *values, int numvalues) { throw std::runtime_error("sendZs not implemented!!!"); }
-    virtual std::vector<double> prepareSTLSimple(double zmin, double zstep) { throw std::runtime_error("prepareSTLSimple not implemented!!!"); }
+    virtual std::vector<double> prepareSTLSimple(double zbase, double zstep) { throw std::runtime_error("prepareSTLSimple not implemented!!!"); }
     virtual std::vector<double> prepareSTLSimple(double zstep) { throw std::runtime_error("prepareSTLSimple not implemented!!!"); }
     virtual int  askForNextSlice() { throw std::runtime_error("askForNextSlice not implemented!!!"); }
     virtual void readNextSlice(clp::Paths &nextSlice) { throw std::runtime_error("readNextSlice not implemented!!!"); }

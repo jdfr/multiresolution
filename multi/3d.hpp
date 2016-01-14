@@ -46,8 +46,8 @@ public:
     Multislicer multi;
     ToolpathManager(MultiSpec &s) : spec(s), slicess(s.numspecs), multi(s) {}
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
-    void removeUsedSlicesBelowZ(double z);
-    void removeAdditionalContoursBelowZ(double z);
+    void removeUsedSlicesPastZ(double z);
+    void removeAdditionalContoursPastZ(double z);
     void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }
 };
 
@@ -87,7 +87,7 @@ public:
     std::vector<RawSliceData> raw;
     std::vector<double> rawZs; //this is required in computeSlicesZs()
     RawSlicesManager(SimpleSlicingScheduler &s) : sched(s) {}
-    void removeUsedRawSlicesBelowZ(double z);
+    void removeUsedRawSlices();
     void clear() { raw.clear();  rawZs.clear();  auxRawSlice.clear();  auxaux.clear();  raw_idx = 0; }
     bool singleRawSliceReady(int raw_idx, int input_idx);
     bool rawReady(int input_idx);

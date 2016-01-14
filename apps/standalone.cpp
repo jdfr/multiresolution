@@ -513,8 +513,12 @@ int main(int argc, const char** argv) {
         std::vector<SingleProcessOutput*> ress(numtools);
         double zstep = multispec.global.z_uniform_step;
 
-        //std::vector<double> zs = slicer->prepareSTLSimple(zstep, zstep);
-        std::vector<double> zs = slicer->prepareSTLSimple(zstep);
+        std::vector<double> zs;
+        if (std::isnan(multispec.global.z_base)) {
+            zs = slicer->prepareSTLSimple(zstep);
+        } else {
+            zs = slicer->prepareSTLSimple(multispec.global.z_base, zstep);
+        }
 
         if (dryrun) {
             printf("dry run: these are the Z values of the required slices, in request order:\n");

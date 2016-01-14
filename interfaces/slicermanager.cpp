@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 
+#include <cmath>
+
 /*strictly speaking, spawning a different process for the slicer is only required if
 we are compiling under MSVS (as slic3r does not compile in MSVS). As the overhead
 seems to be fairly small, we keep it this way for all platforms.*/
@@ -40,7 +42,7 @@ public:
     virtual std::string getErrorMessage() { return err; }
     virtual void getZLimits(double *minz, double *maxz);
     virtual void sendZs(double *values, int numvalues);
-    virtual std::vector<double> prepareSTLSimple(double zmin, double zstep);
+    virtual std::vector<double> prepareSTLSimple(double zbase, double zstep);
     virtual std::vector<double> prepareSTLSimple(double zstep);
     virtual int  askForNextSlice();
     virtual void readNextSlice(clp::Paths &nextSlice);
@@ -115,25 +117,31 @@ void ExternalSlicerManager::sendZs(double *values, int numvalues) {
     fflush(subp.pipeIN);
 }
 
-std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zmin, double zstep) {
-    double nevermind = 0, maxz = 0;
-    getZLimits(&nevermind, &maxz);
+std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zbase, double zstep) {
+    double zmin= 0, zmax = 0;
+    getZLimits(&zmin, &zmax);
+    double zend = (zstep > 0) ? zmax : zmin;
     std::vector<double> zs;
-    zs.reserve((int)((maxz - zmin) / zstep) + 2);
-    for (double j = zmin; j <= maxz; j += zstep) {
-        zs.push_back(j);
+    int numneeded = (int)((zend - zbase) / zstep);
+    if (numneeded > 0) {
+        zs.reserve(numneeded+2);
+        for (double j = zbase; j <= zmax; j += zstep) {
+            zs.push_back(j);
+        }
+        sendZs(&(zs[0]), (int)zs.size());
     }
-    sendZs(&(zs[0]), (int)zs.size());
     return zs;
 }
 
 std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zstep) {
-    double zmin = 0, maxz = 0;
-    getZLimits(&zmin, &maxz);
+    double zmin = 0, zmax = 0;
+    getZLimits(&zmin, &zmax);
     std::vector<double> zs;
-    zs.reserve((int)((maxz - zmin) / zstep) + 2);
-    for (double j = zmin+zstep/2; j <= maxz; j += zstep) {
-        zs.push_back(j);
+    zs.reserve((int)((zmax - zmin) / std::abs(zstep)) + 2);
+    if (zstep > 0) {
+        for (double j = zmin + zstep / 2; j <= zmax; j += zstep) zs.push_back(j);
+    } else {
+        for (double j = zmax + zstep / 2; j >= zmin; j += zstep) zs.push_back(j);
     }
     sendZs(&(zs[0]), (int)zs.size());
     return zs;
