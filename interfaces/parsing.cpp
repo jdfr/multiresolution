@@ -4,18 +4,37 @@
 po::options_description globalOptionsGenerator() {
     po::options_description opts("Slicing engine options (global)");
     opts.add_options()
-        ("save-contours,j", "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
-        ("correct-input", "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
-        ("motion-planner,k", "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
-        ("subtractive-box-mode", po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"), "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
-        ("slicing-uniform,u", po::value<double>()->value_name("z_step"), "The input mesh will be sliced uniformly at the specified slicing step. All processes will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing. The slicing step may be negative.")
-        ("slicing-scheduler,s", po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"), "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
-        ("slicing-manual,m", po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"), "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
-        ("slicing-zbase", po::value<double>()->value_name("z_base"), "If --slicing-uniform is specified, and this parameter is specified, it is the position of the first slice.")
-        ("slicing-direction", po::value<std::string>()->default_value("up")->value_name("(up|down)"), "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
-        ("vertical-correction", "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
-        ("z-epsilon,l", po::value<double>()->default_value(1e-6)->value_name("z_epsilon"), "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
-        ("addsub", "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
+        ("save-contours,j",
+            "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
+        ("correct-input",
+            "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
+        ("motion-planner,k",
+            "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
+        ("subtractive-box-mode",
+            po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"),
+            "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
+        ("slicing-uniform,u",
+            po::value<double>()->value_name("z_step"),
+            "The input mesh will be sliced uniformly at the specified slicing step. All processes will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing. The slicing step may be negative.")
+        ("slicing-scheduler,s",
+            po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"),
+            "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
+        ("slicing-manual,m",
+            po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"),
+            "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
+        ("slicing-zbase",
+            po::value<double>()->value_name("z_base"),
+            "If --slicing-uniform is specified, and this parameter is specified, it is the position of the first slice.")
+        ("slicing-direction",
+            po::value<std::string>()->default_value("up")->value_name("(up|down)"),
+            "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
+        ("vertical-correction",
+            "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
+        ("z-epsilon,l",
+            po::value<double>()->default_value(1e-6)->value_name("z_epsilon"),
+            "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
+        ("addsub",
+            "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
         ;
     return opts;
 }
@@ -23,23 +42,51 @@ po::options_description globalOptionsGenerator() {
 po::options_description perProcessOptionsGenerator() {
     po::options_description opts("Slicing engine options (per process)");
     opts.add_options()
-        ("process,p", po::value<int>()->required()->value_name("ntool"), "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
-        ("no-preprocessing,c", "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
-        ("radx,x", po::value<double>()->required()->value_name("length"), "radius of the voxel for the current process in the XY plane")
-        ("voxel-profile,v", po::value<std::string>()->value_name("(constant|ellipsoid)"), "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
-        ("voxel-z,z", po::value<std::vector<double>>()->multitoken()->value_name("length extent"), "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
-        ("gridstep,g", po::value<double>()->required()->value_name("step"), "grid step for the current process (this is the minimal amount the head can be moved in XY)")
-        ("snap,n", "If this is specified, contours are snapped to a grid centered in the origin and with the step specified in gridstep. Otherwise, no snapping is done.")
-        ("safestep,f", "If specified, and gridstep is specified, the engine tries to minimize the resolution loss caused by snapping")
-        ("clearance,c", "If specified, the current process is computed such that toolpaths cannot overlap")
-        ("smoothing,o", po::value<double>()->value_name("length"), "If snap is not specified and clearance is not specified for the current process, this MUST be specified, and it is the smoothing radius for the computed contours")
-        ("tolerances,t", po::value<std::vector<double>>()->multitoken()->value_name("tol_radx tol_gridstep"), "Values of the roundness parameters for the current process. The first value is for the XY radius scale, the second for the gridstep scale (if the second value is omitted, it is copied from the first one).")
-        ("radius-removecommon,e", po::value<double>()->default_value(0.0)->value_name("length"), "If a positive value is specified, contours are clipped in zones where already-computed low-res contours are nearer than this value")
-        ("medialaxis-radius,a", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
-        ("infill,i", po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"), "If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
-        ("infill-byregion", "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
-        ("infill-recursive,r", "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only for --infill (linesh|linesv|concentric))")
-        ("infill-medialaxis-radius,d", po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"), "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
+        ("process,p",
+            po::value<int>()->required()->value_name("ntool"),
+            "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
+        ("no-preprocessing",
+            "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
+        ("radx,x",
+            po::value<double>()->required()->value_name("length"),
+            "radius of the voxel for the current process in the XY plane")
+        ("voxel-profile,v",
+            po::value<std::string>()->value_name("(constant|ellipsoid)"),
+            "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
+        ("voxel-z,z",
+            po::value<std::vector<double>>()->multitoken()->value_name("length extent"),
+            "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
+        ("gridstep,g",
+            po::value<double>()->required()->value_name("step"),
+            "grid step for the current process (this is the minimal amount the head can be moved in XY)")
+        ("snap,n",
+            "If specified, contours are snapped to a grid centered in the origin and with the step specified in gridstep. Otherwise, no snapping is done.")
+        ("safestep,f",
+            "If specified, and gridstep is specified, the engine tries to minimize the resolution loss caused by snapping")
+        ("clearance,c",
+            "If specified, the current process is computed such that toolpaths cannot overlap")
+        ("smoothing,o",
+            po::value<double>()->value_name("length"),
+            "If snap is not specified and clearance is not specified for the current process, this MUST be specified, and it is the smoothing radius for the computed contours")
+        ("tolerances,t",
+            po::value<std::vector<double>>()->multitoken()->value_name("tol_radx tol_gridstep"),
+            "Values of the roundness parameters for the current process. The first value is for the XY radius scale, the second for the gridstep scale (if the second value is omitted, it is copied from the first one).")
+        ("radius-removecommon,e",
+            po::value<double>()->default_value(0.0)->value_name("length"),
+            "If a positive value is specified, contours are clipped in zones where already-computed low-res contours are nearer than this value")
+        ("medialaxis-radius,a",
+            po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
+            "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
+        ("infill,i",
+            po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"),
+            "If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
+        ("infill-byregion",
+            "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
+        ("infill-recursive,r",
+            "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only for --infill (linesh|linesv|concentric))")
+        ("infill-medialaxis-radius,d",
+            po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
+            "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
         ;
     return opts;
 }

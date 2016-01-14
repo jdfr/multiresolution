@@ -150,15 +150,31 @@ typedef std::pair<po::options_description, po::positional_options_description> M
 MainSpec mainOptions() {
     po::options_description opts("Main options");
     opts.add_options()
-        ("help,h", "produce help message")
-        ("config,q", po::value<std::string>()->default_value("config.txt"), "configuration input file (if no file is provided, it is assumed to be config.txt)")
-        (RESPONSE_FILE_OPTION, po::value<std::string>(), "file with additional parameters, can be specified with '@filename', too")
-        ("load", po::value<std::string>(), "input mesh file")
-        ("save", po::value<std::string>(), "output file in *.paths format")
-        ("save-format", po::value<std::string>()->default_value("integer"), "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
-        ("show,w", po::value<std::vector<std::string>>()->multitoken(), "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
-        ("dry-run,y", "if this option is specified, the system only shows the Z values of the slices to be received from the input mesh file, then terminates without doing anything else")
-        ("feedback,b", po::value<std::vector<std::string>>()->multitoken(), "this option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file itself.")
+        ("help,h",
+            "produce help message")
+        ("config,q",
+            po::value<std::string>()->default_value("config.txt"),
+            "configuration input file (if no file is provided, it is assumed to be config.txt)")
+        (RESPONSE_FILE_OPTION,
+            po::value<std::string>(),
+            "file with additional parameters, can be specified with '@filename', too")
+        ("load",
+            po::value<std::string>(),
+            "input mesh file")
+        ("save",
+            po::value<std::string>(),
+            "output file in *.paths format")
+        ("save-format",
+            po::value<std::string>()->default_value("integer"),
+            "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
+        ("show,w",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
+        ("dry-run,y",
+            "if this option is specified, the system only shows the Z values of the slices to be received from the input mesh file, then terminates without doing anything else")
+        ("feedback,b",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "this option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file itself.")
         ;
     po::positional_options_description positional;
     positional.add("load", 1).add("save", 1);
