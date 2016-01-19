@@ -99,7 +99,7 @@ std::string transformAndSave(const char *input, const char *output, Transformati
         double y = (matrix[4] * xyz[0]) + (matrix[5] * xyz[1]) + (matrix[6] * xyz[2]) + matrix[7];
         double z = (matrix[8] * xyz[0]) + (matrix[9] * xyz[1]) + (matrix[10] * xyz[2]) + matrix[11];
 
-        fprintf(o, "%25.20g %25.20g %25.20g\n", x, y, z);
+        fprintf(o, "%.20g %.20g %.20g\n", x, y, z);
     };
 
     int nline;
