@@ -60,7 +60,7 @@ protected:
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
     void processInfillingsRectilinear(size_t k, clp::Paths &infillingAreas, BBox bb, bool horizontal);
 
-    void applyMedialAxisNotAggregated(size_t k, std::vector<std::vector<double>> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator);
+    void applyMedialAxisNotAggregated(size_t k, std::vector<double> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator);
 
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContoursInClipper(clp::ClipType mode, T &res, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContours(clp::ClipType mode, T &res, clp::Paths &contours, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);

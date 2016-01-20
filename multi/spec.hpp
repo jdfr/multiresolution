@@ -78,13 +78,47 @@ public:
     virtual double getVoxelSemiHeight() { return radiusZ; }
 };
 
-typedef std::vector<std::shared_ptr<VerticalProfile>> VerticalProfilePolyVector;
-
 /********************************************************
 GLOBAL AND LOCAL PARAMETERS
 *********************************************************/
 
 enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearV, InfillingRectilinearH };
+
+typedef struct PerProcessSpec {
+    //required parameters (replicated for each resolution)
+    clp::cInt radius;                // radius of the tool
+    clp::cInt gridstep;              // grid step of the tool. If used (to snap to grid, mainly), this is expected to be significantly smaller than the radius
+    clp::cInt arctolR;               // arcTolerance when doing offseting at the radius scale
+    clp::cInt arctolG;               // arcTolerance when doing offseting at the gridstep scale
+    clp::cInt burrLength;            // radius to remove too small details (applied when no snap is done)
+    clp::cInt radiusRemoveCommon;    // radius to remove shared arcs between contours of different resolutions (applying this in the current, naive way may become quite expensive)
+    bool      applysnap;             // flag to snap to grid
+    bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
+    bool      addInternalClearance;  // make sure that the toolpath is smooth enough to not write over itself
+    std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
+    std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
+    InfillingMode infillingMode;     //how to deal with infillings
+    bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
+    bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
+    bool doPreprocessing;            //flag to decide if preprocessing may be applied
+
+    std::shared_ptr<VerticalProfile> profile;
+
+    //default/derived paramenters (replicated for each resolution)
+    double    substep;
+    double    dilatestep;
+    double    safestep;
+    double    maxdist;
+    double    gridstepX;
+    double    gridstepY;
+    double    shiftX;
+    double    shiftY;
+    bool      useRadiusRemoveCommon;
+    bool      higherProcessUsesRadiusRemoveCommon;
+
+    SnapToGridSpec snapspec;
+
+} PerProcessSpec;
 
 typedef struct MultiSpec {
     GlobalSpec global;
@@ -92,46 +126,15 @@ typedef struct MultiSpec {
     //global required parameters (replicated for each resolution)
     size_t numspecs;
 
-    //required parameters (replicated for each resolution)
-    std::vector<clp::cInt> radiuses;              // radius of the tool
-    std::vector<clp::cInt> gridsteps;             // grid step of the tool. If used (to snap to grid, mainly), this is expected to be significantly smaller than the radius
-    std::vector<clp::cInt> arctolRs;              // arcTolerance when doing offseting at the radius scale
-    std::vector<clp::cInt> arctolGs;              // arcTolerance when doing offseting at the gridstep scale
-    std::vector<clp::cInt> burrLengths;           // radius to remove too small details (applied when no snap is done)
-    std::vector<clp::cInt> radiusesRemoveCommon;  // radius to remove shared arcs between contours of different resolutions (applying this in the current, naive way may become quite expensive)
-    std::vector<bool>      applysnaps;            // flag to snap to grid
-    std::vector<bool>      snapSmallSafeSteps;    // flag to use a small safeStep if snapping to grid
-    std::vector<bool>      addInternalClearances; // make sure that the toolpath is smooth enough to not write over itself
-    std::vector<std::vector<double>> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
-    std::vector<std::vector<double>> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
-    std::vector<InfillingMode> infillingModes;    //how to deal with infillings
-    std::vector<bool> infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
-    std::vector<bool> infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
-    std::vector<bool> doPreprocessing;            //flag to decide if preprocessing may be applied
-
-    VerticalProfilePolyVector profiles;
-
-    //default/derived paramenters (replicated for each resolution)
-    std::vector<double>    substeps;
-    std::vector<double>    dilatesteps;
-    std::vector<double>    safesteps;
-    std::vector<double>    maxdists;
-    std::vector<double>    gridstepsX;
-    std::vector<double>    gridstepsY;
-    std::vector<double>    shiftsX;
-    std::vector<double>    shiftsY;
-    std::vector<bool>      useRadiusesRemoveCommon;
-    std::vector<bool>      higherProcessUsesRadiusesRemoveCommon;
-
-    std::vector<SnapToGridSpec> snapspecs;
+    std::vector<PerProcessSpec> pp;
 
     bool anyUseRadiusesRemoveCommon;
 
     MultiSpec(GlobalSpec _global, size_t n = 0) : global(std::move(_global)), anyUseRadiusesRemoveCommon(false) { if (n>0) initializeVectors(n); }
 
-    void initializeVectors(size_t n);
+    void initializeVectors(size_t n) { numspecs = n; pp.resize(n); }
     bool validate();
-    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsubWorkflowMode) && (useRadiusesRemoveCommon[k]); }
+    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsubWorkflowMode) && (pp[k].useRadiusRemoveCommon); }
     std::string populateParameters();
 } MultiSpec;
 

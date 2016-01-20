@@ -25,8 +25,8 @@ void FileHeader::buildFrom(MultiSpec &multispec, MetricFactors &factors) {
     radiusX.reserve(numtools);
     if (useSched) radiusZ.reserve(numtools);
     for (int k = 0; k < numtools; ++k) {
-        radiusX.push_back(multispec.radiuses[k] * factors.internal_to_input);
-        if (useSched) radiusZ.push_back(multispec.profiles[k]->getVoxelSemiHeight()*factors.internal_to_input);
+        radiusX.push_back(multispec.pp[k].radius * factors.internal_to_input);
+        if (useSched) radiusZ.push_back(multispec.pp[k].profile->getVoxelSemiHeight()*factors.internal_to_input);
     }
     numRecords = 0;
 }

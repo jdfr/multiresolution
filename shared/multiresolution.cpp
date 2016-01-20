@@ -38,6 +38,7 @@ typedef struct SharedLibraryConfig {
 typedef struct SharedLibraryState {
     std::string err;
     MultiSpec spec;
+    std::vector<clp::cInt> processRadiuses;
     SimpleSlicingScheduler * sched;
     Multislicer * multi;
     SharedLibraryState(Configuration *config) : spec(*config), sched(NULL), multi(NULL) {}
@@ -177,7 +178,12 @@ LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscal
 LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
     ParamsExtractInfo ret;
     ret.numProcesses    = (int)state->spec.numspecs;
-    ret.processRadiuses = &(state->spec.radiuses.front());
+    state->processRadiuses.clear();
+    state->processRadiuses.reserve(state->spec.numspecs);
+    for (auto &pp : state->spec.pp) {
+        state->processRadiuses.push_back(pp.radius);
+    }
+    ret.processRadiuses = &(state->processRadiuses.front());
     return ret;
 }
 

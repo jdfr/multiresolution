@@ -129,12 +129,12 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
             if (contourIsAdditive) continue;
         }
 
-        multi.offset.ArcTolerance = (double)spec.arctolGs[ntool_contour];
+        multi.offset.ArcTolerance = (double)spec.pp[ntool_contour].arctolG;
         for (auto slice = slicess[ntool_contour].begin(); slice != slicess[ntool_contour].end(); ++slice) {
             if (!(*slice)->contours.empty()) { 
-                double currentWidth = spec.profiles[ntool_contour]->getWidth((*slice)->z - z);
+                double currentWidth = spec.pp[ntool_contour].profile->getWidth((*slice)->z - z);
                 if (currentWidth > 0) {
-                    double diffwidth = spec.radiuses[ntool_contour] - currentWidth;
+                    double diffwidth = spec.pp[ntool_contour].radius - currentWidth;
                     if ((*slice)->infillingsIndependentContours.empty()) {
                         //if infilling contours were not generated, we make do with the contours, which are actually cheaper to handle!
                         auto &contours = (*slice)->contours;
@@ -231,7 +231,7 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
         } else {
             double extent = maxz - minz;
             int num = 0;
-            for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.profiles[k]->sliceHeight) + 3;
+            for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.pp[k].profile->sliceHeight) + 3;
             input.reserve(num);
             bool sliceUpwards = tm.spec.global.sliceUpwards;
             std::vector<double> zbase(tm.spec.numspecs, sliceUpwards ? minz : maxz);
@@ -245,7 +245,7 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
 bool testSliceNotNearEnd(double z, double zend, int process, ToolpathManager &tm) {
     double zspan = (tm.spec.global.sliceUpwards) ? (zend - z) : (z - zend);
     //why 0.25: 0.5 because it is the offset when voxels are symmetric respect to their Z slice, 0.2 to give some slack and not discard slices that protude slightly
-    return zspan >= tm.spec.profiles[process]->sliceHeight*(0.5 - 0.2);
+    return zspan >= tm.spec.pp[process].profile->sliceHeight*(0.5 - 0.2);
 }
 
 /*this is adequate for additive processes, as it assumes that voxels are symmetric over the Z axis.
@@ -270,7 +270,7 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
     }
 
     double factor = tm.spec.global.sliceUpwards ? 1.0 : -1.0;
-    double z = zbase[process] + tm.spec.profiles[process]->sliceHeight / 2.0 * factor;
+    double z = zbase[process] + tm.spec.pp[process].profile->sliceHeight / 2.0 * factor;
     double znext;
     bool atleastone;
 
@@ -278,18 +278,18 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
         input.push_back(InputSliceData(z, process));
     }
 
-    while (testSliceNotNearEnd(znext = z + tm.spec.profiles[process]->sliceHeight * factor, zend, process, tm)) {
+    while (testSliceNotNearEnd(znext = z + tm.spec.pp[process].profile->sliceHeight * factor, zend, process, tm)) {
         input.push_back(InputSliceData(znext, process));
         if (nextpok) {
             double next_zend;
             if (tm.spec.global.sliceUpwards) {
-                next_zend = std::min(zbase[process] + tm.spec.profiles[process]->sliceHeight, zend);
+                next_zend = std::min(zbase[process] + tm.spec.pp[process].profile->sliceHeight, zend);
             } else {
-                next_zend = std::max(zbase[process] - tm.spec.profiles[process]->sliceHeight, zend);
+                next_zend = std::max(zbase[process] - tm.spec.pp[process].profile->sliceHeight, zend);
             }
             recursiveSimpleInputScheduler(nextp, zbase, next_zend);
         }
-        zbase[process] += tm.spec.profiles[process]->sliceHeight * factor;
+        zbase[process] += tm.spec.pp[process].profile->sliceHeight * factor;
         z = znext;
     }
 
@@ -364,7 +364,7 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
         for (int k = 0; k < input.size(); ++k) {
             int ntool = input[k].ntool;
             double inputz = input[k].z;
-            double voxelSemiZ = tm.spec.profiles[ntool]->getVoxelSemiHeight();
+            double voxelSemiZ = tm.spec.pp[ntool].profile->getVoxelSemiHeight();
             for (int m = 0; m < rm.raw.size(); ++m) {
                 double val = std::fabs(rm.raw[m].z - inputz);
                 if (val <= voxelSemiZ) {
@@ -482,12 +482,12 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                 if (inputz == rawz) {
                     next = &raw[*raw_idx].slice;
                 } else {
-                    double width_at_raw = sched.tm.spec.profiles[ntool]->getWidth(inputz - rawz);
+                    double width_at_raw = sched.tm.spec.pp[ntool].profile->getWidth(inputz - rawz);
                     if (width_at_raw <= 0) {
                         MAKE_SCHED_ERR(sched, "error for input slice with input_idx=" << input_idx << " at z=" << inputz << ", a raw slice with raw_idx=" << *raw_idx << " at z=" << rawz << " was required, but the voxel's width at the raw slice Z was illegal: " << width_at_raw);
                         return NULL;
                     }
-                    double diffwidth = sched.tm.spec.radiuses[ntool] - width_at_raw;
+                    double diffwidth = sched.tm.spec.pp[ntool].radius - width_at_raw;
                     if (diffwidth < 0) {
                         MAKE_SCHED_ERR(sched, "error for input slice with input_idx=" << input_idx << " at z=" << inputz << ", a raw slice with raw_idx=" << *raw_idx << " at z=" << rawz << " was required, but the diffwidth is below 0: " << diffwidth);
                         return NULL;
@@ -538,7 +538,7 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
             }*/
             if (removeUnused && (tm.spec.global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
                 bool sliceUpwards = tm.spec.global.sliceUpwards;
-                double zlimit = input[input_idx].z - tm.spec.profiles[0]->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
+                double zlimit = input[input_idx].z - tm.spec.pp[0].profile->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
                 tm.removeUsedSlicesPastZ(zlimit);
                 tm.removeAdditionalContoursPastZ(zlimit);
                 rm.removeUsedRawSlices();

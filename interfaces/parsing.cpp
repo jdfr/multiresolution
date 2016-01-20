@@ -351,18 +351,18 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
 
         int k = optionsListByTool.first;
 
-        spec.radiuses            [k] = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
-        spec.gridsteps           [k] = (clp::cInt)getScaled(vm["gridstep"]           .as<double>(), scale, doscale);
-        spec.radiusesRemoveCommon[k] = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+        spec.pp[k].radius             = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
+        spec.pp[k].gridstep           = (clp::cInt)getScaled(vm["gridstep"]           .as<double>(), scale, doscale);
+        spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
         if (vm.count("tolerances")) {
             const std::vector<double> & val = vm["tolerances"].as<std::vector<double>>();
-            spec.arctolRs[k] = (clp::cInt)getScaled(val[0], scale, doscale);
-            spec.arctolGs[k] = val.size() == 1 ? spec.arctolRs[k] : (clp::cInt)getScaled(val[1], scale, doscale);
+            spec.pp[k].arctolR = (clp::cInt)getScaled(val[0], scale, doscale);
+            spec.pp[k].arctolG = val.size() == 1 ? spec.pp[k].arctolR : (clp::cInt)getScaled(val[1], scale, doscale);
         } else {
-            spec.arctolRs[k] = (spec.radiuses[k] / 100);
-            spec.arctolGs[k] = (spec.radiuses[k] / 10);
+            spec.pp[k].arctolR = (spec.pp[k].radius / 100);
+            spec.pp[k].arctolG = (spec.pp[k].radius / 10);
         }
-        spec.burrLengths[k] = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.arctolRs[k]);
+        spec.pp[k].burrLength = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.pp[k].arctolR);
 
         if (spec.global.useScheduler) {
             auto requireds = { "voxel-profile", "voxel-z" };
@@ -375,43 +375,43 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             double ZRadius = getScaled(valz[0], scale, doscale);
             double ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
             if (voxelIsEllipsoid) {
-                spec.profiles[k] = std::make_shared<EllipticalProfile>((double)spec.radiuses[k], ZRadius, 2 * ZSemiHeight);
+                spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
             } else {
-                spec.profiles[k] = std::make_shared<ConstantProfile>  ((double)spec.radiuses[k], ZRadius, 2 * ZSemiHeight);
+                spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
             }
         }
-        spec.applysnaps[k]            = vm.count("snap")      != 0;
-        spec.snapSmallSafeSteps[k]    = vm.count("safestep")  != 0;
-        spec.addInternalClearances[k] = vm.count("clearance") != 0;
-        spec.doPreprocessing[k]       = vm.count("no-preprocessing,") == 0;
+        spec.pp[k].applysnap            = vm.count("snap")      != 0;
+        spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
+        spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
+        spec.pp[k].doPreprocessing       = vm.count("no-preprocessing,") == 0;
 
         //if (vm.count("smoothing")) {
-        //    spec.burrLengths[k] = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);
+        //    spec.pp[k].burrLength = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);
         //} else {
-        //    if ((!spec.applysnaps[k]) && (!spec.addInternalClearances[k])) {
+        //    if ((!spec.pp[k].applysnaps) && (!spec.pp[k].addInternalClearance)) {
         //        return str("For process ", k, ": If option --snap is not specified and option --clearance is not specified, option --smoothing MUST be specified");
         //    }
         //}
 
         if (vm.count("medialaxis-radius")) {
-            spec.medialAxisFactors[k] = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
+            spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
         }
 
         bool useinfill = vm.count("infill") != 0;
         if (useinfill) {
             const std::string & val = vm["infill"].as<std::string>();
-            if      (val.compare("concentric")  == 0) spec.infillingModes[k] = InfillingConcentric;
-            else if (val.compare("linesh")      == 0) spec.infillingModes[k] = InfillingRectilinearH;
-            else if (val.compare("linesv")      == 0) spec.infillingModes[k] = InfillingRectilinearV;
-            else if (val.compare("justcontour") == 0) spec.infillingModes[k] = InfillingJustContours;
+            if      (val.compare("concentric")  == 0) spec.pp[k].infillingMode = InfillingConcentric;
+            else if (val.compare("linesh")      == 0) spec.pp[k].infillingMode = InfillingRectilinearH;
+            else if (val.compare("linesv")      == 0) spec.pp[k].infillingMode = InfillingRectilinearV;
+            else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
             else                                      return str("For process ", k, ": invalid infill mode: ", val);
-            spec.infillingRecursive[k] = vm.count("infill-recursive") != 0;
-            spec.infillingWhole    [k] = vm.count("infill-byregion")  == 0;
+            spec.pp[k].infillingRecursive = vm.count("infill-recursive") != 0;
+            spec.pp[k].infillingWhole     = vm.count("infill-byregion")  == 0;
             if (vm.count("infill-medialaxis-radius")) {
-                spec.medialAxisFactorsForInfillings[k] = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
+                spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
             }
         } else {
-            spec.infillingModes[k] = InfillingNone;
+            spec.pp[k].infillingMode = InfillingNone;
         }
     }
     return spec.populateParameters();
