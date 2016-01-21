@@ -5,7 +5,6 @@
 #include <numeric>
 #include <algorithm>
 #include <sstream>
-#include <cmath>
 #include "pathsfile.hpp"
 #include "slicermanager.hpp"
 
@@ -63,7 +62,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         offsetDo(multi.offset, auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
     }
     if (auxUpdate.empty()) return;
-    if (spec.global.addsubWorkflowMode) {
+    if (spec.global.addsub.addsubWorkflowMode) {
         //here, computeContoursAlreadyFilled will always be false
         if (ntool_contour == 0) {
             //contour auxUpdate is additive
@@ -77,7 +76,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         //contour auxUpdate is additive
         if (processToComputeIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
         // processToComputeIsAdditive should always be true here
-        if (computeContoursAlreadyFilled) clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
+        if (computeContoursAlreadyFilled) multi.clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
     }
     //SHOWCONTOURS(spec.global.config, "deflating_contour", &contours, &auxUpdate);
 }
@@ -85,7 +84,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
 //remove from the input contours the parts that are already there from previous slices
 void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool) {
 
-    bool processToComputeIsAdditive = !spec.global.addsubWorkflowMode || ntool == 0;
+    bool processToComputeIsAdditive = !spec.global.addsub.addsubWorkflowMode || ntool == 0;
     bool computeContoursAlreadyFilled = spec.useContoursAlreadyFilled(ntool);
 
     /*the following logic for getting parts to add and parts to substract hinges on
@@ -111,7 +110,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
                 applyContours(additional.second, 0, processToComputeIsAdditive, computeContoursAlreadyFilled, 0.0);
                 //we have received feedback for additional contours.
                 //If flag ignoreRedundantAdditiveContours is true, ignore stored additive contours
-                doNotUseStoredAdditiveContours = spec.global.ignoreRedundantAdditiveContours;
+                doNotUseStoredAdditiveContours = spec.global.addsub.ignoreRedundantAdditiveContours;
                 appliedAdditional = true;
             }
         }
@@ -125,7 +124,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
         
         //do not use any stored additive contour if we have received feedback
         if (doNotUseStoredAdditiveContours) {
-            bool contourIsAdditive = !spec.global.addsubWorkflowMode || ntool_contour == 0;
+            bool contourIsAdditive = !spec.global.addsub.addsubWorkflowMode || ntool_contour == 0;
             if (contourIsAdditive) continue;
         }
 
@@ -153,8 +152,8 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     multi.clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
     multi.clipper.Clear();
     if (computeContoursAlreadyFilled) {
-        clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
-        clipper2.Clear();
+        multi.clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
+        multi.clipper2.Clear();
     }
     //SHOWCONTOURS(spec.global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
@@ -168,7 +167,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
 */
 bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
 
-    if (spec.global.addsubWorkflowMode) spec.global.inputSub.clear();
+    if (spec.global.addsub.addsubWorkflowMode) spec.global.inputSub.clear();
 
     updateInputWithProfilesFromPreviousSlices(auxInitial, rawSlice, z, ntool);
 

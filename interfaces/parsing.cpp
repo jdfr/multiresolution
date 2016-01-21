@@ -25,7 +25,7 @@ po::options_description globalOptionsGenerator() {
             "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
         ("slicing-zbase",
             po::value<double>()->value_name("z_base"),
-            "If --slicing-uniform is specified, and this parameter is specified, it is the position of the first slice.")
+            "If --slicing-uniform is specified, and this parameter is specified, it is the Z position of the first slice, in mesh file units.")
         ("slicing-direction",
             po::value<std::string>()->default_value("up")->value_name("(up|down)"),
             "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
@@ -35,7 +35,13 @@ po::options_description globalOptionsGenerator() {
             po::value<double>()->default_value(1e-6)->value_name("z_epsilon"),
             "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
         ("addsub",
-            "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa)")
+            "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa). By itself, addsub mode does not work: more options must be set. For high-res negative details, set the global option 'neg-closing'. For high-res positive details, either set the global option 'overwrite-gradual' or (if 'clearance' is not being used) set 'infill-medialaxis-radius' for process 0 to one or several very low values (0.5 to 0.01).")
+        ("neg-closing",
+            po::value<double>()->value_name("radius"),
+            "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000, and it can be tuned to make the operation to overwrite more or less negative details.")
+        ("overwrite-gradual",
+        po::value<std::vector<double>>()->multitoken()->value_name("[rad_1 inf_1 rad_2 inf_2 ...]"),
+            "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. As more steps are used, the overwriting is smoother, but also more expensive to compute. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The memebers of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. Please note: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius)")
         ("feedback,b",
             po::value<std::vector<std::string>>()->multitoken(),
             "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
@@ -199,16 +205,41 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     } catch (std::exception &e) {
         return std::string(e.what());
     }
-    spec.alsoContours             = vm.count("save-contours")       != 0;
-    spec.correct                  = vm.count("correct-input")       != 0;
-    spec.applyMotionPlanner       = vm.count("motion-planner")      != 0;
-    spec.addsubWorkflowMode       = vm.count("addsub")              != 0;
-    spec.avoidVerticalOverwriting = vm.count("vertical-correction") != 0;
+    spec.alsoContours              = vm.count("save-contours")       != 0;
+    spec.correct                   = vm.count("correct-input")       != 0;
+    spec.applyMotionPlanner        = vm.count("motion-planner")      != 0;
+    spec.avoidVerticalOverwriting  = vm.count("vertical-correction") != 0;
+
+    spec.addsub.addsubWorkflowMode = vm.count("addsub") != 0;
+    if (spec.addsub.addsubWorkflowMode) {
+        spec.addsub.fattening.eraseHighResNegDetails = vm.count("neg-closing") != 0;
+        spec.addsub.fattening.useGradualFattening    = vm.count("overwrite-gradual") != 0;
+        if (spec.addsub.fattening.eraseHighResNegDetails) {
+            spec.addsub.fattening.eraseHighResNegDetails_radius = (clp::cInt)getScaled(vm["neg-closing"].as<double>(), scale, doscale);
+            spec.addsub.fattening.eraseHighResNegDetails = spec.addsub.fattening.eraseHighResNegDetails_radius != 0.0;
+        }
+        if (spec.addsub.fattening.useGradualFattening) {
+            auto &vals = vm["overwrite-gradual"].as<std::vector<double>>();
+            if ((vals.size() % 2) != 0) {
+                return str("overwrite-gradual must have an even number of values, but it has ", vals.size());
+            }
+            spec.addsub.fattening.gradual.reserve(vals.size() / 2);
+            for (auto val = vals.begin(); val != vals.end(); ++val) {
+                double rad = *(val++);
+                double inf = *val;
+                if (rad < 0) return str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative radius factor: ", rad);
+                if (inf < 0) return str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative inflation factor: ", inf);
+                //maybe issue warnings if rad+inf<1? If so, how to issue them?
+                spec.addsub.fattening.gradual.push_back(FatteningSpec::GradualStep(rad, inf));
+            }
+        }
+
+    }
 
     if (vm.count("subtractive-box-mode")) {
         auto &vals = vm["subtractive-box-mode"].as<std::vector<int>>();
         if (vals.size() == 0) {
-            return std::string("Error: specified subtractive-box-mode without values!");
+            return std::string("subtractive-box-mode was specified without values!");
         } else {
             spec.limitX = vals[0];
             spec.limitY = vals.size() > 1 ? vals[1] : vals[0];
@@ -242,7 +273,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     if (vm.count("slicing-manual")) {
         if (schedSet) return std::string(schedRepErr);
         spec.schedMode = ManualScheduling;
-        auto &vals     = std::move(vm["slicing-manual"].as<std::vector<double>>());
+        auto &vals     = vm["slicing-manual"].as<std::vector<double>>();
         if ((vals.size() % 2) != 0) {
             return str("slicing-manual must have an even number of values, but it has ", vals.size());
         }

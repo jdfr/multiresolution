@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cmath>
-#include <math.h>
 #include <algorithm>
 #include <sstream>
 
@@ -95,14 +94,90 @@ void Multislicer::removeHighResDetails(size_t k, clp::Paths &contours, clp::Path
     //RESULT IS RETURNED IN lowres
 }
 
-//in a first implementation, we suppose that no clearance is required
-void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1) {
+void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1, clp::Paths &aux2) {
 
     //remove high-res negative details.
     offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    double negativeHighResFactor = (double)spec.pp[k].substep * 1.1;
+    double negativeHighResFactor = (double)spec.pp[k].substep * 1.1; //minimal factor
+    if (spec.global.addsub.fattening.eraseHighResNegDetails && (((double)spec.global.addsub.fattening.eraseHighResNegDetails_radius) > negativeHighResFactor)) {
+        negativeHighResFactor = (double)spec.global.addsub.fattening.eraseHighResNegDetails_radius;
+    }
     offsetDo2(offset, lowres, negativeHighResFactor, -negativeHighResFactor, contours, aux1, clp::jtRound, clp::etClosedPolygon);
 
+    if (spec.global.addsub.fattening.useGradualFattening) {
+        clp::Paths fat, thin, next;
+        double r = (double)spec.pp[k].radius;
+        if (spec.pp[k].addInternalClearance) {
+            r *= 2;
+        }
+        //compute the low-res contours with a naive toolpath
+        offsetDo2(offset, fat, -r, r, lowres, aux1, clp::jtRound, clp::etClosedPolygon);
+        //get the areas that are high-res
+        clipperDo(clipper, thin, clp::ctDifference, lowres, fat, clp::pftEvenOdd, clp::pftEvenOdd);
+        //TODO: expose smallNeg as a configurable parameter!!!
+        double smallNeg = r*0.01; //remove spurious ultrathin components
+        offsetDo2(offset, thin, -smallNeg, smallNeg, thin, aux1, clp::jtRound, clp::etClosedPolygon);
+        //SHOWCONTOURS(spec.global.config, "initial fat and thin", &lowres, &fat, &thin);
+
+        //if thin is empty, we have nothing more to do, since we have no high-res areas!
+        if (thin.empty()) return;
+
+        //accumulate the low-res parts
+        clipper2.AddPaths(fat, clp::ptSubject, true);
+
+        //in the sequence of gradual steps:
+        //    -radiusFactor should be strictly decreasing in the range (1, 0]
+        //    -inflateFactor should be strictly increasing in the range [0,1]
+        //    -SUCH THAT, in each step, (radiusFactor+inflateFactor)>=1
+        auto endi = spec.global.addsub.fattening.gradual.end();
+        for (auto step = spec.global.addsub.fattening.gradual.begin(); step != endi; ++step) {
+            double gradradius  = r*step->radiusFactor;
+            double gradinflate = r*step->inflateFactor;
+            if (gradradius != 0.0) {
+                const double gradradius_from_fat = 1.1*gradradius;
+                //get the portion of "thin" which is at least as wide as gradrad
+                offsetDo2(offset, next, -gradradius, gradradius, thin, aux1, clp::jtRound, clp::etClosedPolygon);
+                if (next.empty()) continue;
+                //some parts of "thin" are not as wide as gradrad, but are adjacent to "fat", so we inflate "fat" to encompass them
+                offsetDo(offset, aux1, gradradius_from_fat, fat, clp::jtSquare, clp::etClosedPolygon);
+                unitePaths(clipper, aux2, next, aux1);
+                //get the portion of "thin" which is either near enough of "fat", or at least as wide as gradrad
+                clipperDo(clipper, aux1, clp::ctIntersection, thin, aux2, clp::pftEvenOdd, clp::pftEvenOdd);
+                clp::Paths *subresult;
+                if (gradinflate != 0.0) {
+                    //inflate the previously computed protion of "thin" by the required amount
+                    offsetDo(offset, aux2, gradinflate, aux1, clp::jtRound, clp::etClosedPolygon);
+                    subresult = &aux2;
+                } else {
+                    subresult = &aux1;
+                }
+                //SHOWCONTOURS(spec.global.config, str("fat, thin, next, subresult ", step-spec.global.addsub.fattening.gradual.begin()), &fat, &thin, &next, subresult);
+                //accumulate the result
+                clipper2.AddPaths(*subresult, clp::ptSubject, true);
+                //if we are not in the last iteration, prepare the vars for the next one!
+                if ((endi - step) > 1) {
+                    //get the new "thin", as the non-fattened portion of "thin"
+                    clipperDo(clipper, thin, clp::ctDifference, thin, next, clp::pftEvenOdd, clp::pftEvenOdd);
+                    //set the new fat
+                    fat = std::move(next);
+                }
+            } else {
+                if (gradinflate != 0.0) {
+                    offsetDo(offset, aux2, gradinflate, thin, clp::jtRound, clp::etClosedPolygon);
+                    clipper2.AddPaths(aux2, clp::ptSubject, true);
+                } else {
+                    clipper2.AddPaths(thin, clp::ptSubject, true);
+                }
+                break;
+            }
+        }
+
+        //clp::Paths old_lowres = lowres;
+        clipper2.Execute(clp::ctUnion, lowres, clp::pftNonZero, clp::pftNonZero);
+        //SHOWCONTOURS(spec.global.config, "contour before and after overwriting", &old_lowres, &lowres);
+    }
+
+    //RESULT IS RETURNED IN lowres
 }
 
 void Multislicer::doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths, clp::Paths &contours_alreadyfilled, clp::Paths &aux1) {
@@ -134,6 +209,7 @@ bool Multislicer::generateToolPath(size_t k, bool nextProcessSameKind, clp::Path
     //toolpath <- erode(contour, radius)
     offset.ArcTolerance = (double)spec.pp[k].arctolG;
     offsetDo(offset, temp_toolpath, (double)-spec.pp[k].radius, contour, clp::jtRound, clp::etClosedPolygon);
+    //clp::Paths beforesnap = temp_toolpath;
 
     //IT IS RECOMMENDED TO DO SNAPPING FOR ALL PATHS, BECAUSE IT SEEMS TO REMOVE SLIGHT IMPERFECTIONS WHICH CAN CAUSE PROBLEMS LATER
 
@@ -164,7 +240,9 @@ bool Multislicer::generateToolPath(size_t k, bool nextProcessSameKind, clp::Path
         }
     }
 
+    //SHOWCONTOURS(spec.global.config, "contour, toolpath before and after snap", &contour, &beforesnap, &temp_toolpath);
     //add to the end the initial point of each contour in the toolpath (this is unconditionally necessary to make the interface with the company's c# app to work seamlessly for open and closed paths, but it is also necessary to correctly operate with the toolpath as a set of open paths in clipperlib)
+required overwriting by setting very low values in --medialaxis-radius (also implicitly requiring to not set --clearance). The new options can be safely combined with --clearance, at least for the first process.
     applyToPaths<copyOpenToClosedPath, ReserveCapacity>(temp_toolpath, toolpaths);
     return true;
 }
@@ -415,11 +493,11 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     //INTERIM HACK FOR add/sub
     bool nextProcessSameKind, previousProcessSameKind;
     if (k == 0) {
-        nextProcessSameKind = !spec.global.addsubWorkflowMode;
+        nextProcessSameKind = !spec.global.addsub.addsubWorkflowMode;
         previousProcessSameKind = true;
     } else {
         nextProcessSameKind = true;
-        previousProcessSameKind = !spec.global.addsubWorkflowMode;
+        previousProcessSameKind = !spec.global.addsub.addsubWorkflowMode;
     }
 
     bool CUSTOMINFILLINGS = (spec.pp[k].infillingMode == InfillingConcentric)   ||
@@ -439,7 +517,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         if (nextProcessSameKind) {
             removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
         } else {
-            overwriteHighResDetails(k, contours_tofill, lowres, AUX3);
+            //with the current setup, this is triggered only in add/sub mode for the first process
+            overwriteHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
         }
         contourToProcess = &lowres;
     } else {
@@ -454,7 +533,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     //SHOWCONTOURS(spec.global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
 
-    //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths
+    //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths)
     offsetDo(offset, output.contours, (double)spec.pp[k].radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
 
     //if required, discard common toolpaths.
@@ -643,7 +722,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
                 removeOuter(outputs[k]->infillingAreas, spec.global.outerLimitX, spec.global.outerLimitY);
             }
         }
-        bool nextProcessSameKind = (!spec.global.addsubWorkflowMode) || (k > 0);
+        bool nextProcessSameKind = (!spec.global.addsub.addsubWorkflowMode) || (k > 0);
         if (nextProcessSameKind) {
             if (outputs[k]->infillingsIndependentContours.empty()) {
                 clipperDo(clipper, contours_tofill, clp::ctDifference, contours_tofill, outputs[k]->contours, clp::pftNonZero, clp::pftNonZero);

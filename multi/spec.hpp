@@ -20,16 +20,38 @@ typedef struct FeedbackSpec {
     FeedbackSpec() : feedback(false) {}
 } FeedbackSpec;
 
+//in add/sub mode, "contour fattening" should be computed for high-res features in the first process. This "fattening" can be done in several ways:
+//    -by specifying the medialAxisFactors vector of that process to have one or more very low values. For this, flag useGradualFattening should be false
+//    -by a gradual fattening, setting flag useGradualFattening to true
+//    -for high-res features rich in narrow negative details (such as gratings), setting the flag erasegHighResNegDetails may be useful. This can be used on its own, or combined with any of the two previous methods.
+typedef struct FatteningSpec {
+    typedef struct GradualStep { double radiusFactor; double inflateFactor; GradualStep() {}; GradualStep(double rad, double inf) : radiusFactor(rad), inflateFactor(inf) {} } GradualStep;
+    bool eraseHighResNegDetails;
+    bool useGradualFattening;
+    clp::cInt eraseHighResNegDetails_radius;
+    std::vector<GradualStep> gradual;
+} FatteningSpec;
+
+typedef struct AddSubSpec {
+    bool addsubWorkflowMode;
+    bool ignoreRedundantAdditiveContours; //TODO: make this an explicit parameter, if necessary (used only by 3d scheduling)
+    //IMPORTANT: In our current setup, the add/sub workflow is always:
+    //           -process 0 of FIRST kind (add or sub)
+    //           -all subsequent processes of the OPPOSITE kind
+    //because of this, we host all specifications relative the FIRST kind here (there is only one, and it is always the 0th!), but if we were to enable more processes of the FIRST kind, these specifications would probably have to be moved to PerProcessSpec
+    FatteningSpec fattening;
+    AddSubSpec() : ignoreRedundantAdditiveContours(true) {}
+} AddSubSpec;
+
 typedef struct GlobalSpec {
     typedef struct ZNTool { double z; unsigned int ntool; ZNTool() {}; ZNTool(double _z, unsigned int _ntool) : z(_z), ntool(_ntool) {} } ZNTool;
     //currently, having a reference to the Configuration here is useful only for debugging with showContours
     Configuration &config;
     SchedulerMode schedMode;
     FeedbackSpec fb;
+    AddSubSpec addsub;
     bool useScheduler;
     bool sliceUpwards; //if slicing is not manual, this sets the direction of the slicing (if true: from bottom to top)
-    bool addsubWorkflowMode;
-    bool ignoreRedundantAdditiveContours; //TODO: make this an explicit parameter, if necessary (used only by 3d scheduling)
     bool alsoContours;
     bool applyMotionPlanner;
     bool avoidVerticalOverwriting;
@@ -44,7 +66,7 @@ typedef struct GlobalSpec {
     clp::Paths inputSub; //this is used if flag "addsubWorkflowMode" is set
     bool substractiveOuter;
     clp::cInt outerLimitX, outerLimitY;
-    GlobalSpec(Configuration &_config) : config(_config), inputSub(0), ignoreRedundantAdditiveContours(true) {}
+    GlobalSpec(Configuration &_config) : config(_config), inputSub(0) {}
 } GlobalSpec;
 
 
@@ -134,7 +156,7 @@ typedef struct MultiSpec {
 
     void initializeVectors(size_t n) { numspecs = n; pp.resize(n); }
     bool validate();
-    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsubWorkflowMode) && (pp[k].useRadiusRemoveCommon); }
+    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsub.addsubWorkflowMode) && (pp[k].useRadiusRemoveCommon); }
     std::string populateParameters();
 } MultiSpec;
 

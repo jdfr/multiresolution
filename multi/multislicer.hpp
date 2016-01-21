@@ -40,6 +40,7 @@ protected:
 public:
     clp::ClipperOffset offset;
     clp::Clipper clipper;
+    clp::Clipper clipper2; //we need this in order to conduct more than one clipping in parallel, if necessary
     Multislicer(MultiSpec &_spec) : spec(_spec) {}
     void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); accumInfillingsHolder.clear();  accumInflatedMedialAxis.clear(); accumNonCoveredByInfillings.clear();  infillingsIndependentContours = NULL; }
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the 
@@ -50,7 +51,7 @@ public:
 
 protected:
     void removeHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &opened, clp::Paths &aux1);
-    void overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1);
+    void overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1, clp::Paths &aux2);
 
     void doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths, clp::Paths &contours_alreadyfilled, clp::Paths &aux1);
 

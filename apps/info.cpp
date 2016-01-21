@@ -31,7 +31,8 @@ std::string printPathInfo(const char * filename, bool verbose) {
         for (int k = 0; k < fileheader.numtools; ++k) {
             const char * padding = "\n   ";
             fprintf(stdout, "for tool %d:%sradius in X: %f", k, useSched ? padding : " ", fileheader.radiusX[k]);
-            if (useSched) fprintf(stdout, "%sradius in Z: %f\n", padding, fileheader.radiusZ[k]);
+            if (useSched) fprintf(stdout, "%sradius in Z: %f", padding, fileheader.radiusZ[k]);
+            fprintf(stdout, "\n");
         }
         fprintf(stdout, "Number of Records: %d\n", fileheader.numRecords);
         fprintf(stdout, "\n\n");
