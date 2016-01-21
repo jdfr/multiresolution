@@ -1,5 +1,4 @@
 #include "sliceviewer.hpp"
-#include <sstream>
 
 std::string SlicesViewer::start() {
 

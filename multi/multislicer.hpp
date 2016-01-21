@@ -1,7 +1,6 @@
 #ifndef  MULTISLICER_HEADER
 #define  MULTISLICER_HEADER
 
-#include "common.hpp"
 #include "spec.hpp"
 #include "auxgeom.hpp"
 

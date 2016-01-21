@@ -1,10 +1,7 @@
 #ifndef AUXGEOM_HEADER
 #define AUXGEOM_HEADER
 
-#define _USE_MATH_DEFINES 
-#include <cmath>
-#define M_PI 3.14159265358979323846
-#include "clipper.hpp"
+#include "common.hpp"
 #include <iterator>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -12,7 +9,7 @@
 #  include <limits.h>
 #endif
 
-namespace clp = ClipperLib;
+#define M_PI 3.14159265358979323846
 
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f);
 

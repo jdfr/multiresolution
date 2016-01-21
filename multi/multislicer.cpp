@@ -1,13 +1,8 @@
 #include "multislicer.hpp"
 #include "orientPaths.hpp"
 #include "medialaxis.hpp"
-#include <stdio.h>
-#include <stdlib.h>
-#include <cmath>
-#include <algorithm>
-#include <sstream>
-
 #include "showcontours.hpp"
+#include <algorithm>
 
 /////////////////////////////////////////////////
 /*MACHINERY FOR THE QUICK HACK TO ADAPT THE CODE

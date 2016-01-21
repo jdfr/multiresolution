@@ -1,14 +1,5 @@
-//this is a simple command line application that organizes the execution of the multislicer
-
-//if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
-#define STANDALONE_USEPYTHON
-
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
-#include "auxgeom.hpp"
-#include <stdio.h>
-#include <sstream>
-#include <string>
 
 typedef struct Data {
     int k;

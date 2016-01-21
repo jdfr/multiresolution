@@ -1,10 +1,6 @@
 #include "config.hpp"
 #include <stdio.h>
 #include <sys/stat.h>
-#include <vector>
-#include <sstream>
-#include <cctype>
-#include <algorithm> 
 
 #include <boost/tokenizer.hpp>
 using boost::tokenizer;

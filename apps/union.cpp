@@ -1,14 +1,4 @@
-//this is a simple command line application that organizes the execution of the multislicer
-
-//if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
-#define STANDALONE_USEPYTHON
-
 #include "pathsfile.hpp"
-#include "auxgeom.hpp"
-#include <stdio.h>
-#include <ctype.h>
-#include <sstream>
-#include <string>
 
 void closeAll(std::vector<FILE *> &is, FILE * o) {
     if (o != NULL) fclose(o);

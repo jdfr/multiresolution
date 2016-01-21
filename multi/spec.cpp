@@ -2,9 +2,6 @@
 #include "snapToGrid.hpp"
 
 
-///////////////////////////////////////////
-
-
 bool MultiSpec::validate() {
     //do not validate anything for now
     return true;

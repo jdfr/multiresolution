@@ -1,6 +1,5 @@
 #include "parsing.hpp"
 #include "pathsfile.hpp"
-#include <algorithm>
 
 po::options_description globalOptionsGenerator() {
     po::options_description opts("Slicing engine options (global)");

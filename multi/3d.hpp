@@ -3,8 +3,6 @@
 
 #include "multislicer.hpp"
 #include "spec.hpp"
-#include <math.h>
-#include <exception>
 #include <map>
 
 typedef struct ResultSingleTool : public virtual SingleProcessOutput {

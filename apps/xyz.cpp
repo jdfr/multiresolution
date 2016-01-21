@@ -1,9 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
-#include <string>
 #include <fstream>
-#include <limits>
-#include <math.h>
 
 #include <boost/tokenizer.hpp>
 using boost::tokenizer;

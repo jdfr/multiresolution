@@ -1,4 +1,5 @@
 #include "auxgeom.hpp"
+#include <cmath>
 
 //this function is useful to debug some problems
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f) {

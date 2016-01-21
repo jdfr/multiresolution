@@ -1,11 +1,5 @@
-//this is a simple command line application that organizes the execution of the multislicer
-
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
-#include "auxgeom.hpp"
-#include <stdio.h>
-#include <sstream>
-#include <string>
 #include <iomanip>
 
 

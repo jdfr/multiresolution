@@ -1,23 +1,10 @@
 //this is a simple command line application that organizes the execution of the multislicer
 
-#include <string>
-#include <stdexcept>
-#include <iostream>
-#include <vector>
-#include <map>
-#include <stdexcept>
-
-#include "spec.hpp"
 #include "parsing.hpp"
 #include "slicermanager.hpp"
-#include "multislicer.hpp"
 #include "3d.hpp"
 #include "pathsfile.hpp"
-#include <stdio.h>
-#include <ctype.h>
-#include <sstream>
-#include <string>
-#include <stdlib.h>
+#include <iostream>
 
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #ifdef STANDALONE_USEPYTHON
@@ -33,6 +20,7 @@ template<typename Function, typename... Args> std::string applyToAllFiles(FILES 
     }
     return std::string();
 }
+
 template<typename Function, typename... Args> std::string applyToAllFilesWithIOP(FILES &files, IOPaths iop, Function function, Args... args) {
     for (auto file = files.begin(); file != files.end(); ++file) {
         iop.f = *file;

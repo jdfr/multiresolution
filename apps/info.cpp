@@ -1,16 +1,5 @@
-//this is a simple command line application that organizes the execution of the multislicer
-
-//if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
-#define STANDALONE_USEPYTHON
-
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
-#include "auxgeom.hpp"
-#include <stdio.h>
-#include <ctype.h>
-#include <sstream>
-#include <string>
-#include <math.h>
 #include <limits>
 
 std::string printPathInfo(const char * filename, bool verbose) {

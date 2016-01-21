@@ -1,28 +1,13 @@
+//THIS FILE IMPLEMENTS THE SHARED LIBRARY INTERFACE
+
 //no point in defining all this if not exporting symbols...
 #ifdef LIBRARY_EXPORTS
 
 #include "multiresolution.h"
-#include "common.hpp"
-static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface.h so typedef coord_type resolves to the same type as typedef ClipperLib::cInt");
 #include "pathsfile.hpp"
-
-//THIS FILE IMPLEMENTS THE SHARED LIBRARY INTERFACE
-
-#include "config.hpp"
-#include "spec.hpp"
 #include "parsing.hpp"
 #include "3d.hpp"
-
-#include <fcntl.h>
-#include <string.h>
-#include <vector>
-#include <iterator>
-#include <algorithm>
-#include <cmath>
-
-#if defined(_WIN32) || defined(_WIN64)
-#  include <io.h>
-#endif
+static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface.h so typedef coord_type resolves to the same type as typedef ClipperLib::cInt");
 
 /////////////////////////////////////////////////
 //SHARED LIBRARY INTERFACE

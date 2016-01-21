@@ -1,14 +1,11 @@
 #include "3d.hpp"
 #include "auxgeom.hpp"
 #include "orientPaths.hpp"
-#include <stdexcept>
-#include <numeric>
-#include <algorithm>
-#include <sstream>
 #include "pathsfile.hpp"
 #include "slicermanager.hpp"
-
 #include "showcontours.hpp"
+#include <numeric>
+#include <algorithm>
 
 //this macro is for any object with a std::string err field;
 #define MAKE_ERR(obj, ...) { \

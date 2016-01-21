@@ -1,13 +1,6 @@
 #include "slicermanager.hpp"
-
 #include "subprocess.hpp"
-
 #include "iopaths.hpp"
-
-#include <sstream>
-
-#include <stdio.h>
-
 #include <cmath>
 
 /*strictly speaking, spawning a different process for the slicer is only required if

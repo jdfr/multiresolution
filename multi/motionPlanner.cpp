@@ -1,11 +1,9 @@
-
 #include "motionPlanner.hpp"
 
-#include <stdexcept>
-#include <cmath>
-#include <stdio.h>
 //#define TEST_INTRINSIC
 #ifdef TEST_INTRINSIC
+#include <stdio.h>
+#include <stdexcept>
 #include <exception>
 
 class Int128

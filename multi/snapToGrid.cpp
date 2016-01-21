@@ -1,13 +1,8 @@
 
 #include "snapToGrid.hpp"
-
-#include <stdlib.h>
-#include <math.h>
-#include <limits.h>
-
 #include <sstream>
-
-#include <stdio.h> 
+#include <cmath>
+//#include <stdio.h> 
 
 void inline verySimpleSnapPathToGridWithShift(ClipperLib::Path &path, SnapToGridSpec &spec) {
     for (ClipperLib::Path::iterator pit = path.begin(); pit != path.end(); ++pit) {
