@@ -397,10 +397,10 @@ int main(int argc, const char** argv) {
         double zstep = multispec.global.z_uniform_step;
 
         std::vector<double> zs;
-        if (std::isnan(multispec.global.z_base)) {
-            zs = slicer->prepareSTLSimple(zstep);
-        } else {
+        if (multispec.global.use_z_base) {
             zs = slicer->prepareSTLSimple(multispec.global.z_base, zstep);
+        } else {
+            zs = slicer->prepareSTLSimple(zstep);
         }
 
         if (dryrun) {

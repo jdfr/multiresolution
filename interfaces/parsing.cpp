@@ -258,10 +258,9 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
         spec.schedMode      = UniformScheduling;
         spec.z_uniform_step = vm["slicing-uniform"].as<double>();
         schedSet            = true;
-        if (vm.count("slicing-zbase")) {
+        spec.use_z_base = vm.count("slicing-zbase") != 0;
+        if (spec.use_z_base) {
             spec.z_base = vm["slicing-zbase"].as<double>();
-        } else {
-            spec.z_base = NAN;
         }
     };
     if (vm.count("slicing-scheduler")) {
