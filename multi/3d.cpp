@@ -254,39 +254,37 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
     //ATTENTION: THIS RECURSIVE PROCEDURE CAN GENERATE SLICES THAT ARE AT IDENTICAL OR NEAR IDENTICAL Zs
     //TO AVOID UNNECESARY REPETITIVE SLICING, WE FIX IT IN THE ORDERING STAGE. OF COURSE, THAT DEPENDS CRUCIALLY ON THE ORDERING!
 
-    int process, nextp;
+    int process;
     bool nextpok;
-    nextp = process_spec + 1;
+    int nextp          = process_spec + 1;
+    bool sliceUpwards  = tm.spec.global.sliceUpwards;
     if (tm.spec.global.schedTools.empty()) {
-        process = process_spec;
-        nextpok = nextp < tm.spec.numspecs;
+        process        = process_spec;
+        nextpok        = nextp < tm.spec.numspecs;
     } else {
-        process = tm.spec.global.schedTools[process_spec];
-        nextpok = nextp < tm.spec.global.schedTools.size();
+        process        = tm.spec.global.schedTools[process_spec];
+        nextpok        = nextp < tm.spec.global.schedTools.size();
     }
 
-    double factor = tm.spec.global.sliceUpwards ? 1.0 : -1.0;
-    double z = zbase[process] + tm.spec.pp[process].profile->sliceHeight / 2.0 * factor;
-    double znext;
-    bool atleastone;
+    double sliceHeight = tm.spec.pp[process].profile->sliceHeight;
+    if (!sliceUpwards) {
+           sliceHeight = -sliceHeight;
+    }
+    double z           = zbase[process] + sliceHeight / 2.0;
 
-    if (atleastone = testSliceNotNearEnd(z, zend, process, tm)) {
+    if (testSliceNotNearEnd(z, zend, process, tm)) {
         input.push_back(InputSliceData(z, process));
     }
 
-    while (testSliceNotNearEnd(znext = z + tm.spec.pp[process].profile->sliceHeight * factor, zend, process, tm)) {
-        input.push_back(InputSliceData(znext, process));
+    while (testSliceNotNearEnd(z += sliceHeight, zend, process, tm)) {
+        input.push_back(InputSliceData(z, process));
         if (nextpok) {
-            double next_zend;
-            if (tm.spec.global.sliceUpwards) {
-                next_zend = std::min(zbase[process] + tm.spec.pp[process].profile->sliceHeight, zend);
-            } else {
-                next_zend = std::max(zbase[process] - tm.spec.pp[process].profile->sliceHeight, zend);
-            }
+            double next_zend = sliceUpwards ?
+                std::min(zbase[process] + sliceHeight, zend) :
+                std::max(zbase[process] + sliceHeight, zend);
             recursiveSimpleInputScheduler(nextp, zbase, next_zend);
         }
-        zbase[process] += tm.spec.pp[process].profile->sliceHeight * factor;
-        z = znext;
+        zbase[process] += sliceHeight;
     }
 
     //add possible high res slices higher than the place where low res slices cannot be placed
