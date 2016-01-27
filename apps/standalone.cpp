@@ -90,7 +90,7 @@ int main(int argc, const char** argv) {
 
     char *meshfullpath;
 
-    bool show, use2d, showAtEnd, useviewparams;
+    bool show, use2d, useviewparams;
     std::string viewparams;
 
     bool save;
@@ -152,8 +152,6 @@ int main(int argc, const char** argv) {
             return -1;
         }
 
-        showAtEnd = true; //this option is not exposed for now as an argument...
-
         show = mainOpts.count("show") != 0;
         if (show) {
             const std::vector<std::string> &vals = mainOpts["show"].as<std::vector<std::string>>();
@@ -199,12 +197,6 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
-    bool saveContours = show && ((!use2d) || showAtEnd);
-    bool showInline = show && use2d && (!showAtEnd);
-    bool shownotinline = show && showAtEnd;
-    bool removeUnused = true; //!saveContours;
-    bool write = save || shownotinline;
-
     FILES all_files;
     FILE *singleoutput = NULL;
     IOPaths iop;
@@ -221,7 +213,7 @@ int main(int argc, const char** argv) {
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
     SlicesViewer *slicesViewer=NULL;
-    if (shownotinline) {
+    if (show) {
         slicesViewer = new SlicesViewer(config, "view slices", use2d, viewparams.c_str());
         std::string err = slicesViewer->start();
         if (!err.empty()) {
@@ -240,6 +232,7 @@ int main(int argc, const char** argv) {
     }
     free(meshfullpath);
 
+    bool write = save || show;
     bool alsoContours = multispec.global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
@@ -249,10 +242,14 @@ int main(int argc, const char** argv) {
         applyToAllFiles(all_files, [&header](FILE *f) { return header.writeToFile(f, false); });
     }
 
+    //for now, we do not need to store intermediate results, but let the code live in case we need it later
+    bool saveContours = false;
     std::vector<std::shared_ptr<ResultSingleTool>> results;
+
 
     if (multispec.global.useScheduler) {
 
+        bool removeUnused = true; //!saveContours;
         SimpleSlicingScheduler sched(removeUnused, multispec);
 
         double minz = 0, maxz = 0;
@@ -333,12 +330,6 @@ int main(int argc, const char** argv) {
                 if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", rawZs[i], err.c_str()); return -1; }
             }
 
-#           ifdef STANDALONE_USEPYTHON
-                if (showInline) {
-                    //SHOWCONTOURS(multispec.global.config, str("raw contour at Z ", sched.rm.raw[sched.rm.raw_idx].z), &rawslice);
-                }
-#           endif
-
             //after this, sched.rm takes ownership of the contents of rawslice, so our variable is in an undefined state!!!!
             sched.rm.receiveNextRawSlice(rawslice);
 
@@ -370,14 +361,6 @@ int main(int argc, const char** argv) {
                         if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
                     }
                 }
-#               ifdef STANDALONE_USEPYTHON
-                    if (showInline) {
-                        SHOWCONTOURS(multispec.global.config,
-                            str("processed contours at Z ", single->z, ", tool ", single->ntool),
-                            &(single->contoursToShow), &(single->toolpaths));
-                    }
-#               endif
-
             }
         }
 
@@ -475,17 +458,6 @@ int main(int argc, const char** argv) {
                     }
                 }
             }
-#           ifdef STANDALONE_USEPYTHON
-                if (showInline) {
-                    std::vector<clp::Paths*> toshowv;
-                    toshowv.push_back(&rawslice);
-                    for (int k = 0; k < numtools; ++k) {
-                        toshowv.push_back(&(ress[k]->toolpaths));
-                    }
-                    ShowContoursInfo info(multispec.global.config, str("slices at Z ", zs[i]));
-                    showContours(toshowv, info);
-                }
-#           endif
         }
 
     }
@@ -499,12 +471,12 @@ int main(int argc, const char** argv) {
 
     results.clear();
 
-    if (shownotinline) {
 #ifdef STANDALONE_USEPYTHON
+    if (show) {
         slicesViewer->wait();
         delete slicesViewer;
-#endif
     }
+#endif
 
     if (!slicer->finalize()) {
         std::string err = slicer->getErrorMessage();
