@@ -161,8 +161,8 @@ void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
             }
         } else {
             for (auto &path : nextSlice) for (auto &point : path) {
-                point.X *= scaled;
-                point.Y *= scaled;
+                point.X = (clp::cInt)(point.X * scaled);
+                point.Y = (clp::cInt)(point.Y * scaled);
             }
         }
     }
