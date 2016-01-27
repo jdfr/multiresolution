@@ -58,7 +58,7 @@ MainSpec mainOptions() {
             po::value<std::vector<std::string>>()->multitoken(),
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
         ("dry-run,y",
-            "if this option is specified, the system only shows the Z values of the slices to be received from the input mesh file, then terminates without doing anything else")
+            "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
     po::positional_options_description positional;
     positional.add("load", 1).add("save", 1);
@@ -281,9 +281,13 @@ int main(int argc, const char** argv) {
         }
 
         if (dryrun) {
-            printf("dry run: these are the Z values of the required slices, in request order:\n");
-            for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
-                printf("%.20g\n", *z);
+            printf("dry run:\n\nThese are the Z values of the required slices from the mesh file (raw slices), in request order:\n");
+            for (const auto &z : rawZs) {
+                printf("%.20g\n", z);
+            }
+            printf("\nThese are the NTool number and Z value for the slices to be computed, in the required computing order:\n");
+            for (const auto &input : sched.input) {
+                printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
             }
             slicer->terminate();
             delete slicer;
@@ -392,9 +396,9 @@ int main(int argc, const char** argv) {
         }
 
         if (dryrun) {
-            printf("dry run: these are the Z values of the required slices, in request order:\n");
-            for (auto z = zs.begin(); z != zs.end(); ++z) {
-                printf("%.20g\n", *z);
+            printf("dry run:\n\nThese are the Z values of the required slices from the mesh file (raw slices), in request order:\n");
+            for (const auto &z : zs) {
+                printf("%.20g\n", z);
             }
             slicer->terminate();
             delete slicer;

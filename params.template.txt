@@ -36,7 +36,7 @@
     #--slicing-uniform 0.1 #slice the input file at exactly this step in Z
     --slicing-scheduler #uses the 3D scheduler
     #--slicing-scheduler 0 1 #uses the 3D scheduler, but only uses the tools whose ntool is explicitly specified
-    #--slicing-manual 0 0 0.08 1 #"Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i
+    #--slicing-manual 0 0 1 0.08 #"Same as slicing-scheduler, but the executing order is specified manually: values are NTOOL_1, Z_1, NTOOL_2, Z_2, NTOOL_3, Z_3 ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i
 
   #--vertical-correction #If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)
 

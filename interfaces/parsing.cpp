@@ -21,7 +21,7 @@ po::options_description globalOptionsGenerator() {
             "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
         ("slicing-manual,m",
             po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"),
-            "Same as slicing-scheduler, but the executing order is specified manually: values are Z_1, NTOOL_1, Z_2, NTOOL_2, Z_3 NTOOL_3, ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
+            "Same as slicing-scheduler, but the executing order is specified manually: values are NTOOL_1, Z_1, NTOOL_2, Z_2, NTOOL_3, Z_3 ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
         ("slicing-zbase",
             po::value<double>()->value_name("z_base"),
             "If --slicing-uniform is specified, and this parameter is specified, it is the Z position of the first slice, in mesh file units.")
@@ -277,9 +277,10 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
         }
         spec.schedSpec.reserve(vals.size() / 2);
         for (auto val = vals.begin(); val != vals.end(); ++val) {
-            double z = *(val++);
-            int ntool = (int)*val;
-            if (ntool != *val) return str("Invalid slicing-manual value: for Z ", z, "the tool is not an integer: ", *val);
+            double ntoolv = *val;
+            int ntool = (int)ntoolv;
+            double z  = *(++val);
+            if (ntool != ntoolv) return str("Invalid slicing-manual value in position ", val-1-vals.begin(), ": for Z ", z, "the tool is not an integer: ", *val);
             spec.schedSpec.push_back(GlobalSpec::ZNTool(z, ntool));
         }
         schedSet = true;
