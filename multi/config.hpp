@@ -34,8 +34,14 @@ public:
 
 typedef struct MetricFactors {
     std::string err;
-    double input_to_internal, internal_to_input, input_to_slicer, slicer_to_internal;
-    MetricFactors(Configuration &config);
+    double input_to_internal, internal_to_input,
+           input_to_slicer, slicer_to_internal,
+           param_to_internal, internal_to_param;
+    bool doparamscale;
+    bool init_done;
+    MetricFactors() : init_done(false) {}
+    MetricFactors(Configuration &config, bool _doscale) { init(config, _doscale); };
+    void init(Configuration &config, bool _doscale);
 } MetricFactors;
 
 //this is a hack to convert a series of things to a string

@@ -86,8 +86,6 @@ void usage(MainSpec &mainSpec) {
 }
 
 int main(int argc, const char** argv) {
-    double scale;
-
     char *meshfullpath;
 
     bool show, use2d, useviewparams;
@@ -102,6 +100,8 @@ int main(int argc, const char** argv) {
     
     Configuration config;
     MultiSpec multispec(config);
+    bool doscale = true;
+    MetricFactors factors;
 
     try {
         MainSpec mainSpec = mainOptions();
@@ -137,10 +137,10 @@ int main(int argc, const char** argv) {
 
         if (config.has_err) { fprintf(stderr, config.err.c_str()); return -1; }
 
-        std::string err = getScale(true, config, scale);
-        if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
+        factors.init(config, doscale);
+        if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        err = parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], scale);
+        std::string err = parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], getScale(factors));
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
@@ -189,12 +189,6 @@ int main(int argc, const char** argv) {
             fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
             return -1;
         }
-    }
-
-    MetricFactors factors(config);
-    if (!factors.err.empty()) {
-        fprintf(stderr, factors.err.c_str());
-        return -1;
     }
 
     FILES all_files;

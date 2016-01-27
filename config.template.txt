@@ -19,13 +19,17 @@ SLICER_PATH                  : ${SLICER_PATH} ;
 SLICER_EXEC                  : ${SLICER_EXEC} ;
 SLICER_REPAIR                : true ;
 SLICER_INCREMENTAL           : true ;
-SLICER_TO_INTERNAL_FACTOR    : 100 ; #IMPLICITLY: INPUT_TO_INTERNAL_FACTOR = INPUT_TO_SLICER_FACTOR * SLICER_TO_INTERNAL_FACTOR
 
-#as slic3r gives the Z max and min values in input mesh units, we have to translate from input units to slic3r units
+#internally, we use 64-bit integer types for contour coordinates.
+#This scaling factor enables higher resolution at the cost of being able to process only small objects.
+#Modify if it necessary to slice larger objects
+SLICER_TO_INTERNAL_FACTOR    : 100 ;
+
+#this must be the inverse of slic3r's SCALING_FACTOR
 INPUT_TO_SLICER_FACTOR       : 1000000 ; 
 
-#This is to make sure that the parameters are in micrometers if INPUT_TO_SLICER_FACTOR * SLICER_TO_INTERNAL_FACTOR == 1e8
-PARAMETER_TO_INTERNAL_FACTOR : 100000 ;
+#This is to make sure that the parameters are in micrometers if mesh file units are in millimeters
+INPUT_TO_PARAMETER_FACTOR    : 1000 ;
 
 # config values for using python
 FILESEP                      : ${FILESEP} ;

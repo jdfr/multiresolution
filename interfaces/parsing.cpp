@@ -37,7 +37,7 @@ po::options_description globalOptionsGenerator() {
             "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa). By itself, addsub mode does not work: more options must be set. For high-res negative details, set the global option 'neg-closing'. For high-res positive details, either set the global option 'overwrite-gradual' or (if 'clearance' is not being used) set 'infill-medialaxis-radius' for process 0 to one or several very low values (0.5 to 0.01).")
         ("neg-closing",
             po::value<double>()->value_name("radius"),
-            "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000, and it can be tuned to make the operation to overwrite more or less negative details.")
+            "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000 (the factor can be modified in the config file), and it can be tuned to make the operation to overwrite more or less negative details.")
         ("overwrite-gradual",
         po::value<std::vector<double>>()->multitoken()->value_name("[rad_1 inf_1 rad_2 inf_2 ...]"),
             "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. As more steps are used, the overwriting is smoother, but also more expensive to compute. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The memebers of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. Please note: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius)")
@@ -56,7 +56,7 @@ po::options_description perProcessOptionsGenerator() {
     opts.add_options()
         ("process,p",
             po::value<int>()->required()->value_name("ntool"),
-            "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
+            "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
         ("no-preprocessing",
             "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("radx,x",
@@ -489,19 +489,4 @@ std::vector<std::string> getArgs(int argc, const char ** argv, int numskip) {
         for (int k = numskip; k < argc; ++k) args.push_back(std::string(argv[k]));
     }
     return args;
-}
-
-std::string getScale(bool doscale, Configuration &config, double &scale) {
-    scale = 0.0;
-    if (doscale) {
-        if (config.hasKey("PARAMETER_TO_INTERNAL_FACTOR")) {
-            std::string val = config.getValue("PARAMETER_TO_INTERNAL_FACTOR");
-            char *endptr;
-            scale = strtod(val.c_str(), &endptr);
-            if (*endptr != 0) return str("cannot parse <", val, "> into a double value");
-        } else {
-            return std::string("doscale flag is true, but there was not PARAMETER_TO_INTERNAL_FACTOR in the configuration");
-        }
-    }
-    return std::string();
 }

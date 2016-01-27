@@ -32,7 +32,7 @@ const po::options_description * perProcessOptions();
 
 std::vector<po::parsed_options> sortOptions(std::vector<const po::options_description*> &optss, const po::positional_options_description &posit, int positionalArgumentsIdx, const char *CommandLineOrigin, std::vector<std::string> &args);
 po::parsed_options parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args);
-std::string getScale(bool doscale, Configuration &config, double &scale);
+inline double getScale(MetricFactors &factors) { return factors.doparamscale ? factors.param_to_internal : 0.0; }
 
 std::vector<std::string> getArgs(int argc, const char ** argv, int numskip=1);
 

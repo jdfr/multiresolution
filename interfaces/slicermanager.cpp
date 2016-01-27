@@ -16,18 +16,20 @@ class ExternalSlicerManager : public SlicerManager {
     std::string workdir;
     std::string err;
     bool repair, incremental;
+    double scaled;
     long scale;
+    bool useIntegerScale;
     int numSlice;
 public:
     ExternalSlicerManager(
 #ifdef SLICER_USE_DEBUG_FILE
         std::string &&_debugfile,
 #endif
-    std::string &&_execpath, std::string &&_workdir, bool _repair, bool _incremental, long _scale) :
+    std::string &&_execpath, std::string &&_workdir, bool _repair, bool _incremental, double _scaled) :
 #ifdef SLICER_USE_DEBUG_FILE
     debugfile(std::move(_debugfile)),
 #endif
-    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scale(_scale) {}
+    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scaled(_scaled), scale((long)_scaled), useIntegerScale(((double)scale)==scaled) {}
     virtual ~ExternalSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
     virtual bool terminate();
@@ -152,12 +154,15 @@ void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
         return;
     }
     if (scale != 0) {
-        auto paend = nextSlice.end();
-        for (auto path = nextSlice.begin(); path != paend; ++path) {
-            auto poend = path->end();
-            for (auto point = path->begin(); point != poend; ++point) {
-                point->X *= scale;
-                point->Y *= scale;
+        if (useIntegerScale) {
+            for (auto &path : nextSlice) for (auto &point : path) {
+                point.X *= scale;
+                point.Y *= scale;
+            }
+        } else {
+            for (auto &path : nextSlice) for (auto &point : path) {
+                point.X *= scaled;
+                point.Y *= scaled;
             }
         }
     }
@@ -168,8 +173,8 @@ SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
 
     case SlicerManagerExternal: {
 
-        std::string scale = config.getValue("SLICER_TO_INTERNAL_FACTOR");
-        long sc = strtol(scale.c_str(), NULL, 10);
+        MetricFactors factors(config, false);
+        if (!factors.err.empty()) return NULL;
 
         return new ExternalSlicerManager(
 #ifdef SLICER_USE_DEBUG_FILE
@@ -179,7 +184,7 @@ SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
             config.getValue("SLICER_PATH"),
             config.getValue("SLICER_REPAIR").compare("true") == 0,
             config.getValue("SLICER_INCREMENTAL").compare("true") == 0,
-            sc);
+            factors.slicer_to_internal);
 
     } case SlicerManagerNative:
     default:

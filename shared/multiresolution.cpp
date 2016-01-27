@@ -23,6 +23,7 @@ typedef struct SharedLibraryConfig {
 typedef struct SharedLibraryState {
     std::string err;
     MultiSpec spec;
+    MetricFactors factors;
     std::vector<clp::cInt> processRadiuses;
     SimpleSlicingScheduler * sched;
     Multislicer * multi;
@@ -134,10 +135,12 @@ StateHandle initState(Configuration *config, std::vector<std::string> &args, boo
         state->err = state->spec.global.config.err;
         return state;
     }
-    double scale;
-    std::string err = getScale(doscale, *config, scale);
-    if (!err.empty()) { state->err = err; return state; }
-    err = parseAll(state->spec, NULL, args, scale);
+    state->factors.init(*config, doscale);
+    if (!state->factors.err.empty()) {
+        state->err = state->factors.err;
+        return state;
+    }
+    std::string err = parseAll(state->spec, NULL, args, getScale(state->factors));
     if (!err.empty()) { state->err = err; return state; }
     if (state->spec.global.useScheduler) {
         bool removeUnused = true;
@@ -318,21 +321,15 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
         return ret;
     }
     if (state->spec.global.fb.feedback) {
-        //MetricFactors is not needed anywhere else in the shared library interface, so we can create it here as an one-off
-        MetricFactors factors(state->spec.global.config);
-        if (!factors.err.empty()) {
-            state->err = factors.err;
-            voidSlices3DSpecInfo(ret);
-            return ret;
-        }
+        double internal_to_input = state->factors.internal_to_input;
 
         //un-scale the z values for raw slices, since they are needed by applyFeedback()
         std::vector<double> rawZs = state->sched->rm.rawZs;
         for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
-            *z *= factors.internal_to_input;
+            *z *= internal_to_input;
         }
 
-        std::string err = applyFeedback(state->spec.global.config, factors, *state->sched, rawZs, state->sched->rm.rawZs);
+        std::string err = applyFeedback(state->spec.global.config, state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
         if (!err.empty()) {
             state->err = err;
             voidSlices3DSpecInfo(ret);

@@ -205,24 +205,38 @@ static inline std::string &trim(std::string &s) {
     return ltrim(rtrim(s));
 }
 
-MetricFactors::MetricFactors(Configuration &config) {
-    std::string val_input_to_slicer, val_slicer_to_internal;
-    if (config.hasKey("INPUT_TO_SLICER_FACTOR")) {
-        val_input_to_slicer = config.getValue("INPUT_TO_SLICER_FACTOR");
+bool getDoubleConfigVal(Configuration &config, const char *name, std::string &err, double &result) {
+    if (config.hasKey(name)) {
+        std::string val = config.getValue(name);
+        char *endptr;
+        result = strtod(val.c_str(), &endptr);
+        if (*endptr != 0) {
+            err = str("cannot parse <", val, "> (", name, ") into a double value");
+            return false;
+        }
     } else {
-        err = "the configuration value INPUT_TO_SLICER_FACTOR was not found in the configuration file!";
-        return;
+        err = str("the configuration value ", name, " was not found in the configuration file!");
+        return false;
     }
-    if (config.hasKey("SLICER_TO_INTERNAL_FACTOR")) {
-        val_slicer_to_internal = config.getValue("SLICER_TO_INTERNAL_FACTOR");
+    return true;
+}
+
+void MetricFactors::init(Configuration &config, bool _doparamscale) {
+    init_done = true;
+    doparamscale = _doparamscale;
+    if (!getDoubleConfigVal(config, "INPUT_TO_SLICER_FACTOR",    err, input_to_slicer))    return;
+    if (!getDoubleConfigVal(config, "SLICER_TO_INTERNAL_FACTOR", err, slicer_to_internal)) return;
+    input_to_internal     = input_to_slicer * slicer_to_internal;
+    internal_to_input     = 1 / input_to_internal;
+    if (doparamscale) {
+        double input_to_param;
+        if (!getDoubleConfigVal(config, "INPUT_TO_PARAMETER_FACTOR", err, input_to_param)) return;
+        param_to_internal = input_to_internal / input_to_param;
+        internal_to_param = 1 / param_to_internal;
     } else {
-        err = "the configuration value SLICER_TO_INTERNAL_FACTOR was not found in the configuration file!";
-        return;
+        param_to_internal = 1;
+        internal_to_param = 1;
     }
-    input_to_slicer = strtod(val_input_to_slicer.c_str(), NULL);
-    slicer_to_internal = strtod(val_slicer_to_internal.c_str(), NULL);
-    input_to_internal = input_to_slicer*slicer_to_internal;
-    internal_to_input = 1 / input_to_internal;
 }
 
 void Configuration::load(const char *filename) {
