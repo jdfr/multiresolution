@@ -205,40 +205,6 @@ static inline std::string &trim(std::string &s) {
     return ltrim(rtrim(s));
 }
 
-bool getDoubleConfigVal(Configuration &config, const char *name, std::string &err, double &result) {
-    if (config.hasKey(name)) {
-        std::string val = config.getValue(name);
-        char *endptr;
-        result = strtod(val.c_str(), &endptr);
-        if (*endptr != 0) {
-            err = str("cannot parse <", val, "> (", name, ") into a double value");
-            return false;
-        }
-    } else {
-        err = str("the configuration value ", name, " was not found in the configuration file!");
-        return false;
-    }
-    return true;
-}
-
-void MetricFactors::init(Configuration &config, bool _doparamscale) {
-    init_done = true;
-    doparamscale = _doparamscale;
-    if (!getDoubleConfigVal(config, "INPUT_TO_SLICER_FACTOR",    err, input_to_slicer))    return;
-    if (!getDoubleConfigVal(config, "SLICER_TO_INTERNAL_FACTOR", err, slicer_to_internal)) return;
-    input_to_internal     = input_to_slicer * slicer_to_internal;
-    internal_to_input     = 1 / input_to_internal;
-    if (doparamscale) {
-        double input_to_param;
-        if (!getDoubleConfigVal(config, "INPUT_TO_PARAMETER_FACTOR", err, input_to_param)) return;
-        param_to_internal = input_to_internal / input_to_param;
-        internal_to_param = 1 / param_to_internal;
-    } else {
-        param_to_internal = 1;
-        internal_to_param = 1;
-    }
-}
-
 void Configuration::load(const char *filename) {
     bool ok = true;
     std::string contents = get_file_contents(filename, ok);
@@ -281,3 +247,36 @@ std::string Configuration::getValue(const char * key) {
     return getValue(std::string(key));
 }
 
+bool getDoubleConfigVal(Configuration &config, const char *name, std::string &err, double &result) {
+    if (config.hasKey(name)) {
+        std::string val = config.getValue(name);
+        char *endptr;
+        result = strtod(val.c_str(), &endptr);
+        if (*endptr != 0) {
+            err = str("cannot parse <", val, "> (", name, ") into a double value");
+            return false;
+        }
+    } else {
+        err = str("the configuration value ", name, " was not found in the configuration file!");
+        return false;
+    }
+    return true;
+}
+
+void MetricFactors::init(Configuration &config, bool _doparamscale) {
+    init_done = true;
+    doparamscale = _doparamscale;
+    if (!getDoubleConfigVal(config, "INPUT_TO_SLICER_FACTOR", err, input_to_slicer))    return;
+    if (!getDoubleConfigVal(config, "SLICER_TO_INTERNAL_FACTOR", err, slicer_to_internal)) return;
+    input_to_internal = input_to_slicer * slicer_to_internal;
+    internal_to_input = 1 / input_to_internal;
+    if (doparamscale) {
+        double input_to_param;
+        if (!getDoubleConfigVal(config, "INPUT_TO_PARAMETER_FACTOR", err, input_to_param)) return;
+        param_to_internal = input_to_internal / input_to_param;
+        internal_to_param = 1 / param_to_internal;
+    } else {
+        param_to_internal = 1;
+        internal_to_param = 1;
+    }
+}
