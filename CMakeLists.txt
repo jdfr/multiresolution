@@ -76,7 +76,10 @@ if(NOT(CMAKE_SIZEOF_VOID_P EQUAL 8))
   message(FATAL_ERROR "This code is designed only for x64 systems! Size of void pointer: " ${CMAKE_SIZEOF_VOID_P})
 endif()
 
-SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type")
+if (NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type")
+  #SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Release type")
+endif()
 
 ADD_DEFINITIONS(-DCLIPPER_USE_INTRINSIC_128)
 if (MSVC)
