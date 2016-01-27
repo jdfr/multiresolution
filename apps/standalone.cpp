@@ -272,11 +272,11 @@ int main(int argc, const char** argv) {
         }
 
         if (dryrun) {
-            printf("dry run:\n\nThese are the Z values of the required slices from the mesh file (raw slices), in request order:\n");
+            printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
             for (const auto &z : rawZs) {
                 printf("%.20g\n", z);
             }
-            printf("\nThese are the NTool number and Z value for the slices to be computed, in the required computing order:\n");
+            printf("\nThese are the %d pairs of NTool number and Z value for the slices to be computed, in the required computing order:\n", sched.input.size());
             for (const auto &input : sched.input) {
                 printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
             }
@@ -373,7 +373,7 @@ int main(int argc, const char** argv) {
         }
 
         if (dryrun) {
-            printf("dry run:\n\nThese are the Z values of the required slices from the mesh file (raw slices), in request order:\n");
+            printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
             for (const auto &z : zs) {
                 printf("%.20g\n", z);
             }
