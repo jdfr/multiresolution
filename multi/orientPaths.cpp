@@ -46,7 +46,7 @@ void initAreas(clp::Paths &paths, areas_t &areas, mypairs &absareas, orients_t &
     for (clp::Paths::iterator it = paths.begin(); it != paths.end(); ++it) {
         *(ar) = clp::Area(*it);
         *(ot++) = (*ar)>=0;
-        *(pa++) = mypair(fabs(*ar), i++);
+        *(pa++) = mypair(std::fabs(*ar), i++);
         ++ar;
         DO_DEBUG_ORIENT(printf("  INITAREA %d: %f, %f, %d\n", i-1, *(ar-1), (pa-1)->first, (pa-1)->second));
     }

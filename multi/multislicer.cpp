@@ -27,10 +27,10 @@ typedef struct InOuter {
             miny = std::min(miny, point->Y);
             maxy = std::max(maxy, point->Y);
         }
-        return ((abs(minx)>=this->limitX) ||
-                (abs(maxx)>=this->limitX) ||
-                (abs(miny)>=this->limitY) ||
-                (abs(maxy)>=this->limitY));
+        return ((std::abs(minx) >= this->limitX) ||
+                (std::abs(maxx) >= this->limitX) ||
+                (std::abs(miny) >= this->limitY) ||
+                (std::abs(maxy) >= this->limitY));
     }
 } InOuter;
 
@@ -311,10 +311,10 @@ void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAr
     }
     //IMPORTANT: these lambdas test if the line distance is below the threshold. If diagonal lines are possible, a new lambda must be added to handle them!
     if (horizontal) {
-        auto test = [minLineSize](clp::Path &line) {return abs(line.front().X - line.back().X) < minLineSize; };
+        auto test = [minLineSize](clp::Path &line) {return std::abs(line.front().X - line.back().X) < minLineSize; };
         lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
     } else { //vertical
-        auto test = [minLineSize](clp::Path &line) {return abs(line.front().Y - line.back().Y) < minLineSize; };
+        auto test = [minLineSize](clp::Path &line) {return std::abs(line.front().Y - line.back().Y) < minLineSize; };
         lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
     }
     COPYTO(lines, *accumInfillings);

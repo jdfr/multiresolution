@@ -87,7 +87,7 @@ inline void extend_path_end(clp::Path &path, double distance) {
 
 
 inline bool near_equal_points(clp::IntPoint a, clp::IntPoint b, clp::cInt tolerance) {
-    return (abs(a.X - b.X) <= tolerance) && (abs(a.Y - b.Y) <= tolerance);
+    return (std::abs(a.X - b.X) <= tolerance) && (std::abs(a.Y - b.Y) <= tolerance);
     //return (a.X == b.X) && (a.Y - b.Y);
 }
 
@@ -352,12 +352,12 @@ bool valid_edge(Segments &lines, edge_t& edge, double min_width) {
     const Segment &segmentB = lines[cellB.source_index()];
 
     // relative angle between the two segments
-    double angle = fabs(segmentB.orientation() - segmentA.orientation());
+    double angle = std::fabs(segmentB.orientation() - segmentA.orientation());
 
     // the angle can range from 0 (same direction) to PI (opposite direction)
     // we're interested only in segments close to the second case (facing segments)
     // but we allow a tolerance. this ensures that we're dealing with a thin area
-    if (fabs(angle - M_PI) > M_PI / 5) return false;
+    if (std::fabs(angle - M_PI) > M_PI / 5) return false;
 
     /* each edge vertex is equidistant to both cell segments but the distance
     will differ between the two vertices IF the shape is narrowing

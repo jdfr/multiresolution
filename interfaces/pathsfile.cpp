@@ -127,7 +127,7 @@ bool PathInFileSpec::matchesHeader(SliceHeader &h) {
     return (h.alldata.size()>=5) &&
             ((!usetype)  || (type == h.type)) &&
             ((!usentool) || (ntool == h.ntool)) &&
-            ((!usez)     || (fabs(z - h.z)<1e-6));
+            ((!usez)     || (std::fabs(z - h.z)<1e-6));
 }
 
 std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, bool furtherArgs) {
