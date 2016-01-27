@@ -240,220 +240,227 @@ int main(int argc, const char** argv) {
     bool saveContours = false;
     std::vector<std::shared_ptr<ResultSingleTool>> results;
 
+    try {
 
-    if (multispec.global.useScheduler) {
+        if (multispec.global.useScheduler) {
 
-        bool removeUnused = true; //!saveContours;
-        SimpleSlicingScheduler sched(removeUnused, multispec);
+            bool removeUnused = true; //!saveContours;
+            SimpleSlicingScheduler sched(removeUnused, multispec);
 
-        double minz = 0, maxz = 0;
+            double minz = 0, maxz = 0;
 
-        slicer->getZLimits(&minz, &maxz);
+            slicer->getZLimits(&minz, &maxz);
 
-        if (multispec.global.schedMode == ManualScheduling) {
-            for (auto pair = multispec.global.schedSpec.begin(); pair != multispec.global.schedSpec.end(); ++pair) {
-                pair->z *= factors.input_to_internal;
-            }
-        }
-
-        sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec.global.z_epsilon, ScheduleTwoPhotonSimple);
-
-        if (sched.has_err) {
-            fprintf(stderr, "Error while trying to create the slicing schedule: %s\n", sched.err.c_str());
-            return -1;
-        }
-
-        int schednuminputslices = (int)sched.rm.raw.size();
-        int schednumoutputslices = (int)sched.output.size();
-
-        std::vector<double> rawZs = sched.rm.rawZs;
-        for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
-            *z *= factors.internal_to_input;
-        }
-
-        if (dryrun) {
-            printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
-            for (const auto &z : rawZs) {
-                printf("%.20g\n", z);
-            }
-            printf("\nThese are the %d pairs of NTool number and Z value for the slices to be computed, in the required computing order:\n", sched.input.size());
-            for (const auto &input : sched.input) {
-                printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
-            }
-            slicer->terminate();
-            delete slicer;
-            return 0;
-        }
-
-        if (multispec.global.fb.feedback) {
-            std::string err = applyFeedback(config, factors, sched, rawZs, sched.rm.rawZs);
-            if (!err.empty()) {
-                fprintf(stderr, err.c_str());
-                return -1;
-            }
-        }
-
-        slicer->sendZs(&(rawZs[0]), schednuminputslices);
-
-        if (write) {
-            numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-            std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
-            if (!err.empty()) {
-                fprintf(stderr, err.c_str());
-                return -1;
-            }
-        }
-
-        if (saveContours) {
-            results.reserve(schednumoutputslices);
-        }
-
-        for (int i = 0; i < schednuminputslices; ++i) {
-            printf("reading raw slice %d/%d\n", i, schednuminputslices - 1);
-            rawslice.clear();
-
-            slicer->readNextSlice(rawslice); {
-                std::string err = slicer->getErrorMessage();
-                if (!err.empty()) {
-                    fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
+            if (multispec.global.schedMode == ManualScheduling) {
+                for (auto pair = multispec.global.schedSpec.begin(); pair != multispec.global.schedSpec.end(); ++pair) {
+                    pair->z *= factors.input_to_internal;
                 }
             }
 
-            if (write && alsoContours) {
-                std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
-                if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", rawZs[i], err.c_str()); return -1; }
-            }
+            sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec.global.z_epsilon, ScheduleTwoPhotonSimple);
 
-            //after this, sched.rm takes ownership of the contents of rawslice, so our variable is in an undefined state!!!!
-            sched.rm.receiveNextRawSlice(rawslice);
-
-            sched.computeNextInputSlices();
             if (sched.has_err) {
-                fprintf(stderr, "Error in computeNextInputSlices: %s", sched.err.c_str());
+                fprintf(stderr, "Error while trying to create the slicing schedule: %s\n", sched.err.c_str());
                 return -1;
             }
-            while (1) {
-                if (sched.output_idx >= sched.output.size()) break;
-                std::shared_ptr<ResultSingleTool> single = sched.giveNextOutputSlice(); //this method will return slices in the ordering
-                if (saveContours) results.push_back(single);
+
+            int schednuminputslices = (int)sched.rm.raw.size();
+            int schednumoutputslices = (int)sched.output.size();
+
+            std::vector<double> rawZs = sched.rm.rawZs;
+            for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
+                *z *= factors.internal_to_input;
+            }
+
+            if (dryrun) {
+                printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
+                for (const auto &z : rawZs) {
+                    printf("%.20g\n", z);
+                }
+                printf("\nThese are the %d pairs of NTool number and Z value for the slices to be computed, in the required computing order:\n", sched.input.size());
+                for (const auto &input : sched.input) {
+                    printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
+                }
+                slicer->terminate();
+                delete slicer;
+                return 0;
+            }
+
+            if (multispec.global.fb.feedback) {
+                std::string err = applyFeedback(config, factors, sched, rawZs, sched.rm.rawZs);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
+                    return -1;
+                }
+            }
+
+            slicer->sendZs(&(rawZs[0]), schednuminputslices);
+
+            if (write) {
+                numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
+                std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
+                    return -1;
+                }
+            }
+
+            if (saveContours) {
+                results.reserve(schednumoutputslices);
+            }
+
+            for (int i = 0; i < schednuminputslices; ++i) {
+                printf("reading raw slice %d/%d\n", i, schednuminputslices - 1);
+                rawslice.clear();
+
+                slicer->readNextSlice(rawslice); {
+                    std::string err = slicer->getErrorMessage();
+                    if (!err.empty()) {
+                        fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
+                    }
+                }
+
+                if (write && alsoContours) {
+                    std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
+                    if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", rawZs[i], err.c_str()); return -1; }
+                }
+
+                //after this, sched.rm takes ownership of the contents of rawslice, so our variable is in an undefined state!!!!
+                sched.rm.receiveNextRawSlice(rawslice);
+
+                sched.computeNextInputSlices();
                 if (sched.has_err) {
-                    fprintf(stderr, "Error in giveNextOutputSlice.1: %s\n", sched.err.c_str());
+                    fprintf(stderr, "Error in computeNextInputSlices: %s", sched.err.c_str());
                     return -1;
                 }
-                if (single == NULL) break;
-                if (single->has_err) {
-                    fprintf(stderr, "Error in giveNextOutputSlice.2: %s\n", single->err.c_str());
-                    return -1;
-                }
-                printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
-                if (write) {
-                    double z = single->z * factors.internal_to_input;
-                    std::string err     = writeSlices(all_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
-                    if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
-                    if (alsoContours) {
-                        std::string err = writeSlices(all_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
-                        if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
+                while (1) {
+                    if (sched.output_idx >= sched.output.size()) break;
+                    std::shared_ptr<ResultSingleTool> single = sched.giveNextOutputSlice(); //this method will return slices in the ordering
+                    if (saveContours) results.push_back(single);
+                    if (sched.has_err) {
+                        fprintf(stderr, "Error in giveNextOutputSlice.1: %s\n", sched.err.c_str());
+                        return -1;
+                    }
+                    if (single == NULL) break;
+                    if (single->has_err) {
+                        fprintf(stderr, "Error in giveNextOutputSlice.2: %s\n", single->err.c_str());
+                        return -1;
+                    }
+                    printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
+                    if (write) {
+                        double z = single->z * factors.internal_to_input;
+                        std::string err     = writeSlices(all_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
+                        if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
+                        if (alsoContours) {
+                            std::string err = writeSlices(all_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
+                            if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
+                        }
                     }
                 }
             }
-        }
 
-    } else {
-
-        Multislicer multi(multispec);
-        std::vector<ResultSingleTool> res;
-        std::vector<SingleProcessOutput*> ress(numtools);
-        double zstep = multispec.global.z_uniform_step;
-
-        std::vector<double> zs;
-        if (multispec.global.use_z_base) {
-            zs = slicer->prepareSTLSimple(multispec.global.z_base, zstep);
         } else {
-            zs = slicer->prepareSTLSimple(zstep);
-        }
 
-        if (dryrun) {
-            printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
-            for (const auto &z : zs) {
-                printf("%.20g\n", z);
-            }
-            slicer->terminate();
-            delete slicer;
-            return 0;
-        }
+            Multislicer multi(multispec);
+            std::vector<ResultSingleTool> res;
+            std::vector<SingleProcessOutput*> ress(numtools);
+            double zstep = multispec.global.z_uniform_step;
 
-        numsteps = (int64)zs.size();
-        int numresults = (int) (numsteps * numtools);
-
-        if (saveContours) {
-            res.reserve(numtools);
-        } else {
-            results.reserve(numresults);
-        }
-
-        if (write) {
-            //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
-            numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-            std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
-            if (!err.empty()) {
-                fprintf(stderr, err.c_str());
-            }
-        }
-
-        for (int i = 0; i < numsteps; ++i) {
-            printf("processing raw slice %d/%d\n", i, numsteps - 1);
-
-            rawslice.clear();
-            dummy.clear();
-            if (saveContours) {
-                for (int k = 0; k < numtools; ++k) {
-                    results.push_back(std::make_shared<ResultSingleTool>(zs[i], k, (int)results.size()));
-                    ress[k] = &*results.back();
-                }
+            std::vector<double> zs;
+            if (multispec.global.use_z_base) {
+                zs = slicer->prepareSTLSimple(multispec.global.z_base, zstep);
             } else {
-                res.clear();
-                res.resize(numtools);
-                for (int k = 0; k < numtools; ++k) {
-                    res[k].z = zs[i];
-                    res[k].ntool = k;
-                    res[k].idx = k;
-                    ress[k] = &(res[k]);
+                zs = slicer->prepareSTLSimple(zstep);
+            }
+
+            if (dryrun) {
+                printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
+                for (const auto &z : zs) {
+                    printf("%.20g\n", z);
                 }
+                slicer->terminate();
+                delete slicer;
+                return 0;
             }
 
-            slicer->readNextSlice(rawslice); {
-                std::string err = slicer->getErrorMessage();
-                if (!err.empty()) {
-                    fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
-                }
-            }
-#           ifdef STANDALONE_USEPYTHON
-                //SHOWCONTOURS(multispec.global.config, "raw", &rawslice);
-#           endif
+            numsteps = (int64)zs.size();
+            int numresults = (int) (numsteps * numtools);
 
-            if (write && alsoContours) {
-                std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, zs[i], saveFormat, factors.internal_to_input);
-                if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", zs[i], err.c_str()); return -1; }
-            }
-
-            int lastk = multi.applyProcesses(ress, rawslice, dummy);
-            if (lastk != numtools) {
-                fprintf(stderr, "Error in applyProcesses (raw slice %d, last tool %d): %s\n", i, lastk, ress[lastk]->err.c_str());
-                return -1;
+            if (saveContours) {
+                res.reserve(numtools);
+            } else {
+                results.reserve(numresults);
             }
 
             if (write) {
-                for (int k = 0; k < numtools; ++k) {
-                    std::string err     = writeSlices(all_files, ress[k]->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          k, zs[i], saveFormat, factors.internal_to_input);
-                    if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
-                    if (alsoContours) {
-                        std::string err = writeSlices(all_files, ress[k]->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, k, zs[i], saveFormat, factors.internal_to_input);
-                        if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
+                //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
+                numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
+                std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
+                }
+            }
+
+            for (int i = 0; i < numsteps; ++i) {
+                printf("processing raw slice %d/%d\n", i, numsteps - 1);
+
+                rawslice.clear();
+                dummy.clear();
+                if (saveContours) {
+                    for (int k = 0; k < numtools; ++k) {
+                        results.push_back(std::make_shared<ResultSingleTool>(zs[i], k, (int)results.size()));
+                        ress[k] = &*results.back();
+                    }
+                } else {
+                    res.clear();
+                    res.resize(numtools);
+                    for (int k = 0; k < numtools; ++k) {
+                        res[k].z     = zs[i];
+                        res[k].ntool = k;
+                        res[k].idx   = k;
+                        ress[k]      = &(res[k]);
+                    }
+                }
+
+                slicer->readNextSlice(rawslice); {
+                    std::string err = slicer->getErrorMessage();
+                    if (!err.empty()) {
+                        fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
+                    }
+                }
+    #           ifdef STANDALONE_USEPYTHON
+                    //SHOWCONTOURS(multispec.global.config, "raw", &rawslice);
+    #           endif
+
+                if (write && alsoContours) {
+                    std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, zs[i], saveFormat, factors.internal_to_input);
+                    if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", zs[i], err.c_str()); return -1; }
+                }
+
+                int lastk = multi.applyProcesses(ress, rawslice, dummy);
+                if (lastk != numtools) {
+                    fprintf(stderr, "Error in applyProcesses (raw slice %d, last tool %d): %s\n", i, lastk, ress[lastk]->err.c_str());
+                    return -1;
+                }
+
+                if (write) {
+                    for (int k = 0; k < numtools; ++k) {
+                        std::string err     = writeSlices(all_files, ress[k]->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          k, zs[i], saveFormat, factors.internal_to_input);
+                        if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
+                        if (alsoContours) {
+                            std::string err = writeSlices(all_files, ress[k]->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, k, zs[i], saveFormat, factors.internal_to_input);
+                            if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
+                        }
                     }
                 }
             }
-        }
 
+        }
+    } catch (clp::clipperException &e) {
+        std::string err = handleClipperException(e);
+        fprintf(stderr, err.c_str());
+    } catch (std::exception &e) {
+        fprintf(stderr, "Unhandled exception: %s\n", e.what()); return -1;
     }
 
     for (auto file = all_files.begin(); file != all_files.end(); ++file) {

@@ -1,5 +1,14 @@
 #include "auxgeom.hpp"
+#include "config.hpp"
 #include <cmath>
+
+std::string handleClipperException(clp::clipperException &e) {
+    if (strcmp(e.what(), "Coordinate outside allowed range") == 0) {
+        return std::string("ClipperLib error! polygon coordinates were too big!");
+    } else {
+        return str("ClipperLib unhandled error: ", e.what());
+    }
+}
 
 //this function is useful to debug some problems
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f) {

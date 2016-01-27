@@ -233,10 +233,15 @@ LIBRARY_API  ResultsHandle computeResult(SharedLibrarySlice* slice, StateHandle 
             ress[k] = &*result->res[k];
         }
 
-        int lastk = state->multi->applyProcesses(ress, *slice->paths, dummy);
-        if (lastk != numspecs) {
-            result->err = result->res[lastk]->err;
-            return result;
+        try {
+            int lastk = state->multi->applyProcesses(ress, *slice->paths, dummy);
+            if (lastk != numspecs) {
+                result->err = result->res[lastk]->err;
+            }
+        } catch (clp::clipperException &e) {
+            result->err = handleClipperException(e);
+        } catch (std::exception &e) {
+            result->err = str("Unhandled exception: ", e.what());
         }
 
     }
@@ -362,9 +367,15 @@ LIBRARY_API void receiveInputSlice(StateHandle state, InputSliceHandle slice) {
 }
 
 LIBRARY_API void computeOutputSlices(StateHandle state) {
-    state->sched->computeNextInputSlices();
-    if (state->sched->has_err) {
-        state->err = state->sched->err;
+    try {
+        state->sched->computeNextInputSlices();
+        if (state->sched->has_err) {
+            state->err = state->sched->err;
+        }
+    } catch (clp::clipperException &e) {
+        state->err = handleClipperException(e);
+    } catch (std::exception &e) {
+        state->err = str("Unhandled exception: ", e.what());
     }
 }
 

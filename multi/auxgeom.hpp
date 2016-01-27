@@ -11,6 +11,8 @@
 
 #define M_PI 3.14159265358979323846
 
+std::string handleClipperException(clp::clipperException &e);
+
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f);
 
 template<typename T> inline void MOVETO(T &source, std::vector<T> &dest) {
