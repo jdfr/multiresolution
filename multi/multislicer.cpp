@@ -132,12 +132,12 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
                 const double gradradius_from_fat = 1.1*gradradius;
                 //get the portion of "thin" which is at least as wide as gradrad
                 offsetDo2(offset, next, -gradradius, gradradius, thin, aux1, clp::jtRound, clp::etClosedPolygon);
-                if (next.empty()) continue;
                 //some parts of "thin" are not as wide as gradrad, but are adjacent to "fat", so we inflate "fat" to encompass them
                 offsetDo(offset, aux1, gradradius_from_fat, fat, clp::jtSquare, clp::etClosedPolygon);
                 unitePaths(clipper, aux2, next, aux1);
                 //get the portion of "thin" which is either near enough of "fat", or at least as wide as gradrad
                 clipperDo(clipper, aux1, clp::ctIntersection, thin, aux2, clp::pftEvenOdd, clp::pftEvenOdd);
+                if (aux1.empty()) continue;
                 clp::Paths *subresult;
                 if (gradinflate != 0.0) {
                     //inflate the previously computed protion of "thin" by the required amount
@@ -152,9 +152,9 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
                 //if we are not in the last iteration, prepare the vars for the next one!
                 if ((endi - step) > 1) {
                     //get the new "thin", as the non-fattened portion of "thin"
-                    clipperDo(clipper, thin, clp::ctDifference, thin, next, clp::pftEvenOdd, clp::pftEvenOdd);
+                    clipperDo(clipper, thin, clp::ctDifference, thin, aux1, clp::pftEvenOdd, clp::pftEvenOdd);
                     //set the new fat
-                    fat = std::move(next);
+                    fat = std::move(aux1);
                 }
             } else {
                 if (gradinflate != 0.0) {
