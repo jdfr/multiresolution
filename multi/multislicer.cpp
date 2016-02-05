@@ -169,6 +169,7 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
 
         //clp::Paths old_lowres = lowres;
         clipper2.Execute(clp::ctUnion, lowres, clp::pftNonZero, clp::pftNonZero);
+        clipper2.Clear();
         //SHOWCONTOURS(spec.global.config, "contour before and after overwriting", &old_lowres, &lowres);
     }
 
