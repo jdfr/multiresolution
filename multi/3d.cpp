@@ -233,8 +233,10 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
             std::vector<double> zbase(tm.spec.numspecs, sliceUpwards ? minz : maxz);
             recursiveSimpleInputScheduler(0, zbase, sliceUpwards ? maxz : minz);
         }
-        computeSimpleOutputOrderForInputSlices();
-        pruneInputZsAndCreateRawZs(epsilon);
+        if (!input.empty()) {
+            computeSimpleOutputOrderForInputSlices();
+            pruneInputZsAndCreateRawZs(epsilon);
+        }
     }
 }
 
