@@ -81,4 +81,57 @@ bool read3DPaths(IOPaths &iop, Paths3D &paths);
 bool write3DPaths(IOPaths &iop, Paths3D &paths, PathCloseMode mode);
 int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode);
 
+
+//base abstract class to serialize sequences of clp::Paths
+class PathWriter {
+public:
+    std::string err;
+    std::string filename;
+    virtual ~PathWriter() {}
+    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool close();
+};
+
+//this class implements the common functionality for all PathWriters which can write to several files at once
+class PathWriterMultiFile: public PathWriter {
+public:
+    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool close();
+    virtual ~PathWriterMultiFile() { close(); }
+protected:
+    bool matchZNtool(int type, int ntool, double z);
+    int findOrCreateSubwriter(int type, double radius, int ntool, double z);
+    //derived classes must implement a constructor without parameters, closeSpecific(), startWriter(), writePathsSpecific(), and endWriter()
+    virtual bool startWriter();
+    virtual bool endWriter();
+    virtual bool writePathsSpecific(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool specificClose();
+    virtual PathWriterMultiFile* createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
+    double z, epsilon;
+    double radius;
+    int type;
+    int ntool;
+    bool isopen;
+    bool generic_for_ntool, generic_for_z, generic_for_type, generic_all, delegateWork;
+    int currentSubwriter;
+    std::vector<PathWriterMultiFile*> subwriters;
+    FILE * f;
+};
+
+enum DXFWMode {DXFAscii, DXFBinary};
+
+//write to DXF file (either ascii or binary)
+template<DXFWMode mode> class DXFPathWriter : public PathWriterMultiFile {
+public:
+    DXFPathWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
+    virtual bool startWriter();
+    virtual bool endWriter();
+    virtual bool writePathsSpecific(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool specificClose();
+    virtual PathWriterMultiFile* createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
+};
+
+typedef DXFPathWriter<DXFAscii>  DXFAsciiPathWriter;
+typedef DXFPathWriter<DXFBinary> DXFBinaryPathWriter;
+
 #endif

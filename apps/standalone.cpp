@@ -46,14 +46,27 @@ MainSpec mainOptions() {
             po::value<std::string>()->default_value("config.txt"),
             "configuration input file (if no file is provided, it is assumed to be config.txt)")
         ("load",
-            po::value<std::string>(),
+            po::value<std::string>()->value_name("filename"),
             "input mesh file")
         ("save",
-            po::value<std::string>(),
+            po::value<std::string>()->value_name("filename"),
             "output file in *.paths format")
         ("save-format",
             po::value<std::string>()->default_value("integer"),
             "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
+        ("dxf-toolpaths",
+            po::value<std::string>()->value_name("filename"),
+            "Output toolpaths in a *.dxf file")
+        ("dxf-contours",
+            po::value<std::string>()->value_name("filename"),
+            "Output contours in a *.dxf file (if both this and --dxf-toolpaths are specified, the file names MUST be different)")
+        ("dxf-format",
+            po::value<std::string>()->default_value("binary"),
+            "Format of the output DXF files: either 'binary' or 'ascii'. The default is 'binary'")
+        ("dxf-by-z",
+            "If this option is specified, a different DXF output file is generated for each Z value")
+        ("dxf-by-tool",
+            "If this option is specified, a different DXF output file is generated for each process. Note: if --dxf-by-z is also specified, a different file is generated for each combination of Z and process")
         ("show,w",
             po::value<std::vector<std::string>>()->multitoken(),
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
@@ -102,6 +115,12 @@ int main(int argc, const char** argv) {
     MultiSpec multispec(config);
     bool doscale = true;
     MetricFactors factors;
+
+    std::vector<PathWriter*> pathwriters_all;
+    std::vector<PathWriter*> pathwriters_arefiles;
+    std::vector<PathWriter*> pathwriters_raw;
+    std::vector<PathWriter*> pathwriters_contour;
+    std::vector<PathWriter*> pathwriters_toolpath;
 
     try {
         MainSpec mainSpec = mainOptions();
@@ -175,6 +194,41 @@ int main(int argc, const char** argv) {
                 fprintf(stderr, "save format parameter must start by either 'i' (integer) or 'f' (float): <%s>\n", savef.c_str());
                 return -1;
             }
+        }
+
+        std::string dxfm = std::move(mainOpts["dxf-format"].as<std::string>());
+        char t = tolower(dxfm[0]);
+        DXFWMode dxfmode;
+        if (t == 'b') {
+            dxfmode = DXFBinary;
+        } else if (t == 'a') {
+            dxfmode = DXFAscii;
+        } else {
+            fprintf(stderr, "DXF format parameter must start by either 'b' (binary) or 'a' (ascii): <%s>\n", dxfm.c_str());
+            return -1;
+        }
+        bool generic_by_ntool = mainOpts.count("dxf-by-tool") == 0;
+        bool generic_by_z     = mainOpts.count("dxf-by-z")    == 0;
+        auto dxf_modes = { "dxf-toolpaths", "dxf-contours" };
+        std::vector<PathWriter*>* specific_pathwriter_vector [] = { &pathwriters_toolpath, &pathwriters_contour };
+
+        int k = 0;
+        for (auto &dxf_mode : dxf_modes) {
+            if (mainOpts.count(dxf_mode) != 0) {
+                PathWriter *w;
+                std::string fn          = std::move(mainOpts[dxf_mode].as<std::string>());
+                const bool generic_type = true;
+                double epsilon          = multispec.global.z_epsilon*factors.internal_to_input;
+                if (dxfmode == DXFAscii) {
+                    w = new DXFAsciiPathWriter (std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                } else {
+                    w = new DXFBinaryPathWriter(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                }
+                pathwriters_all.push_back(w);
+                pathwriters_arefiles.push_back(w);
+                specific_pathwriter_vector[k]->push_back(w);
+            }
+            ++k;
         }
 
         mainOpts = po::variables_map();
@@ -349,9 +403,22 @@ int main(int argc, const char** argv) {
                     printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
                     if (write) {
                         double z = single->z * factors.internal_to_input;
+                        double rad = multispec.pp[single->ntool].radius * factors.internal_to_input;
                         std::string err     = writeSlices(all_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
                         if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
+                        for (auto &pathwriter : pathwriters_toolpath) {
+                            if (!pathwriter->writePaths(single->toolpaths, PATHTYPE_TOOLPATH, rad, single->ntool, z, factors.internal_to_input, true)) {
+                                fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str());
+                                return -1;
+                            }
+                        }
                         if (alsoContours) {
+                            for (auto &pathwriter : pathwriters_contour) {
+                                if (!pathwriter->writePaths(single->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, single->ntool, z, factors.internal_to_input, true)) {
+                                    fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str());
+                                    return -1;
+                                }
+                            }
                             std::string err = writeSlices(all_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
                             if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
                         }
@@ -468,6 +535,12 @@ int main(int argc, const char** argv) {
     }
     if (save) {
         fclose(singleoutput);
+    }
+    for (auto &pathwriter : pathwriters_arefiles) {
+        if (!pathwriter->close()) {
+            fprintf(stderr, "Error trying to close file <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
+            return -1;
+        }
     }
 
     results.clear();
