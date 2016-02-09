@@ -12,29 +12,6 @@
 #    include "sliceviewer.hpp"
 #endif
 
-//utility template for IO functionality
-template<typename Function, typename... Args> std::string applyToAllFiles(FILES &files, Function function, Args... args) {
-    for (auto file = files.begin(); file != files.end(); ++file) {
-        std::string err = function(*file, args...);
-        if (!err.empty()) return str("For ", file - files.begin(), "-th file: ", err);
-    }
-    return std::string();
-}
-
-template<typename Function, typename... Args> std::string applyToAllFilesWithIOP(FILES &files, IOPaths iop, Function function, Args... args) {
-    for (auto file = files.begin(); file != files.end(); ++file) {
-        iop.f = *file;
-        if (!((iop.*function)(args...))) {
-            return str("For ", file - files.begin(), "-th file: error <", iop.errs[0].message, "> in ", iop.errs[0].function);
-        }
-    }
-    return std::string();
-}
-
-inline std::string writeSlices(FILES &files, clp::Paths &paths, PathCloseMode mode, int64 type, int64 ntool, double z, int64 saveFormat, double scaling) {
-    return applyToAllFiles(files, writeSlice, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
-}
-
 typedef std::pair<po::options_description, po::positional_options_description> MainSpec;
 
 MainSpec mainOptions() {
@@ -116,11 +93,12 @@ int main(int argc, const char** argv) {
     bool doscale = true;
     MetricFactors factors;
 
-    std::vector<PathWriter*> pathwriters_all;
-    std::vector<PathWriter*> pathwriters_arefiles;
-    std::vector<PathWriter*> pathwriters_raw;
-    std::vector<PathWriter*> pathwriters_contour;
-    std::vector<PathWriter*> pathwriters_toolpath;
+    std::vector<PathWriter*> pathwriters_arefiles;    //everything which has to be closed
+    std::vector<PathWriter*> pathwriters_raw;         //everything receiving raw slices
+    std::vector<PathWriter*> pathwriters_contour;     //everything receiving contours
+    std::vector<PathWriter*> pathwriters_toolpath;    //everything receiving toolpaths
+    std::vector<PathsFileWriter*> pathwriters_native; //everything outputting in native format
+    PathsFileWriter* pathwriter_viewer;               //PathWriter in native format for the viewer
 
     try {
         MainSpec mainSpec = mainOptions();
@@ -224,7 +202,6 @@ int main(int argc, const char** argv) {
                 } else {
                     w = new DXFBinaryPathWriter(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
                 }
-                pathwriters_all.push_back(w);
                 pathwriters_arefiles.push_back(w);
                 specific_pathwriter_vector[k]->push_back(w);
             }
@@ -245,22 +222,10 @@ int main(int argc, const char** argv) {
         }
     }
 
-    FILES all_files;
-    FILE *singleoutput = NULL;
-    IOPaths iop;
-    if (save) {
-        singleoutput = fopen(singleoutputfilename.c_str(), "wb");
-        if (singleoutput == NULL) {
-            fprintf(stderr, "Error trying to open this file for output: %s\n", singleoutputfilename.c_str());
-            return -1;
-        }
-        all_files.push_back(singleoutput);
-    }
-
     SlicerManager *slicer = getSlicerManager(config, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
-    SlicesViewer *slicesViewer=NULL;
+    SlicesViewer *slicesViewer = NULL;
     if (show) {
         slicesViewer = new SlicesViewer(config, "view slices", use2d, viewparams.c_str());
         std::string err = slicesViewer->start();
@@ -268,7 +233,6 @@ int main(int argc, const char** argv) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
             return -1;
         }
-        all_files.push_back(slicesViewer->pipeIN);
     }
 #endif
 
@@ -280,14 +244,38 @@ int main(int argc, const char** argv) {
     }
     free(meshfullpath);
 
-    bool write = save || show;
     bool alsoContours = multispec.global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
     int numtools = (int)multispec.numspecs;
-    if (write) {
+    if (save || show) {
         FileHeader header(multispec, factors);
-        applyToAllFiles(all_files, [&header](FILE *f) { return header.writeToFile(f, false); });
+#ifdef STANDALONE_USEPYTHON
+        if (show) {
+            pathwriter_viewer = new PathsFileWriter("sliceViewerStream", slicesViewer->pipeIN, &header, PATHFORMAT_INT64);
+            pathwriters_native     .push_back(pathwriter_viewer);
+            pathwriters_toolpath   .push_back(pathwriters_native.back());
+            if (alsoContours) {
+                pathwriters_raw    .push_back(pathwriters_native.back());
+                pathwriters_contour.push_back(pathwriters_native.back());
+            }
+        }
+#endif
+        if (save) {
+            pathwriters_native     .push_back(new PathsFileWriter(singleoutputfilename, NULL, &header, saveFormat));
+            pathwriters_arefiles   .push_back(pathwriters_native.back());
+            pathwriters_toolpath   .push_back(pathwriters_native.back());
+            if (alsoContours) {
+                pathwriters_raw    .push_back(pathwriters_native.back());
+                pathwriters_contour.push_back(pathwriters_native.back());
+            }
+        }
+        for (auto &w : pathwriters_native) {
+            if (!w->start()) {
+                fprintf(stderr, "Error trying to start output: %s\n", w->err.c_str());
+                return -1;
+            }
+        }
     }
 
     //for now, we do not need to store intermediate results, but let the code live in case we need it later
@@ -350,12 +338,13 @@ int main(int argc, const char** argv) {
 
             slicer->sendZs(&(rawZs[0]), schednuminputslices);
 
-            if (write) {
+            if (!pathwriters_native.empty()) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-                std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
-                if (!err.empty()) {
-                    fprintf(stderr, err.c_str());
-                    return -1;
+                for (auto &w : pathwriters_native) {
+                    if (!w->writeNumRecords(numoutputs)) {
+                        fprintf(stderr, "Error trying to write number of records: %s\n", w->err.c_str());
+                        return -1;
+                    }
                 }
             }
 
@@ -374,9 +363,10 @@ int main(int argc, const char** argv) {
                     }
                 }
 
-                if (write && alsoContours) {
-                    std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, rawZs[i], saveFormat, factors.internal_to_input);
-                    if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", rawZs[i], err.c_str()); return -1; }
+                for (auto &w : pathwriters_raw) {
+                    if (!w->writePaths(rawslice, PATHTYPE_RAW_CONTOUR, 0, -1, rawZs[i], factors.internal_to_input, true)) {
+                        fprintf(stderr, "Error writing raw contour for z=%f: %s\n", rawZs[i], w->err.c_str());
+                    }
                 }
 
                 //after this, sched.rm takes ownership of the contents of rawslice, so our variable is in an undefined state!!!!
@@ -401,26 +391,18 @@ int main(int argc, const char** argv) {
                         return -1;
                     }
                     printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
-                    if (write) {
-                        double z = single->z * factors.internal_to_input;
-                        double rad = multispec.pp[single->ntool].radius * factors.internal_to_input;
-                        std::string err     = writeSlices(all_files, single->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          single->ntool, z, saveFormat, factors.internal_to_input);
-                        if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
-                        for (auto &pathwriter : pathwriters_toolpath) {
-                            if (!pathwriter->writePaths(single->toolpaths, PATHTYPE_TOOLPATH, rad, single->ntool, z, factors.internal_to_input, true)) {
-                                fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str());
-                                return -1;
-                            }
+                    double zscaled = single->z                          * factors.internal_to_input;
+                    double rad     = multispec.pp[single->ntool].radius * factors.internal_to_input;
+                    for (auto &pathwriter : pathwriters_toolpath) {
+                        if (!pathwriter->writePaths(single->toolpaths, PATHTYPE_TOOLPATH, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
+                            return -1;
                         }
-                        if (alsoContours) {
-                            for (auto &pathwriter : pathwriters_contour) {
-                                if (!pathwriter->writePaths(single->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, single->ntool, z, factors.internal_to_input, true)) {
-                                    fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str());
-                                    return -1;
-                                }
-                            }
-                            std::string err = writeSlices(all_files, single->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, single->ntool, z, saveFormat, factors.internal_to_input);
-                            if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, single->z, err.c_str()); return -1; }
+                    }
+                    for (auto &pathwriter : pathwriters_contour) {
+                        if (!pathwriter->writePaths(single->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, single->ntool, zscaled, factors.internal_to_input, true)) {
+                            fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
+                            return -1;
                         }
                     }
                 }
@@ -459,12 +441,14 @@ int main(int argc, const char** argv) {
                 results.reserve(numresults);
             }
 
-            if (write) {
+            if (!pathwriters_native.empty()) {
                 //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
                 numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-                std::string err = applyToAllFilesWithIOP(all_files, iop, &IOPaths::writeInt64, numoutputs);
-                if (!err.empty()) {
-                    fprintf(stderr, err.c_str());
+                for (auto &w : pathwriters_native) {
+                    if (!w->writeNumRecords(numoutputs)) {
+                        fprintf(stderr, "Error trying to write number of records: %s\n", w->err.c_str());
+                        return -1;
+                    }
                 }
             }
 
@@ -495,13 +479,11 @@ int main(int argc, const char** argv) {
                         fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", i, err.c_str());
                     }
                 }
-    #           ifdef STANDALONE_USEPYTHON
-                    //SHOWCONTOURS(multispec.global.config, "raw", &rawslice);
-    #           endif
 
-                if (write && alsoContours) {
-                    std::string err = writeSlices(all_files, rawslice, PathLoop, PATHTYPE_RAW_CONTOUR, -1, zs[i], saveFormat, factors.internal_to_input);
-                    if (!err.empty()) { fprintf(stderr, "Error writing raw slice for z=%f: %s\n", zs[i], err.c_str()); return -1; }
+                for (auto &w : pathwriters_raw) {
+                    if (!w->writePaths(rawslice, PATHTYPE_RAW_CONTOUR, 0, -1, zs[i], factors.internal_to_input, true)) {
+                        fprintf(stderr, "Error writing raw contour for z=%f: %s\n", zs[i], w->err.c_str());
+                    }
                 }
 
                 int lastk = multi.applyProcesses(ress, rawslice, dummy);
@@ -510,18 +492,23 @@ int main(int argc, const char** argv) {
                     return -1;
                 }
 
-                if (write) {
-                    for (int k = 0; k < numtools; ++k) {
-                        std::string err     = writeSlices(all_files, ress[k]->toolpaths,      PathOpen, PATHTYPE_TOOLPATH,          k, zs[i], saveFormat, factors.internal_to_input);
-                        if (!err.empty()) {     fprintf(stderr, "Error writing toolpaths for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
-                        if (alsoContours) {
-                            std::string err = writeSlices(all_files, ress[k]->contoursToShow, PathLoop, PATHTYPE_PROCESSED_CONTOUR, k, zs[i], saveFormat, factors.internal_to_input);
-                            if (!err.empty()) { fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zs[i], err.c_str()); return -1; }
+                double zscaled = zs[i] * factors.internal_to_input;
+                for (int k = 0; k < numtools; ++k) {
+                    double rad     = multispec.pp[k].radius * factors.internal_to_input;
+                    for (auto &pathwriter : pathwriters_toolpath) {
+                        if (!pathwriter->writePaths(ress[k]->toolpaths, PATHTYPE_TOOLPATH, rad, k, zscaled, factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", k, zscaled, pathwriter->err.c_str());
+                            return -1;
+                        }
+                    }
+                    for (auto &pathwriter : pathwriters_contour) {
+                        if (!pathwriter->writePaths(ress[k]->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, k, zscaled, factors.internal_to_input, true)) {
+                            fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zscaled, pathwriter->err.c_str());
+                            return -1;
                         }
                     }
                 }
             }
-
         }
     } catch (clp::clipperException &e) {
         std::string err = handleClipperException(e);
@@ -530,27 +517,7 @@ int main(int argc, const char** argv) {
         fprintf(stderr, "Unhandled exception: %s\n", e.what()); return -1;
     }
 
-    for (auto file = all_files.begin(); file != all_files.end(); ++file) {
-        fflush(*file);
-    }
-    if (save) {
-        fclose(singleoutput);
-    }
-    for (auto &pathwriter : pathwriters_arefiles) {
-        if (!pathwriter->close()) {
-            fprintf(stderr, "Error trying to close file <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
-            return -1;
-        }
-    }
-
     results.clear();
-
-#ifdef STANDALONE_USEPYTHON
-    if (show) {
-        slicesViewer->wait();
-        delete slicesViewer;
-    }
-#endif
 
     if (!slicer->finalize()) {
         std::string err = slicer->getErrorMessage();
@@ -558,7 +525,21 @@ int main(int argc, const char** argv) {
     }
     delete slicer;
 
+    for (auto &pathwriter : pathwriters_arefiles) {
+        if (!pathwriter->close()) {
+            fprintf(stderr, "Error trying to close file <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
+        }
+        delete pathwriter;
+    }
+
+#ifdef STANDALONE_USEPYTHON
+    if (show) {
+        fflush(slicesViewer->pipeIN);
+        delete pathwriter_viewer;
+        slicesViewer->wait();
+        delete slicesViewer;
+    }
+#endif
+
     return 0;
 }
-
-
