@@ -58,7 +58,8 @@ po::options_description perProcessOptionsGenerator() {
             po::value<int>()->required()->value_name("ntool"),
             "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
         ("no-preprocessing",
-            "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
+            po::value<double>()->implicit_value(0.0)->value_name("rad"),
+            "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("no-toolpaths",
             "If specified, the toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
         ("radx,x",
@@ -343,7 +344,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             bool found = false;
             for (auto id = processIds.begin(); id != processIds.end();  ++id) {
                 if (*id == param) {
-                    currentProcess = id - processIds.begin();
+                    currentProcess = (int)(id - processIds.begin());
                     found = true;
                     break;
                 }
@@ -351,7 +352,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             if (found) continue;
             processIds.push_back(param);
             optionsByTool.push_back(OptionsByTool(param, po::parsed_options(perProcessOptions(), optionList.m_options_prefix)));
-            currentProcess = optionsByTool.size() - 1;
+            currentProcess = (int)optionsByTool.size() - 1;
             if (maxProcess < processIds.back()) maxProcess = processIds.back();
             continue;
         }
@@ -430,6 +431,9 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
         spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
         spec.pp[k].computeToolpaths     = vm.count("no-toolpaths") == 0;
         
+        if (!spec.pp[k].doPreprocessing) {
+            spec.pp[k].noPreprocessingOffset = getScaled(vm["no-preprocessing"].as<double>(), scale, doscale);
+        }
 
         //if (vm.count("smoothing")) {
         //    spec.pp[k].burrLength = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);

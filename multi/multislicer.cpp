@@ -510,16 +510,32 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     bool notthelast = (k + 1) < spec.numspecs;
 
     //this only makes sense if there is a tool with higher resolution down the line
-    if (spec.pp[k].doPreprocessing && notthelast) {
+    if (spec.pp[k].doPreprocessing) {
         if (nextProcessSameKind) {
-            removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
+            if (notthelast) {
+                removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
+            } else {
+                if ((spec.numspecs > 1) && spec.pp[k-1].applysnap) {
+                    //if we applied snapping previously, we need to remove the small linings
+                    offset.ArcTolerance = (double)spec.pp[k].arctolG;
+                    offsetDo2(offset, lowres, -(double)spec.pp[k].dilatestep, (double)spec.pp[k].dilatestep, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
+                } else {
+                    lowres = contours_tofill;
+                }
+            }
         } else {
             //with the current setup, this is triggered only in add/sub mode for the first process
             overwriteHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
         }
         contourToProcess = &lowres;
     } else {
-        contourToProcess = &contours_tofill;
+        if (spec.pp[k].noPreprocessingOffset == 0.0) {
+            contourToProcess = &contours_tofill;
+        } else {
+            offset.ArcTolerance = (double)spec.pp[k].arctolG;
+            offsetDo2(offset, lowres, -spec.pp[k].noPreprocessingOffset, spec.pp[k].noPreprocessingOffset, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
+            contourToProcess = &lowres;
+        }
     }
 
     if (!spec.pp[k].computeToolpaths) {
@@ -717,7 +733,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
         //SHOWCONTOURS(spec.global.config, "before_applying_process_1", &contours_tofill);
         //SHOWCONTOURS(spec.global.config, "before_applying_process_2", &contours_alreadyfilled);
         bool ok = applyProcess(*(outputs[k]), contours_tofill, contours_alreadyfilled, k);
-        //SHOWCONTOURS(spec.global.config, "after_applying_process", &contours_tofill, &(outputs[k]->contours));
+        //SHOWCONTOURS(spec.global.config, str("after_applying_process ", k), &contours_tofill, &(outputs[k]->contours));
         if (!ok) break;
         if (spec.global.substractiveOuter) {
             removeOuter(outputs[k]->toolpaths,          spec.global.outerLimitX, spec.global.outerLimitY);

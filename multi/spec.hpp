@@ -125,6 +125,7 @@ typedef struct PerProcessSpec {
     bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
     bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
     bool doPreprocessing;            //flag to decide if preprocessing may be applied
+    double noPreprocessingOffset;    //if no preprocessing is done, a morphological opening is done with this value
 
     std::shared_ptr<VerticalProfile> profile;
 
