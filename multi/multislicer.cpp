@@ -502,6 +502,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
     infillingAreas->clear();
+    clp::Paths *intermediate_medialaxis;;
 
     clp::Paths &lowres = AUX2;
     clp::Paths *contourToProcess;
@@ -521,80 +522,84 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         contourToProcess = &contours_tofill;
     }
 
-    clp::Paths &unprocessedToolPaths = AUX3;
-    if (!generateToolPath(k, nextProcessSameKind, *contourToProcess, output.toolpaths, unprocessedToolPaths, AUX4)) {
-        this->clear();
-        return false;
-    }
-
-    //SHOWCONTOURS(spec.global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
-
-    //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths)
-    offsetDo(offset, output.contours, (double)spec.pp[k].radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
-
-    //if required, discard common toolpaths.
-    bool discardCommonToolpaths = spec.useContoursAlreadyFilled(k);
-
-    if (discardCommonToolpaths) {
-        doDiscardCommonToolPaths(k, output.toolpaths, contours_alreadyfilled, AUX4);
-    }
-    if (nextProcessSameKind && CUSTOMINFILLINGS && spec.pp[k].infillingRecursive) {
-        output.infillingsIndependentContours.resize(1);
-        offsetDo(offset, output.infillingsIndependentContours[0], (double)spec.pp[k].radius, output.toolpaths, clp::jtRound, clp::etOpenRound);
-    }
-
-    //generate the infilling contour only if necessary
-    output.alsoInfillingAreas = (spec.pp[k].infillingMode==InfillingJustContours);
-    //the generation of the infilling regions depends on the flag discardCommonToolpaths
-    if (spec.pp[k].infillingMode != InfillingNone) {
-        if (discardCommonToolpaths) {
-            //this is more expensive than the alternative, but necessary for possibly open toolpaths
-            if (output.infillingsIndependentContours.empty()) {
-                operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.toolpaths, (double)spec.pp[k].radius, &AUX4, (clp::Paths*)NULL);
-            } else {
-                clipperDo(clipper, *infillingAreas, clp::ctDifference, output.contours, output.infillingsIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
-            }
-        } else {
-            //TODO: change the constant 0.3 by a parameter (that is, a parameter to tune the shrink factor for the the infilling, if no clearance is needed)
-            //ALTERNATIVE TODO: make the shrink factor a non-conditional parameter, but the user should then remember to set it appropriately if clearance is required
-            //0.99: cannot be 1.0, clipping / round-off errors crop up
-            double shrinkFactor = (spec.pp[k].addInternalClearance) ? 0.99 : 0.3;
-            offsetDo(offset, *infillingAreas, -(double)spec.pp[k].radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
-        }
-    }
-
-    if (CUSTOMINFILLINGS) {
-        AUX2.clear();
-        //NOTE: using unprocessedToolPaths here is semantically dubious. REVISIT LATER!
-        if (!processInfillings(k, *infillingAreas, unprocessedToolPaths)) {
+    if (!spec.pp[k].computeToolpaths) {
+        output.contours = *contourToProcess; //TODO: do not use deep copy if possible
+    } else {
+        clp::Paths &unprocessedToolPaths = AUX3;
+        if (!generateToolPath(k, nextProcessSameKind, *contourToProcess, output.toolpaths, unprocessedToolPaths, AUX4)) {
             this->clear();
             return false;
         }
-    }
 
-    AUX4.clear();
-    clp::Paths &intermediate_medialaxis = AUX4;
+        //SHOWCONTOURS(spec.global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
 
-    //if ((!output.infillingsIndependentContours.empty()) && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
-    if (nextProcessSameKind && CUSTOMINFILLINGS && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
-        //showContours(output.infillingsIndependentContours, ShowContoursInfo(spec.global.config, "see infilling contours"));
-        clipperDo(clipper, accumNonCoveredByInfillings, clp::ctDifference, *infillingAreas, output.infillingsIndependentContours, clp::pftNonZero, clp::pftNonZero);
-        //elsewhere in the code we use !infillingsIndependentContours.empty() as a test to see if we are doing recursive infillings, so we clear it to make sure we do not break that logic
-        if (!spec.pp[k].infillingRecursive) output.infillingsIndependentContours.clear();
-        //SHOWCONTOURS(spec.global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
-        applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, intermediate_medialaxis);
-    }
+        //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths)
+        offsetDo(offset, output.contours, (double)spec.pp[k].radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
 
-    if (!spec.pp[k].medialAxisFactors.empty()) {
-      
-        //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
-        clp::Paths *intermediate_paths = &AUX3;
+        //if required, discard common toolpaths.
+        bool discardCommonToolpaths = spec.useContoursAlreadyFilled(k);
 
-        clipperDo(clipper, *intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
-        //SHOWCONTOURS(spec.global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+        if (discardCommonToolpaths) {
+            doDiscardCommonToolPaths(k, output.toolpaths, contours_alreadyfilled, AUX4);
+        }
+        if (nextProcessSameKind && CUSTOMINFILLINGS && spec.pp[k].infillingRecursive) {
+            output.infillingsIndependentContours.resize(1);
+            offsetDo(offset, output.infillingsIndependentContours[0], (double)spec.pp[k].radius, output.toolpaths, clp::jtRound, clp::etOpenRound);
+        }
 
-        //but now, apply the medial axis algorithm!!!!
-        applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, intermediate_medialaxis);
+        //generate the infilling contour only if necessary
+        output.alsoInfillingAreas = (spec.pp[k].infillingMode == InfillingJustContours);
+        //the generation of the infilling regions depends on the flag discardCommonToolpaths
+        if (spec.pp[k].infillingMode != InfillingNone) {
+            if (discardCommonToolpaths) {
+                //this is more expensive than the alternative, but necessary for possibly open toolpaths
+                if (output.infillingsIndependentContours.empty()) {
+                    operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.toolpaths, (double)spec.pp[k].radius, &AUX4, (clp::Paths*)NULL);
+                } else {
+                    clipperDo(clipper, *infillingAreas, clp::ctDifference, output.contours, output.infillingsIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
+                }
+            } else {
+                //TODO: change the constant 0.3 by a parameter (that is, a parameter to tune the shrink factor for the the infilling, if no clearance is needed)
+                //ALTERNATIVE TODO: make the shrink factor a non-conditional parameter, but the user should then remember to set it appropriately if clearance is required
+                //0.99: cannot be 1.0, clipping / round-off errors crop up
+                double shrinkFactor = (spec.pp[k].addInternalClearance) ? 0.99 : 0.3;
+                offsetDo(offset, *infillingAreas, -(double)spec.pp[k].radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+            }
+        }
+
+        if (CUSTOMINFILLINGS) {
+            AUX2.clear();
+            //NOTE: using unprocessedToolPaths here is semantically dubious. REVISIT LATER!
+            if (!processInfillings(k, *infillingAreas, unprocessedToolPaths)) {
+                this->clear();
+                return false;
+            }
+        }
+
+        AUX4.clear();
+        intermediate_medialaxis = &AUX4;
+
+        //if ((!output.infillingsIndependentContours.empty()) && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
+        if (nextProcessSameKind && CUSTOMINFILLINGS && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
+            //showContours(output.infillingsIndependentContours, ShowContoursInfo(spec.global.config, "see infilling contours"));
+            clipperDo(clipper, accumNonCoveredByInfillings, clp::ctDifference, *infillingAreas, output.infillingsIndependentContours, clp::pftNonZero, clp::pftNonZero);
+            //elsewhere in the code we use !infillingsIndependentContours.empty() as a test to see if we are doing recursive infillings, so we clear it to make sure we do not break that logic
+            if (!spec.pp[k].infillingRecursive) output.infillingsIndependentContours.clear();
+            //SHOWCONTOURS(spec.global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
+            applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis);
+        }
+
+        if (!spec.pp[k].medialAxisFactors.empty()) {
+
+            //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
+            clp::Paths *intermediate_paths = &AUX3;
+
+            clipperDo(clipper, *intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
+            //SHOWCONTOURS(spec.global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+
+            //but now, apply the medial axis algorithm!!!!
+            applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
+        }
     }
 
     if (output.infillingsIndependentContours.empty() && nextProcessSameKind) {
@@ -618,60 +623,62 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         }
     }
 
-    /*TODO: right now, the motion planning makes little sense. it would be better to do each island separately:
+    if (spec.pp[k].computeToolpaths) {
+        /*TODO: right now, the motion planning makes little sense. it would be better to do each island separately:
         -do one HoledPolygon
         -do its outer medial axes (possibly merge with the next step)
         -do its infilling and inner medial axes
         -go to nearest HoledPolygons and repeat
-    this would require to use HoledPolygons as the native datatype and keep the infillings and medial axes
-    classified by HoledPolygon (and innerness in the case of the medial axes), modifying the above algorithms
-    accordingly.
-    it would also require to modify the motion planner to use the combination of HoledPolygons and infillings
-    separated by HoledPolygon. Right now this is the workflow:
-        
-    IF LUMP_CONTOURS_AND_INFILLINGS_TOGETHER:
+        this would require to use HoledPolygons as the native datatype and keep the infillings and medial axes
+        classified by HoledPolygon (and innerness in the case of the medial axes), modifying the above algorithms
+        accordingly.
+        it would also require to modify the motion planner to use the combination of HoledPolygons and infillings
+        separated by HoledPolygon. Right now this is the workflow:
+
+        IF LUMP_CONTOURS_AND_INFILLINGS_TOGETHER:
         -all is lumped together, then motion planning is done
-    ELSE IF THERE ARE NOT CUSTOM INFILLINGS:
+        ELSE IF THERE ARE NOT CUSTOM INFILLINGS:
         -contours and medial axes are lumped together, then motion planning is done
-    ELSE
+        ELSE
         -contours are planned, then custom infillings and (if applicable) medial axes are lumped together and then motion planning is done for them
-    Cyclomatic complexity is quite big, redundant code is minimized
-        
-    */
-    bool use_infillings = CUSTOMINFILLINGS && !accumInfillingsHolder.empty();
-    bool use_medialaxis = !spec.pp[k].medialAxisFactors.empty() && !intermediate_medialaxis.empty();
-    bool add_medialaxis_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner || !use_infillings) && use_medialaxis;
-    bool add_infillings_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner) && use_infillings;
-    if (add_medialaxis_now) {
-        MOVETO(intermediate_medialaxis, output.toolpaths);
-        intermediate_medialaxis.clear();
-    }
-    if (add_infillings_now) {
-        MOVETO(accumInfillingsHolder, output.toolpaths);
-        accumInfillingsHolder.clear();
-    }
+        Cyclomatic complexity is quite big, redundant code is minimized
 
-    if (spec.global.applyMotionPlanner) {
-        //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this (and probably be ruined as well)
+        */
+        bool use_infillings = CUSTOMINFILLINGS && !accumInfillingsHolder.empty();
+        bool use_medialaxis = !spec.pp[k].medialAxisFactors.empty() && !intermediate_medialaxis->empty();
+        bool add_medialaxis_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner || !use_infillings) && use_medialaxis;
+        bool add_infillings_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner) && use_infillings;
+        if (add_medialaxis_now) {
+            MOVETO(*intermediate_medialaxis, output.toolpaths);
+            intermediate_medialaxis->clear();
+        }
+        if (add_infillings_now) {
+            MOVETO(accumInfillingsHolder, output.toolpaths);
+            accumInfillingsHolder.clear();
+        }
 
-        //trying to do the thing below does not feel very good
-        verySimpleMotionPlanner(spec.startState, PathOpen, output.toolpaths); //these are open toolpaths (contains a mix of open and actually closed ones)
+        if (spec.global.applyMotionPlanner) {
+            //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this (and probably be ruined as well)
 
-        /*the order IS important (start_near is a side-effected configuration value),
-        and should be the same as the output order in the gcode pipeline (alternatively,
-        if the gcode pipeline can reorder arbitrarily both kinds of objects
-        (currently the company's AutoCAD app does not), this should be completely redesigned
-        (and probably deferred until actual gcode creation)*/
-        if (!LUMP_CONTOURS_AND_INFILLINGS_TOGETHER) {
-            if (use_infillings) {
-                //INVARIANT: add_medialaxis_now is false
-                if (!spec.pp[k].medialAxisFactors.empty()) {
-                    MOVETO(intermediate_medialaxis, accumInfillingsHolder);
-                    intermediate_medialaxis.clear();
+            //trying to do the thing below does not feel very good
+            verySimpleMotionPlanner(spec.startState, PathOpen, output.toolpaths); //these are open toolpaths (contains a mix of open and actually closed ones)
+
+            /*the order IS important (start_near is a side-effected configuration value),
+            and should be the same as the output order in the gcode pipeline (alternatively,
+            if the gcode pipeline can reorder arbitrarily both kinds of objects
+            (currently the company's AutoCAD app does not), this should be completely redesigned
+            (and probably deferred until actual gcode creation)*/
+            if (!LUMP_CONTOURS_AND_INFILLINGS_TOGETHER) {
+                if (use_infillings) {
+                    //INVARIANT: add_medialaxis_now is false
+                    if (!spec.pp[k].medialAxisFactors.empty()) {
+                        MOVETO(*intermediate_medialaxis, accumInfillingsHolder);
+                        intermediate_medialaxis->clear();
+                    }
+                    verySimpleMotionPlanner(spec.startState, PathOpen, accumInfillingsHolder);
+                    MOVETO(accumInfillingsHolder, output.toolpaths);
+                    accumInfillingsHolder.clear();
                 }
-                verySimpleMotionPlanner(spec.startState, PathOpen, accumInfillingsHolder);
-                MOVETO(accumInfillingsHolder, output.toolpaths);
-                accumInfillingsHolder.clear();
             }
         }
     }

@@ -59,6 +59,8 @@ po::options_description perProcessOptionsGenerator() {
             "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
         ("no-preprocessing",
             "If specified, the raw contours are not pre-processed before generating the toolpaths. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
+        ("no-toolpaths",
+            "If specified, the toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
         ("radx,x",
             po::value<double>()->required()->value_name("length"),
             "radius of the voxel for the current process in the XY plane")
@@ -426,6 +428,8 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
         spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
         spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
         spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
+        spec.pp[k].computeToolpaths     = vm.count("no-toolpaths") == 0;
+        
 
         //if (vm.count("smoothing")) {
         //    spec.pp[k].burrLength = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);

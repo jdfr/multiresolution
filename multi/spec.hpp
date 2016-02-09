@@ -115,6 +115,7 @@ typedef struct PerProcessSpec {
     clp::cInt arctolG;               // arcTolerance when doing offseting at the gridstep scale
     clp::cInt burrLength;            // radius to remove too small details (applied when no snap is done)
     clp::cInt radiusRemoveCommon;    // radius to remove shared arcs between contours of different resolutions (applying this in the current, naive way may become quite expensive)
+    bool      computeToolpaths;      // flag to effectively compute the toolpaths (alternative: only contours, without taking into account toolpath smoothing effects)
     bool      applysnap;             // flag to snap to grid
     bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
     bool      addInternalClearance;  // make sure that the toolpath is smooth enough to not write over itself

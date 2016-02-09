@@ -284,6 +284,7 @@ function(SINGLESOURCE_EXECUTABLE GENERATE_OPTION TARGETNAME SOURCEFILE EXENAME)
 endfunction(SINGLESOURCE_EXECUTABLE)
 
 SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER, multiresolution_svgconverter apps/svg.cpp       svgconv)
+SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER, multiresolution_dxfconverter apps/dxf.cpp       dxfconv)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER,   multiresolution_filefilter   apps/filter.cpp    filterp)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEINFO,     multiresolution_fileinfo     apps/info.cpp      infop)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEUNION,    multiresolution_fileunion    apps/union.cpp     unionp)
