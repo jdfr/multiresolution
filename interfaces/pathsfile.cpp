@@ -234,6 +234,55 @@ bool PathWriter::close() {
     throw std::runtime_error("Base method PathWriter::close() should never be called!");
 }
 
+bool PathsFileWriter::start() {
+    if (!isOpen) {
+        if (!f_already_open) {
+            f = fopen(filename.c_str(), "wb");
+            if (f == NULL) {
+                err = str("output pathsfile <", filename, ">: file could not be open");
+                return false;
+            }
+        }
+        isOpen = true;
+        err = fileheader->writeToFile(f, false);
+        if (!err.empty()) return false;
+    }
+    return true;
+}
+
+bool PathsFileWriter::writeNumRecords(int64 numRecords) {
+    if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
+        err = str("output pathsfile <", filename, ">: could not write number of records");
+        return false;
+    }
+}
+
+bool PathsFileWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+    if (!isOpen) {
+        if (!start()) return false;
+    }
+    PathCloseMode mode = isClosed ? PathLoop : PathOpen;
+    err = writeSlice(f, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
+    return err.empty();
+}
+
+bool PathsFileWriter::close() {
+    bool ok = true;
+    if (isOpen) {
+        if (!f_already_open) {
+            bool ok = fclose(f) == 0;
+            if (ok) {
+                f = NULL;
+            } else {
+                err = str("output pathsfile <", filename, ">: could not be closed!!!");
+            }
+        }
+        isOpen = false;
+    }
+    return ok;
+}
+
+
 #define ISASCII  (mode==DXFAscii)
 #define ISBINARY (mode==DXFBinary)
 
