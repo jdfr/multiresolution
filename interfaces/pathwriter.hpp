@@ -58,6 +58,7 @@ protected:
 enum DXFWMode { DXFAscii, DXFBinary };
 
 //write to DXF file (either ascii or binary)
+//TODO: currently, this only works on little-endian machines such as x86. If necessary, modify so it also work in different XXX-endians
 template<DXFWMode mode> class DXFPathWriter : public PathWriterMultiFile<DXFPathWriter<mode>> {
 public:
     DXFPathWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
