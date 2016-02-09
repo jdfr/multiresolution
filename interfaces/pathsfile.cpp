@@ -224,6 +224,9 @@ int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode) {
 
 
 
+bool PathWriter::start() {
+    throw std::runtime_error("Base method PathWriter::close() should never be called!");
+}
 bool PathWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
     throw std::runtime_error("Base method PathWriter::writePaths() should never be called!");
 }
@@ -279,6 +282,12 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
     subwriters.back()->z            = _z;
     subwriters.back()->delegateWork = false;
     return currentSubwriter = ((int)subwriters.size() - 1);
+}
+
+template<typename T> bool PathWriterMultiFile<T>::start() {
+    if (!this->isopen) {
+        if (!static_cast<T*>(this)->startWriter()) return false;
+    }
 }
 
 template<typename T> bool PathWriterMultiFile<T>::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {

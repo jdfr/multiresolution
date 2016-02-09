@@ -88,6 +88,7 @@ public:
     std::string err;
     std::string filename;
     virtual ~PathWriter() {}
+    virtual bool start(); //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
 };
@@ -96,6 +97,7 @@ public:
 //We use the CRTP idiom to get compile-time dispatch where we need it
 template<typename T> class PathWriterMultiFile: public PathWriter {
 public:
+    virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
     virtual ~PathWriterMultiFile() { close(); }
