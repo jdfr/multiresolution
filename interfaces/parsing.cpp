@@ -330,6 +330,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
     optionsByTool.reserve(3); //reasonable number to reserve
     std::vector<int> processIds;
     int maxProcess = 0;
+    int currentProcess;
     //separate global options, and sort per-process options according to the previous --process option
     for (auto & option : optionList.options) {
         if (option.string_key.compare("process") == 0) {
@@ -337,14 +338,25 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             char *endptr; int param = (int)strtol(option.value[0].c_str(), &endptr, 10);
             if (param<0) return std::string("process option cannot have negative value: ", param);
             if ((*endptr) != 0) return str("process option value must be a non-negative integer: ", option.value[0]);
+            bool found = false;
+            for (auto id = processIds.begin(); id != processIds.end();  ++id) {
+                if (*id == param) {
+                    currentProcess = id - processIds.begin();
+                    found = true;
+                    break;
+                }
+            }
+            if (found) continue;
             processIds.push_back(param);
             optionsByTool.push_back(OptionsByTool(param, po::parsed_options(perProcessOptions(), optionList.m_options_prefix)));
+            currentProcess = optionsByTool.size() - 1;
             if (maxProcess < processIds.back()) maxProcess = processIds.back();
+            continue;
         }
         if (optionsByTool.empty()) {
             return str("option ", option.string_key, " cannot be specified before option --process");
         }
-        optionsByTool.back().second.options.push_back(std::move(option));
+        optionsByTool[currentProcess].second.options.push_back(std::move(option));
     }
     //some sanity checks
     if (optionsByTool.empty()) {
@@ -413,7 +425,7 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
         spec.pp[k].applysnap            = vm.count("snap")      != 0;
         spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
         spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
-        spec.pp[k].doPreprocessing       = vm.count("no-preprocessing,") == 0;
+        spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
 
         //if (vm.count("smoothing")) {
         //    spec.pp[k].burrLength = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);

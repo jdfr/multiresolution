@@ -262,7 +262,7 @@ int main(int argc, const char** argv) {
         }
 #endif
         if (save) {
-            pathwriters_native     .push_back(new PathsFileWriter(singleoutputfilename, NULL, &header, saveFormat));
+            pathwriters_native     .push_back(new PathsFileWriter(singleoutputfilename, NULL, &header, (int)saveFormat));
             pathwriters_arefiles   .push_back(pathwriters_native.back());
             pathwriters_toolpath   .push_back(pathwriters_native.back());
             if (alsoContours) {
