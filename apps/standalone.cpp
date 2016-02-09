@@ -492,18 +492,17 @@ int main(int argc, const char** argv) {
                     return -1;
                 }
 
-                double zscaled = zs[i] * factors.internal_to_input;
                 for (int k = 0; k < numtools; ++k) {
                     double rad     = multispec.pp[k].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
-                        if (!pathwriter->writePaths(ress[k]->toolpaths, PATHTYPE_TOOLPATH, rad, k, zscaled, factors.internal_to_input, false)) {
-                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", k, zscaled, pathwriter->err.c_str());
+                        if (!pathwriter->writePaths(ress[k]->toolpaths, PATHTYPE_TOOLPATH, rad, k, zs[i], factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
                             return -1;
                         }
                     }
                     for (auto &pathwriter : pathwriters_contour) {
-                        if (!pathwriter->writePaths(ress[k]->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, k, zscaled, factors.internal_to_input, true)) {
-                            fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zscaled, pathwriter->err.c_str());
+                        if (!pathwriter->writePaths(ress[k]->contoursToShow, PATHTYPE_PROCESSED_CONTOUR, rad, k, zs[i], factors.internal_to_input, true)) {
+                            fprintf(stderr, "Error writing contours  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
                             return -1;
                         }
                     }
