@@ -234,33 +234,19 @@ bool PathWriter::close() {
 #define ISASCII  (mode==DXFAscii)
 #define ISBINARY (mode==DXFBinary)
 
+template class PathWriterMultiFile<DXFAsciiPathWriter>;
+template class PathWriterMultiFile<DXFBinaryPathWriter>;
+
 template class DXFPathWriter<DXFAscii>;
 template class DXFPathWriter<DXFBinary>;
 
-bool PathWriterMultiFile::startWriter() {
-    throw std::runtime_error("Base method PathWriterMultiFile::startWriter() should never be called!");
-}
-bool PathWriterMultiFile::endWriter() {
-    throw std::runtime_error("Base method PathWriterMultiFile::endWriter() should never be called!");
-}
-bool PathWriterMultiFile::writePathsSpecific(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    throw std::runtime_error("Base method PathWriterMultiFile::writePathsSpecific should never be called!");
-}
-bool PathWriterMultiFile::specificClose() {
-    throw std::runtime_error("Base method PathWriterMultiFile::specificClose() should never be called!");
-}
-PathWriterMultiFile* PathWriterMultiFile::createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z) {
-    throw std::runtime_error("Base method PathWriterMultiFile::createSubWriter() should never be called!");
-}
-
-
-bool PathWriterMultiFile::matchZNtool(int _type, int _ntool, double _z) {
+template<typename T> bool PathWriterMultiFile<T>::matchZNtool(int _type, int _ntool, double _z) {
     return generic_all || ((generic_for_ntool || (ntool == _ntool)) &&
                            (generic_for_z     || (std::fabs(z - _z) < epsilon)) &&
                            (generic_for_type  || (_type==type)));
 }
 
-int PathWriterMultiFile::findOrCreateSubwriter(int _type, double _radius, int _ntool, double _z) {
+template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type, double _radius, int _ntool, double _z) {
     if (subwriters.size()>0) {
         if (subwriters[currentSubwriter]->matchZNtool(_type, _ntool, _z)) {
             return currentSubwriter;
@@ -286,7 +272,7 @@ int PathWriterMultiFile::findOrCreateSubwriter(int _type, double _radius, int _n
     if (!generic_for_ntool) N       = str(".N", _ntool);
     if (!generic_for_z)     Z       = str(".Z", _z);
     std::string newfilename         = str(filename, Type, N, Z, ".dxf");
-    subwriters.push_back(createSubWriter(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
+    subwriters.push_back(new T(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
     subwriters.back()->type         = _type;
     subwriters.back()->radius       = _radius;
     subwriters.back()->ntool        = _ntool;
@@ -295,7 +281,7 @@ int PathWriterMultiFile::findOrCreateSubwriter(int _type, double _radius, int _n
     return currentSubwriter = ((int)subwriters.size() - 1);
 }
 
-bool PathWriterMultiFile::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+template<typename T> bool PathWriterMultiFile<T>::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
     if (delegateWork) {
         int idx = findOrCreateSubwriter(type, radius, ntool, z);
         bool ret = subwriters[idx]->writePaths(paths, type, radius, ntool, z, scaling, isClosed);
@@ -303,12 +289,12 @@ bool PathWriterMultiFile::writePaths(clp::Paths &paths, int type, double radius,
         return ret;
     }
     if (!isopen) {
-        if (!startWriter()) return false;
+        if (!static_cast<T*>(this)->startWriter()) return false;
     }
-    return writePathsSpecific(paths, type, radius, ntool, z, scaling, isClosed);
+    return static_cast<T*>(this)->writePathsSpecific(paths, type, radius, ntool, z, scaling, isClosed);
 }
 
-bool PathWriterMultiFile::close() {
+template<typename T> bool PathWriterMultiFile<T>::close() {
     bool ok = true;
     if (!subwriters.empty()) {
         for (auto &w : subwriters) {
@@ -322,9 +308,9 @@ bool PathWriterMultiFile::close() {
     }
     if (isopen) {
         bool newok;
-        newok = endWriter();
+        newok = static_cast<T*>(this)->endWriter();
         ok = ok && newok;
-        newok = specificClose();
+        newok = static_cast<T*>(this)->specificClose();
         ok = ok && newok;
         isopen = false;
     }
@@ -332,44 +318,39 @@ bool PathWriterMultiFile::close() {
 }
 
 template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
-    epsilon           = _epsilon;
-    generic_for_ntool = _generic_ntool;
-    generic_for_z     = _generic_z;
-    generic_for_type  = _generic_type;
-    generic_all       = generic_for_ntool && generic_for_z && generic_for_type;
-    delegateWork      = !generic_all;
-    filename          = std::move(file);
-    if (generic_all) {
-        bool file_ends_in_dxf = (filename.length() >= 4) &&
-            (tolower(*(filename.end() - 1)) == 'f') &&
-            (tolower(*(filename.end() - 2)) == 'x') &&
-            (tolower(*(filename.end() - 3)) == 'd') &&
-            ((*(filename.end() - 4)) == '.');
+    this->epsilon           = _epsilon;
+    this->generic_for_ntool = _generic_ntool;
+    this->generic_for_z     = _generic_z;
+    this->generic_for_type  = _generic_type;
+    this->generic_all       = this->generic_for_ntool && this->generic_for_z && this->generic_for_type;
+    this->delegateWork      = !this->generic_all;
+    this->filename          = std::move(file);
+    if (this->generic_all) {
+        bool file_ends_in_dxf = (this->filename.length() >= 4) &&
+            (tolower(*(this->filename.end() - 1)) == 'f') &&
+            (tolower(*(this->filename.end() - 2)) == 'x') &&
+            (tolower(*(this->filename.end() - 3)) == 'd') &&
+            ((*(this->filename.end() - 4)) == '.');
         if (!file_ends_in_dxf) {
-            filename += ".dxf";
+            this->filename += ".dxf";
         }
     }
-    isopen = false;
+    this->isopen = false;
 }
-
-template<DXFWMode mode> PathWriterMultiFile* DXFPathWriter<mode>::createSubWriter(std::string file, double epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
-    return new DXFPathWriter<mode>(file, epsilon, _generic_type, _generic_ntool, _generic_z);
-}
-
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
     if (ISBINARY) {
         if (sizeof(char) != 1) {
-            err = str("To write binary DXF files we expect char to be 1 byte long!");
+            this->err = str("To write binary DXF files we expect char to be 1 byte long!");
             return false;
         }
     }
-    f = fopen(filename.c_str(), ISASCII ? "wt" : "wb");
-    if (f == NULL) {
-        err = str("DXF output file <", filename, ">: file could not be open");
+    this->f = fopen(this->filename.c_str(), ISASCII ? "wt" : "wb");
+    if (this->f == NULL) {
+        this->err = str("DXF output file <", this->filename, ">: file could not be open");
         return false;
     }
-    isopen = true;
+    this->isopen = true;
     if (ISASCII) {
         const char * HEADERA =
             //DXF header
@@ -386,8 +367,8 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
             //START PAYLOAD
             "0\nSECTION\n"
             "2\nENTITIES\n";
-        if (fprintf(f, HEADERA) <0) {
-            err = str("DXF output file <", filename, ">: header could not be written!!!");
+        if (fprintf(this->f, HEADERA) <0) {
+            this->err = str("DXF output file <", this->filename, ">: header could not be written!!!");
             return false;
         }
     } else {
@@ -407,8 +388,8 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
             //START PAYLOAD
             "\x00" "SECTION\x00"
             "\x02" "ENTITIES\x00";
-        if (fwrite(HEADERB, sizeof(char), sizeof(HEADERB) - 1, f) != (sizeof(HEADERB) - 1)) {
-            err = str("DXF output file <", filename, ">: header could not be written!!!");
+        if (fwrite(HEADERB, sizeof(char), sizeof(HEADERB) - 1, this->f) != (sizeof(HEADERB) - 1)) {
+            this->err = str("DXF output file <", this->filename, ">: header could not be written!!!");
             return false;
         }
     }
@@ -416,21 +397,21 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
 }
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::endWriter() {
-    if (isopen && err.empty()) {
+    if (this->isopen && this->err.empty()) {
         if (ISASCII) {
             const char * ENDA =
                 "0\nENDSEC\n"
                 "0\nEOF";
-            if (fprintf(f, ENDA) < 0) {
-                err = str("DXF output file <", filename, ">: end could not be written!!!");
+            if (fprintf(this->f, ENDA) < 0) {
+                this->err = str("DXF output file <", this->filename, ">: end could not be written!!!");
                 return false;
             }
         } else {
             const char ENDB[] =
                 "\x00" "ENDSEC\x00"
                 "\x00" "EOF\x00";
-            if (fwrite(ENDB, sizeof(char), sizeof(ENDB) - 1, f) != (sizeof(ENDB) - 1)) {
-                err = str("DXF output file <", filename, ">: end could not be written!!!");
+            if (fwrite(ENDB, sizeof(char), sizeof(ENDB) - 1, this->f) != (sizeof(ENDB) - 1)) {
+                this->err = str("DXF output file <", this->filename, ">: end could not be written!!!");
                 return false;
             }
         }
@@ -439,23 +420,23 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::endWriter() {
 }
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::specificClose() {
-    bool ok = fclose(f) == 0;
+    bool ok = fclose(this->f) == 0;
     if (ok) {
-        f = NULL;
+        this->f = NULL;
     } else {
-        err = str("DXF output file <", filename, ">: could not be closed!!!");
+        this->err = str("DXF output file <", this->filename, ">: could not be closed!!!");
     }
     return ok;
 }
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    if (isopen && (!paths.empty())) {
-        double width = generic_for_ntool ? (2 * radius) : 0.0;
-        double elevation = generic_for_z ? z : 0.0;
+    if (this->isopen && (!paths.empty())) {
+        double width = this->generic_for_ntool ? (2 * radius) : 0.0;
+        double elevation = this->generic_for_z ? z : 0.0;
         for (auto & path : paths) {
             if (path.empty()) continue;
             if (ISASCII) {
-                if (fprintf(f,
+                if (fprintf(this->f,
                     "0\nPOLYLINE\n"
                     "8\n0\n" //the layer
                     "39\n%.20g\n" //width
@@ -466,7 +447,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                     "30\n%.20g\n" //elevation
                     "70\n%d\n", //isClosed
                     width, elevation, isClosed != 0) < 0) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 };
             } else {
@@ -474,12 +455,12 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                     "\x00" "POLYLINE\x00"
                     "\x08" "0\x00" //the layer
                     "\x27"; //width
-                if (fwrite(POLYHEADER, sizeof(char), sizeof(POLYHEADER) - 1, f) != (sizeof(POLYHEADER) - 1)) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(POLYHEADER, sizeof(char), sizeof(POLYHEADER) - 1, this->f) != (sizeof(POLYHEADER) - 1)) {
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
-                if (fwrite(&width, sizeof(double), 1, f) != 1) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(&width, sizeof(double), 1, this->f) != 1) {
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
                 const char AcDb2dPolyline[] =
@@ -488,12 +469,12 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                     "\x0a" "\x00\x00\x00\x00\x00\x00\x00\x00"
                     "\x14" "\x00\x00\x00\x00\x00\x00\x00\x00"
                     "\x1e"; //elevation
-                if (fwrite(AcDb2dPolyline, sizeof(char), sizeof(AcDb2dPolyline) - 1, f) != (sizeof(AcDb2dPolyline) - 1)) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(AcDb2dPolyline, sizeof(char), sizeof(AcDb2dPolyline) - 1, this->f) != (sizeof(AcDb2dPolyline) - 1)) {
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
-                if (fwrite(&elevation, sizeof(double), 1, f) != 1) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(&elevation, sizeof(double), 1, this->f) != 1) {
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 };
                 const char closedVal0[] = "\x46\x00\x00";
@@ -501,14 +482,14 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                 const char *closedVal = isClosed ? closedVal1 : closedVal0;
                 const size_t closedValL = isClosed ? (sizeof(closedVal1) - 1) : (sizeof(closedVal0) - 1);
                 //isClosed
-                if (fwrite(closedVal, sizeof(char), closedValL, f) != closedValL) {
-                    err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(closedVal, sizeof(char), closedValL, this->f) != closedValL) {
+                    this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
             }
             for (auto &point : path) {
                 if (ISASCII) {
-                    if (fprintf(f,
+                    if (fprintf(this->f,
                         "0\nVERTEX\n"
                         "8\n0\n" //the layer
                         //"62\n[COLORNUMBER]\n" //color number
@@ -520,7 +501,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                         point.X*scaling,
                         point.Y*scaling
                         ) < 0) {
-                        err = str("Error writing polyline points to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                        this->err = str("Error writing polyline points to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                 } else {
@@ -530,41 +511,41 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                         "\x08" "0\x00" //the layer
                         "\x64" "AcDb2dVertex\x00" //subclass marker
                         "\x0a"; //X
-                    if (fwrite(VERTEX, sizeof(char), sizeof(VERTEX) - 1, f) != (sizeof(VERTEX) - 1)) {
-                        err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    if (fwrite(VERTEX, sizeof(char), sizeof(VERTEX) - 1, this->f) != (sizeof(VERTEX) - 1)) {
+                        this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                     val = point.X*scaling;
-                    if (fwrite(&val, sizeof(double), 1, f) != 1) {
-                        err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    if (fwrite(&val, sizeof(double), 1, this->f) != 1) {
+                        this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                     const char Y[] = "\x14";
-                    if (fwrite(Y, sizeof(char), sizeof(Y) - 1, f) != (sizeof(Y) - 1)) { //Y
-                        err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    if (fwrite(Y, sizeof(char), sizeof(Y) - 1, this->f) != (sizeof(Y) - 1)) { //Y
+                        this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                     val = point.Y*scaling;
-                    if (fwrite(&val, sizeof(double), 1, f) != 1) {
-                        err = str("Error writing polyline header to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    if (fwrite(&val, sizeof(double), 1, this->f) != 1) {
+                        this->err = str("Error writing polyline header to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                     const char Z[] = "\x1e\x00\x00\x00\x00\x00\x00\x00\x00";
-                    if (fwrite(Z, sizeof(char), sizeof(Z) - 1, f) != (sizeof(Z) - 1)) { //Elevation (absolute or relative? if absolute, we have to repeat it here)
-                        err = str("Error writing polyline points to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                    if (fwrite(Z, sizeof(char), sizeof(Z) - 1, this->f) != (sizeof(Z) - 1)) { //Elevation (absolute or relative? if absolute, we have to repeat it here)
+                        this->err = str("Error writing polyline points to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                         return false;
                     }
                 }
             }
             if (ISASCII) {
-                if (fprintf(f, "0\nSEQEND\n") < 0) {
-                    err = str("Error writing polyline end to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fprintf(this->f, "0\nSEQEND\n") < 0) {
+                    this->err = str("Error writing polyline end to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
             } else {
                 const char SEQEND[] = "\x00" "SEQEND\x00";
-                if (fwrite(SEQEND, sizeof(char), sizeof(SEQEND) - 1, f) != (sizeof(SEQEND) - 1)) {
-                    err = str("Error writing polyline end to file <", filename, "> in DXFPathWriter::writePathsSpecific()");
+                if (fwrite(SEQEND, sizeof(char), sizeof(SEQEND) - 1, this->f) != (sizeof(SEQEND) - 1)) {
+                    this->err = str("Error writing polyline end to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
                 }
             }
