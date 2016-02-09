@@ -128,6 +128,24 @@ template<typename T> bool PathWriterMultiFile<T>::writePaths(clp::Paths &paths, 
     return static_cast<T*>(this)->writePathsSpecific(paths, type, radius, ntool, z, scaling, isClosed);
 }
 
+template<typename T> bool PathWriterMultiFile<T>::writeToAll(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+    bool ret = true;
+    if (delegateWork) {
+        bool ret = true;
+        for (auto &w : subwriters) {
+            bool newret = w->writePaths(paths, type, radius, ntool, z, scaling, isClosed);
+            if (!newret) err = w->err;
+            ret = ret && newret;
+        }
+    }
+    if (isopen) {
+        bool newret = static_cast<T*>(this)->writePathsSpecific(paths, type, radius, ntool, z, scaling, isClosed);
+        ret = ret && newret;
+    }
+    return ret;
+}
+
+
 template<typename T> bool PathWriterMultiFile<T>::close() {
     bool ok = true;
     if (!subwriters.empty()) {

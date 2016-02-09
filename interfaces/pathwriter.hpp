@@ -38,6 +38,7 @@ public:
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
     virtual ~PathWriterMultiFile() { close(); }
+    bool writeToAll(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
 protected:
     bool matchZNtool(int type, int ntool, double z);
     int findOrCreateSubwriter(int type, double radius, int ntool, double z);
