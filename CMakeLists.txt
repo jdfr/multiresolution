@@ -164,6 +164,8 @@ set(CORESOURCES
   interfaces/parsing.cpp
   interfaces/pathsfile.hpp
   interfaces/pathsfile.cpp
+  interfaces/pathwriter.hpp
+  interfaces/pathwriter.cpp
   interfaces/slicermanager.hpp
   interfaces/slicermanager.cpp
   interfaces/subprocess.hpp
