@@ -17,16 +17,17 @@ public:
 //this class implements a PathWriter using the file format specified by FileHeader and SliceHeader
 class PathsFileWriter : public PathWriter {
 public:
-    PathsFileWriter(std::string file, FILE *_f, FileHeader *_fileheader, int _saveFormat) : f(_f), f_already_open(_f != NULL), isOpen(false), saveFormat(_saveFormat), fileheader(_fileheader) { filename = std::move(file); }
+    PathsFileWriter(std::string file, FILE *_f, std::shared_ptr<FileHeader> _fileheader, int64 _saveFormat, int64 _numRecords = -1) : f(_f), f_already_open(_f != NULL), isOpen(false), saveFormat(_saveFormat), fileheader(std::move(_fileheader)), numRecords(_numRecords) { filename = std::move(file); }
     virtual ~PathsFileWriter() { close(); }
     virtual bool start();
-    bool writeNumRecords(int64 numRecords); //this method is required because of the way standalone.cpp is structured
+    void setNumRecords(int64 _numRecords) { numRecords = _numRecords; } //this method is required because of the way standalone.cpp is structured
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
 protected:
     FILE * f;
-    FileHeader *fileheader;
-    int saveFormat;
+    std::shared_ptr<FileHeader> fileheader;
+    int64 saveFormat;
+    int64 numRecords;
     bool isOpen, f_already_open;
 };
 

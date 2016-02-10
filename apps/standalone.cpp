@@ -93,12 +93,12 @@ int main(int argc, const char** argv) {
     bool doscale = true;
     MetricFactors factors;
 
-    std::vector<PathWriter*> pathwriters_arefiles;    //everything which has to be closed
-    std::vector<PathWriter*> pathwriters_raw;         //everything receiving raw slices
-    std::vector<PathWriter*> pathwriters_contour;     //everything receiving contours
-    std::vector<PathWriter*> pathwriters_toolpath;    //everything receiving toolpaths
-    std::vector<PathsFileWriter*> pathwriters_native; //everything outputting in native format
-    PathsFileWriter* pathwriter_viewer;               //PathWriter in native format for the viewer
+    std::vector<std::shared_ptr<PathWriter>> pathwriters_arefiles;    //everything which has to be closed
+    std::vector<std::shared_ptr<PathWriter>> pathwriters_raw;         //everything receiving raw slices
+    std::vector<std::shared_ptr<PathWriter>> pathwriters_contour;     //everything receiving contours
+    std::vector<std::shared_ptr<PathWriter>> pathwriters_toolpath;    //everything receiving toolpaths
+    std::vector<std::shared_ptr<PathsFileWriter>> pathwriters_native; //everything outputting in native format
+    std::shared_ptr<PathsFileWriter> pathwriter_viewer;               //PathWriter in native format for the viewer
 
     try {
         MainSpec mainSpec = mainOptions();
@@ -188,19 +188,19 @@ int main(int argc, const char** argv) {
         bool generic_by_ntool = mainOpts.count("dxf-by-tool") == 0;
         bool generic_by_z     = mainOpts.count("dxf-by-z")    == 0;
         auto dxf_modes = { "dxf-toolpaths", "dxf-contours" };
-        std::vector<PathWriter*>* specific_pathwriter_vector [] = { &pathwriters_toolpath, &pathwriters_contour };
+        std::vector<std::shared_ptr<PathWriter>>* specific_pathwriter_vector [] = { &pathwriters_toolpath, &pathwriters_contour };
 
         int k = 0;
         for (auto &dxf_mode : dxf_modes) {
             if (mainOpts.count(dxf_mode) != 0) {
-                PathWriter *w;
+                std::shared_ptr<PathWriter> w;
                 std::string fn          = std::move(mainOpts[dxf_mode].as<std::string>());
                 const bool generic_type = true;
                 double epsilon          = multispec.global.z_epsilon*factors.internal_to_input;
                 if (dxfmode == DXFAscii) {
-                    w = new DXFAsciiPathWriter (std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                    w = std::make_shared<DXFAsciiPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
                 } else {
-                    w = new DXFBinaryPathWriter(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                    w = std::make_shared<DXFBinaryPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
                 }
                 pathwriters_arefiles.push_back(w);
                 specific_pathwriter_vector[k]->push_back(w);
@@ -249,10 +249,10 @@ int main(int argc, const char** argv) {
     int64 numoutputs, numsteps;
     int numtools = (int)multispec.numspecs;
     if (save || show) {
-        FileHeader header(multispec, factors);
+        std::shared_ptr<FileHeader> header = std::make_shared<FileHeader>(multispec, factors);
 #ifdef STANDALONE_USEPYTHON
         if (show) {
-            pathwriter_viewer = new PathsFileWriter("sliceViewerStream", slicesViewer->pipeIN, &header, PATHFORMAT_INT64);
+            pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
             pathwriters_native     .push_back(pathwriter_viewer);
             pathwriters_toolpath   .push_back(pathwriters_native.back());
             if (alsoContours) {
@@ -262,18 +262,12 @@ int main(int argc, const char** argv) {
         }
 #endif
         if (save) {
-            pathwriters_native     .push_back(new PathsFileWriter(singleoutputfilename, NULL, &header, (int)saveFormat));
+            pathwriters_native     .push_back(std::make_shared<PathsFileWriter>(singleoutputfilename, (FILE*)NULL, header, saveFormat));
             pathwriters_arefiles   .push_back(pathwriters_native.back());
             pathwriters_toolpath   .push_back(pathwriters_native.back());
             if (alsoContours) {
                 pathwriters_raw    .push_back(pathwriters_native.back());
                 pathwriters_contour.push_back(pathwriters_native.back());
-            }
-        }
-        for (auto &w : pathwriters_native) {
-            if (!w->start()) {
-                fprintf(stderr, "Error trying to start output: %s\n", w->err.c_str());
-                return -1;
             }
         }
     }
@@ -340,12 +334,7 @@ int main(int argc, const char** argv) {
 
             if (!pathwriters_native.empty()) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-                for (auto &w : pathwriters_native) {
-                    if (!w->writeNumRecords(numoutputs)) {
-                        fprintf(stderr, "Error trying to write number of records: %s\n", w->err.c_str());
-                        return -1;
-                    }
-                }
+                for (auto &w : pathwriters_native) w->setNumRecords(numoutputs);
             }
 
             if (saveContours) {
@@ -444,12 +433,7 @@ int main(int argc, const char** argv) {
             if (!pathwriters_native.empty()) {
                 //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
                 numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-                for (auto &w : pathwriters_native) {
-                    if (!w->writeNumRecords(numoutputs)) {
-                        fprintf(stderr, "Error trying to write number of records: %s\n", w->err.c_str());
-                        return -1;
-                    }
-                }
+                for (auto &w : pathwriters_native) w->setNumRecords(numoutputs);
             }
 
             for (int i = 0; i < numsteps; ++i) {
@@ -528,13 +512,11 @@ int main(int argc, const char** argv) {
         if (!pathwriter->close()) {
             fprintf(stderr, "Error trying to close file <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
         }
-        delete pathwriter;
     }
 
 #ifdef STANDALONE_USEPYTHON
     if (show) {
         fflush(slicesViewer->pipeIN);
-        delete pathwriter_viewer;
         slicesViewer->wait();
         delete slicesViewer;
     }

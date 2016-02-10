@@ -12,6 +12,10 @@ bool PathWriter::close() {
 
 bool PathsFileWriter::start() {
     if (!isOpen) {
+        if (numRecords < 0) {
+            err = str("output pathsfile <", filename, ">: the number of records was not set (or incorrectly set)");
+            return false;
+        }
         if (!f_already_open) {
             f = fopen(filename.c_str(), "wb");
             if (f == NULL) {
@@ -21,16 +25,13 @@ bool PathsFileWriter::start() {
         }
         isOpen = true;
         err = fileheader->writeToFile(f, false);
+        if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
+            err = str("output pathsfile <", filename, ">: could not write number of records");
+            return false;
+        }
         if (!err.empty()) return false;
     }
     return true;
-}
-
-bool PathsFileWriter::writeNumRecords(int64 numRecords) {
-    if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
-        err = str("output pathsfile <", filename, ">: could not write number of records");
-        return false;
-    }
 }
 
 bool PathsFileWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
