@@ -76,7 +76,7 @@ void usage(MainSpec &mainSpec) {
 }
 
 int main(int argc, const char** argv) {
-    char *meshfullpath;
+    std::string meshfullpath;
 
     bool show, use2d, useviewparams;
     std::string viewparams;
@@ -143,11 +143,13 @@ int main(int argc, const char** argv) {
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
 
         //this is necessary because the slicer may have a different working directory
-        meshfullpath = fullPath(meshfilename.c_str());
-        if (meshfullpath == NULL) {
+        char *meshfullpath_c = fullPath(meshfilename.c_str());
+        if (meshfullpath_c == NULL) {
             fprintf(stderr, "Error trying to resolve canonical path to the input mesh file: %s", meshfilename.c_str());
             return -1;
         }
+        meshfullpath = meshfullpath_c;
+        free(meshfullpath_c);
 
         show = mainOpts.count("show") != 0;
         if (show) {
@@ -236,13 +238,11 @@ int main(int argc, const char** argv) {
     }
 #endif
 
-    if (!slicer->start(meshfullpath)) {
+    if (!slicer->start(meshfullpath.c_str())) {
         std::string err = slicer->getErrorMessage();
         fprintf(stderr, "Error while trying to start the slicer manager: %s!!!\n", err.c_str());
-        free(meshfullpath);
         return -1;
     }
-    free(meshfullpath);
 
     bool alsoContours = multispec.global.alsoContours;
     clp::Paths rawslice, dummy;
