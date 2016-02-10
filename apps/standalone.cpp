@@ -225,9 +225,9 @@ int main(int argc, const char** argv) {
     std::shared_ptr<SlicerManager> slicer = getSlicerManager(config, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
-    SlicesViewer *slicesViewer = NULL;
+    std::shared_ptr<SlicesViewer> slicesViewer;
     if (show) {
-        slicesViewer = new SlicesViewer(config, "view slices", use2d, viewparams.c_str());
+        slicesViewer = std::make_shared<SlicesViewer>(config, "view slices", use2d, viewparams.c_str());
         std::string err = slicesViewer->start();
         if (!err.empty()) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
@@ -515,7 +515,6 @@ int main(int argc, const char** argv) {
     if (show) {
         fflush(slicesViewer->pipeIN);
         slicesViewer->wait();
-        delete slicesViewer;
     }
 #endif
 
