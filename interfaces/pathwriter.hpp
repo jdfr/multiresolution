@@ -52,7 +52,7 @@ protected:
     bool generic_for_ntool, generic_for_z, generic_for_type, generic_all, delegateWork;
     int currentSubwriter;
     //this has to be a vector of pointers because if the vector gets bigger, it will destroy and recreate the objects, interfering with the life cycle we have designed
-    std::vector<T*> subwriters;
+    std::vector<std::shared_ptr<T>> subwriters;
     FILE * f;
 };
 

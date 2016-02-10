@@ -101,7 +101,7 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
     if (!generic_for_ntool) N       = str(".N", _ntool);
     if (!generic_for_z)     Z       = str(".Z", _z);
     std::string newfilename         = str(filename, Type, N, Z, ".dxf");
-    subwriters.push_back(new T(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
+    subwriters.push_back(std::make_shared<T>(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
     subwriters.back()->type         = _type;
     subwriters.back()->radius       = _radius;
     subwriters.back()->ntool        = _ntool;
@@ -155,7 +155,6 @@ template<typename T> bool PathWriterMultiFile<T>::close() {
                 err = w->err;
                 ok = false;
             }
-            delete w;
         }
         subwriters.clear();
     }
