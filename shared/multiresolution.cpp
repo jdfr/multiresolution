@@ -15,27 +15,20 @@ static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface
 
 typedef struct SharedLibraryConfig {
     std::string err;
-    Configuration config;
+    std::shared_ptr<Configuration> config;
 
-    SharedLibraryConfig(char * configfile) { config.load(configfile); }
+    SharedLibraryConfig(char * configfile) { config = std::make_shared<Configuration>(); config->load(configfile); }
 } SharedLibraryConfig;
 
 typedef struct SharedLibraryState {
     std::string err;
+    std::shared_ptr<Configuration> config;
     MultiSpec spec;
     MetricFactors factors;
     std::vector<clp::cInt> processRadiuses;
-    SimpleSlicingScheduler * sched;
-    Multislicer * multi;
-    SharedLibraryState(Configuration *config) : spec(*config), sched(NULL), multi(NULL) {}
-    ~SharedLibraryState() {
-        if (this->sched) {
-            delete this->sched;
-        }
-        if (this->multi) {
-            delete this->multi;
-        }
-    }
+    std::shared_ptr<SimpleSlicingScheduler> sched;
+    std::shared_ptr<Multislicer> multi;
+    SharedLibraryState(std::shared_ptr<Configuration> _config) : config(std::move(_config)), spec(*config) {}
 } SharedLibraryState;
 
 
@@ -43,77 +36,49 @@ typedef struct SharedLibraryState {
 //structure to read a slice in the shared library interface
 typedef struct SharedLibrarySlice {
     std::string err;
-    clp::Paths *paths;
-    bool freepaths;
-    int* numpoints;
-    clp::cInt** pathpointers;
+    std::shared_ptr<clp::Paths> paths;
+    std::vector<int> numpoints;
+    std::vector<clp::cInt*> pathpointers;
     SharedLibrarySlice(int numpaths);
-    SharedLibrarySlice(clp::Paths *_paths);
-    ~SharedLibrarySlice();
+    SharedLibrarySlice(std::shared_ptr<clp::Paths> _paths);
 } SharedLibrarySlice;
 
 //structure to hold the results of the multislicer in the shared library interface
 typedef struct SharedLibraryResult {
     std::string err;
     std::vector<std::shared_ptr<ResultSingleTool>> res;
-    int* numpoints;
-    clp::cInt** pathpointers;
+    std::vector<int> numpoints;
+    std::vector<clp::cInt*> pathpointers;
     double z;
     int ntool;
-    SharedLibraryResult(size_t _numtools, int _ntool = -1, double _z = NAN) : res(_numtools), ntool(_ntool), z(_z), numpoints(NULL), pathpointers(NULL) {}
-    SharedLibraryResult(std::shared_ptr<ResultSingleTool> single) : numpoints(NULL), pathpointers(NULL), res(1, std::move(single)), ntool(res[0]->ntool), z(res[0]->z) {}
-    ~SharedLibraryResult();
+    SharedLibraryResult(size_t _numtools, int _ntool = -1, double _z = NAN) : res(_numtools), ntool(_ntool), z(_z) {}
+    SharedLibraryResult(std::shared_ptr<ResultSingleTool> single) : res(1, std::move(single)), ntool(res[0]->ntool), z(res[0]->z) {}
 } SharedLibraryResult;
 
 #if ( defined(_WIN32) || defined(_WIN64) )
 //taken from http://codereview.stackexchange.com/questions/419/converting-between-stdwstring-and-stdstring
-std::wstring s2ws(const std::string& s)
-{
+std::wstring s2ws(const std::string& s) {
     int len;
     int slength = (int)s.length() + 1;
-    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0); 
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
     std::wstring r(len, L'\0');
     MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
     return r;
 }
 
-std::string ws2s(const std::wstring& s)
-{
+std::string ws2s(const std::wstring& s) {
     int len;
     int slength = (int)s.length() + 1;
-    len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0); 
+    len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0);
     std::string r(len, '\0');
-    WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, &r[0], len, 0, 0); 
+    WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, &r[0], len, 0, 0);
     return r;
 }
 #endif
 
-SharedLibrarySlice::SharedLibrarySlice(int numpaths) {
-    this->paths = new clp::Paths(numpaths);
-    this->freepaths = true;
-    this->numpoints = new int[numpaths];
-    this->pathpointers = new clp::cInt*[numpaths];
-}
+SharedLibrarySlice::SharedLibrarySlice(int numpaths) : paths(std::make_shared<clp::Paths>(numpaths)), numpoints(numpaths), pathpointers(numpaths) {}
 
-SharedLibrarySlice::SharedLibrarySlice(clp::Paths *_paths) {
-    this->paths = _paths;
-    this->freepaths = false;
-    size_t numpaths = _paths->size();
-    this->numpoints = new int[numpaths];
-    this->pathpointers = new clp::cInt*[numpaths];
-}
-
-SharedLibrarySlice::~SharedLibrarySlice() {
-    if (this->freepaths) delete this->paths;
-    delete this->numpoints;
-    delete this->pathpointers;
-}
-
-SharedLibraryResult::~SharedLibraryResult() {
-    if(this->numpoints!=NULL) delete this->numpoints;
-    if(this->pathpointers!=NULL) delete this->pathpointers;
-}
-
+SharedLibrarySlice::SharedLibrarySlice(std::shared_ptr<clp::Paths> _paths) : paths(std::move(_paths)), numpoints(paths->size()), pathpointers(paths->size()) {}
 
 LIBRARY_API  BSTR getErrorText(void* value) {
     //err is defined as the first memeber in all structs to be able to retrieve it from any of them with uniform code. Yes, I know, this is dirty as hell
@@ -129,7 +94,7 @@ LIBRARY_API  BSTR getErrorText(void* value) {
 #endif
 }
 
-StateHandle initState(Configuration *config, std::vector<std::string> &args, bool doscale) {
+StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::string> &args, bool doscale) {
     SharedLibraryState *state = new SharedLibraryState(config);
     if (state->spec.global.config.has_err) {
         state->err = state->spec.global.config.err;
@@ -144,9 +109,9 @@ StateHandle initState(Configuration *config, std::vector<std::string> &args, boo
     if (!err.empty()) { state->err = err; return state; }
     if (state->spec.global.useScheduler) {
         bool removeUnused = true;
-        state->sched = new SimpleSlicingScheduler(removeUnused, state->spec);
+        state->sched = std::make_shared<SimpleSlicingScheduler>(removeUnused, state->spec);
     } else {
-        state->multi = new Multislicer(state->spec);
+        state->multi = std::make_shared<Multislicer>(state->spec);
     }
     //state->args.err = "hellooooooooo"; return args;
     return state;
@@ -155,17 +120,17 @@ StateHandle initState(Configuration *config, std::vector<std::string> &args, boo
 LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* arguments) {
     std::string argl(arguments);
     auto args = normalizedSplit(argl);
-    return initState(&config->config, args, doscale != 0);
+    return initState(config->config, args, doscale != 0);
 }
 
 LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv) {
     auto args = getArgs(argc, argv);
-    return initState(&config->config, args, doscale!=0);
+    return initState(config->config, args, doscale != 0);
 }
 
 LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
     ParamsExtractInfo ret;
-    ret.numProcesses    = (int)state->spec.numspecs;
+    ret.numProcesses = (int)state->spec.numspecs;
     state->processRadiuses.clear();
     state->processRadiuses.reserve(state->spec.numspecs);
     for (auto &pp : state->spec.pp) {
@@ -177,8 +142,8 @@ LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
 
 LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
     SharedLibraryConfig *config = new SharedLibraryConfig(configfilename);
-    if (config->config.has_err) {
-        config->err = config->config.err;
+    if (config->config->has_err) {
+        config->err = config->config->err;
     }
     return config;
 }
@@ -204,7 +169,7 @@ LIBRARY_API  InputSliceInfo createInputSlice(int numpaths) {
     InputSliceInfo info;
     SharedLibrarySlice *slice = new SharedLibrarySlice(numpaths);
     info.slice = slice;
-    info.numpointsArray = slice->numpoints;
+    info.numpointsArray = &slice->numpoints.front();
     return info;
 }
 
@@ -212,17 +177,17 @@ LIBRARY_API  clp::cInt** getPathsArray(SharedLibrarySlice* slice) {
     size_t numpaths = slice->paths->size();
     for (size_t k = 0; k < numpaths; ++k) {
         (*(slice->paths))[k].resize(slice->numpoints[k]);
-        slice->pathpointers[k] = (clp::cInt*)( (*( slice->paths))[k].data());
+        slice->pathpointers[k] = (clp::cInt*)((*(slice->paths))[k].data());
     }
-    return slice->pathpointers;
+    return &slice->pathpointers.front();
 }
-    
+
 
 LIBRARY_API  ResultsHandle computeResult(SharedLibrarySlice* slice, StateHandle state) {
     clp::Paths dummy;
     size_t numspecs = state->spec.numspecs;
     SharedLibraryResult * result = new SharedLibraryResult(numspecs);
-        
+
     GlobalSpec &global = state->spec.global;
     if (slice->paths->size() > 0) {
         //this is a very ugly hack to compromise between part of the code requiring vector<shared_ptr<T>>
@@ -245,13 +210,13 @@ LIBRARY_API  ResultsHandle computeResult(SharedLibrarySlice* slice, StateHandle 
         }
 
     }
-    
+
     return result;
 
 }
-    
+
 LIBRARY_API  void freeInputSlice(SharedLibrarySlice* slice) {
-    if (slice!=NULL) delete slice;
+    if (slice != NULL) delete slice;
 }
 
 LIBRARY_API  int alsoComplementary(SharedLibraryResult* result, int ntool) {
@@ -272,21 +237,21 @@ inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, Outpu
     return paths;
 }
 
-template<typename InfoStruct, typename PointType, typename CoordType> void genericFillOutput(InfoStruct &out, std::vector<std::vector<PointType>> &paths, int *&numpoints, CoordType **&pathpointers) {
+template<typename InfoStruct, typename PointType, typename CoordType> void genericFillOutput(InfoStruct &out, std::vector<std::vector<PointType>> &paths, std::vector<int> &numpoints, std::vector<CoordType *> &pathpointers) {
     out.numpaths = (int)(paths.size());
-    if (numpoints != NULL) delete numpoints;
-    numpoints = new int[out.numpaths];
+    numpoints.clear();
+    numpoints.resize(out.numpaths);
     for (size_t k = 0; k<out.numpaths; ++k) {
         numpoints[k] = (int)(paths[k].size());
     }
-    out.numpointsArray = numpoints;
+    out.numpointsArray = &numpoints.front();
 
-    if (pathpointers != NULL) delete pathpointers;
-    pathpointers = new CoordType*[out.numpaths];
+    pathpointers.clear();
+    pathpointers.resize(out.numpaths);
     for (size_t k = 0; k < out.numpaths; ++k) {
-        pathpointers[k] = (CoordType*) (paths[k].data());
+        pathpointers[k] = (CoordType*)(paths[k].data());
     }
-    out.pathsArray = (decltype(out.pathsArray))pathpointers;
+    out.pathsArray = (decltype(out.pathsArray))(&pathpointers.front());
 }
 
 LIBRARY_API OutputSliceInfo getOutputSliceInfo(SharedLibraryResult* result, int ntool, OutputSliceInfo_PathType pathtype) {
@@ -304,7 +269,7 @@ LIBRARY_API OutputSliceInfo getOutputSliceInfo(SharedLibraryResult* result, int 
 
 
 LIBRARY_API  void freeResult(SharedLibraryResult* result) {
-    if (result!=NULL) delete result;
+    if (result != NULL) delete result;
 }
 
 void voidSlices3DSpecInfo(Slices3DSpecInfo &info) {
@@ -314,7 +279,7 @@ void voidSlices3DSpecInfo(Slices3DSpecInfo &info) {
 
 LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, double zmax) {
     Slices3DSpecInfo ret;
-    if (state->sched == NULL) {
+    if (!state->sched) {
         state->err = "Cannot use computeSlicesZs if the scheduler was not configured in the arguments!!!!";
         voidSlices3DSpecInfo(ret);
         return ret;
@@ -411,34 +376,30 @@ typedef struct SharedLibraryPaths {
     IOPaths iop;
     FileHeader fileheader;
     int currentRecord;
-    int* numpoints;
-    clp::cInt **pathpointersi;
-    double **pathpointersd;
+    std::vector<int> numpoints;
+    std::vector<clp::cInt*> pathpointersi;
+    std::vector<double*> pathpointersd;
     clp::Paths pathsi;
     DPaths pathsd;
     Paths3D pathsd3;
-    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), iop(f), err(), currentRecord(0), numpoints(NULL), pathpointersi(NULL), pathpointersd(NULL) {}
+    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), iop(f), err(), currentRecord(0) {}
     void clearPaths() {
         pathsi.clear();
         pathsd.clear();
         pathsd3.clear();
-        if (pathpointersi != NULL) delete pathpointersi;
-        if (pathpointersd != NULL) delete pathpointersd;
-        pathpointersi = NULL;
-        pathpointersd = NULL;
+        numpoints.clear();
+        pathpointersi.clear();
+        pathpointersd.clear();
     }
     ~SharedLibraryPaths() {
-        if (numpoints     != NULL) delete numpoints;
-        if (pathpointersi != NULL) delete pathpointersi;
-        if (pathpointersd != NULL) delete pathpointersd;
-        if (iop.f         != NULL) fclose(iop.f);
+        if (iop.f != NULL) fclose(iop.f);
     }
 } SharedLibraryPaths;
 
 LIBRARY_API  LoadPathFileInfo loadPathsFile(char *pathsfilename) {
     LoadPathFileInfo result;
     result.numRecords = result.ntools = -1;
-    result.pathfile   = NULL;
+    result.pathfile = NULL;
 
     FILE * file = fopen(pathsfilename, "rb");
 
@@ -450,8 +411,8 @@ LIBRARY_API  LoadPathFileInfo loadPathsFile(char *pathsfilename) {
     }
 
     result.pathfile->err = result.pathfile->fileheader.readFromFile(file);
-    result.numRecords    = (int)result.pathfile->fileheader.numRecords;
-    result.ntools        = (int)result.pathfile->fileheader.numtools;
+    result.numRecords = (int)result.pathfile->fileheader.numRecords;
+    result.ntools = (int)result.pathfile->fileheader.numtools;
 
     return result;
 }
@@ -495,17 +456,17 @@ LIBRARY_API  LoadPathInfo loadNextPaths(PathsHandle paths) {
         if (!paths->iop.readClipperPaths(paths->pathsi)) { paths->err = str("In file ", paths->filename, ": could not read integer paths in record ", paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput(out, paths->pathsi, paths->numpoints, paths->pathpointersi);
     } else if (header.saveFormat == PATHFORMAT_DOUBLE) {
-        if (!paths->iop.readDoublePaths(paths->pathsd))  { paths->err = str("In file ", paths->filename, ": could not read double paths in record ",  paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
+        if (!paths->iop.readDoublePaths(paths->pathsd))  { paths->err = str("In file ", paths->filename, ": could not read double paths in record ", paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput(out, paths->pathsd, paths->numpoints, paths->pathpointersd);
     } else if (header.saveFormat == PATHFORMAT_DOUBLE_3D) {
-        if (!read3DPaths(paths->iop, paths->pathsd3))    { paths->err = str("In file ", paths->filename, ": could not read 3d paths in record ",      paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
+        if (!read3DPaths(paths->iop, paths->pathsd3))    { paths->err = str("In file ", paths->filename, ": could not read 3d paths in record ", paths->currentRecord, ", message: <", paths->iop.errs[0].message, "> in ", paths->iop.errs[0].function); out; };
         genericFillOutput<LoadPathInfo, Point3D, double>(out, paths->pathsd3, paths->numpoints, paths->pathpointersd);
     }
-    out.ntool      = (int)header.ntool;
-    out.type       = (int)header.type;
+    out.ntool = (int)header.ntool;
+    out.type = (int)header.type;
     out.saveFormat = (int)header.saveFormat;
-    out.scaling    =      header.scaling;
-    out.z          =      header.z;
+    out.scaling = header.scaling;
+    out.z = header.z;
 
     ++(paths->currentRecord);
 
