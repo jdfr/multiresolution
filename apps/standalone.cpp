@@ -373,7 +373,7 @@ int main(int argc, const char** argv) {
                         fprintf(stderr, "Error in giveNextOutputSlice.1: %s\n", sched.err.c_str());
                         return -1;
                     }
-                    if (single == NULL) break;
+                    if (!single) break;
                     if (single->has_err) {
                         fprintf(stderr, "Error in giveNextOutputSlice.2: %s\n", single->err.c_str());
                         return -1;

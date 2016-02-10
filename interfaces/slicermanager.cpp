@@ -174,7 +174,7 @@ std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, SlicerMan
     case SlicerManagerExternal: {
 
         MetricFactors factors(config, false);
-        if (!factors.err.empty()) return NULL;
+        if (!factors.err.empty()) return std::shared_ptr<SlicerManager>();
 
         return std::make_shared<ExternalSlicerManager>(
 #ifdef SLICER_USE_DEBUG_FILE

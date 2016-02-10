@@ -550,7 +550,7 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
 
 //this method will return slices in the intended ordering, if available
 std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() {
-    if (!output[output_idx].computed) return NULL;
+    if (!output[output_idx].computed) return std::shared_ptr<ResultSingleTool>();
     int ntool = output[output_idx].ntool;
     for (int k = 0; k < tm.slicess[ntool].size(); ++k) {
         if ((tm.slicess[ntool][k]->idx == output_idx) && (!tm.slicess[ntool][k]->used)) {
@@ -561,8 +561,7 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
     }
     has_err = true;
     err = "Could not find the expected output slice!!!";
-    return std::shared_ptr<ResultSingleTool>(NULL);
-    //return NULL;
+    return std::shared_ptr<ResultSingleTool>();
 }
 
 

@@ -390,7 +390,7 @@ LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
         state->err = state->sched->err + " (in giveOutputIfAvailable.1)";
         return NULL;
     }
-    if (single == NULL) {
+    if (!single) {
         return NULL;
     }
     if (single->has_err) {
