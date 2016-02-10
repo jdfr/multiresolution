@@ -114,6 +114,7 @@ template<typename T> bool PathWriterMultiFile<T>::start() {
     if (!this->isopen) {
         if (!static_cast<T*>(this)->startWriter()) return false;
     }
+    return true;
 }
 
 template<typename T> bool PathWriterMultiFile<T>::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
