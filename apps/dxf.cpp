@@ -14,13 +14,13 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
     int index = 0;
     IOPaths iop(f);
     clp::Paths output;
-    PathWriter *writer;
-    DXFAsciiPathWriter *writera;
-    DXFBinaryPathWriter *writerb;
+    std::shared_ptr<PathWriter> writer;
+    std::shared_ptr<DXFAsciiPathWriter> writera;
+    std::shared_ptr<DXFBinaryPathWriter> writerb;
     if (ascii) {
-        writer = writera = new DXFAsciiPathWriter (dxffilename, 1e-9, true, !byn, !byz);
+        writer = writera = std::make_shared<DXFAsciiPathWriter>(dxffilename, 1e-9, true, !byn, !byz);
     } else {
-        writer = writerb = new DXFBinaryPathWriter(dxffilename, 1e-9, true, !byn, !byz);
+        writer = writerb = std::make_shared<DXFBinaryPathWriter>(dxffilename, 1e-9, true, !byn, !byz);
     }
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         std::string err = sliceheader.readFromFile(f);
@@ -82,7 +82,6 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
         output.clear();
     }
     writer->close();
-    delete writer;
 
     return err;
 }
