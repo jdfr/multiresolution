@@ -190,13 +190,9 @@ template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, dou
     this->isopen = false;
 }
 
+static_assert(sizeof(char) == 1, "To write binary DXF files we expect char to be 1 byte long!");
+
 template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
-    if (ISBINARY) {
-        if (sizeof(char) != 1) {
-            this->err = str("To write binary DXF files we expect char to be 1 byte long!");
-            return false;
-        }
-    }
     this->f = fopen(this->filename.c_str(), ISASCII ? "wt" : "wb");
     if (this->f == NULL) {
         this->err = str("DXF output file <", this->filename, ">: file could not be open");
