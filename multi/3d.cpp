@@ -577,7 +577,7 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         config.update("SLICER_DEBUGFILE", feedbackdebugfile);
 #endif
 
-        SlicerManager *feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
+        std::shared_ptr<SlicerManager> feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
 
 #ifdef SLICER_USE_DEBUG_FILE
         config.update("SLICER_DEBUGFILE", oldValue);
@@ -621,7 +621,6 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
             return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
         }
 
-        delete feedbackSlicer;
         return std::string();
     } else {
 

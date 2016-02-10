@@ -1,9 +1,10 @@
 #ifndef SLICERMANAGER_HEADER
 #define SLICERMANAGER_HEADER
 
-#include <stdexcept>
 #include "common.hpp"
 #include "config.hpp"
+#include <stdexcept>
+#include <memory>
 
 //functionally abstract class
 class SlicerManager {
@@ -26,6 +27,6 @@ enum SlicerManagerType {
     SlicerManagerNative
 };
 
-SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type);
+std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, SlicerManagerType type);
 
 #endif

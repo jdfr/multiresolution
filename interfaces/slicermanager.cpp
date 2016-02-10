@@ -168,7 +168,7 @@ void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     }
 }
 
-SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
+std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, SlicerManagerType type) {
     switch (type) {
 
     case SlicerManagerExternal: {
@@ -176,7 +176,7 @@ SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
         MetricFactors factors(config, false);
         if (!factors.err.empty()) return NULL;
 
-        return new ExternalSlicerManager(
+        return std::make_shared<ExternalSlicerManager>(
 #ifdef SLICER_USE_DEBUG_FILE
             config.getValue("SLICER_DEBUGFILE"),
 #endif
@@ -189,6 +189,6 @@ SlicerManager *getSlicerManager(Configuration &config, SlicerManagerType type) {
     } case SlicerManagerNative:
     default:
         //not implemented yet
-        return NULL;
+        return std::shared_ptr<ExternalSlicerManager>();
     }
 }

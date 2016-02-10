@@ -222,7 +222,7 @@ int main(int argc, const char** argv) {
         }
     }
 
-    SlicerManager *slicer = getSlicerManager(config, SlicerManagerExternal);
+    std::shared_ptr<SlicerManager> slicer = getSlicerManager(config, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
     SlicesViewer *slicesViewer = NULL;
@@ -318,7 +318,6 @@ int main(int argc, const char** argv) {
                     printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
                 }
                 slicer->terminate();
-                delete slicer;
                 return 0;
             }
 
@@ -417,7 +416,6 @@ int main(int argc, const char** argv) {
                     printf("%.20g\n", z);
                 }
                 slicer->terminate();
-                delete slicer;
                 return 0;
             }
 
@@ -506,7 +504,6 @@ int main(int argc, const char** argv) {
         std::string err = slicer->getErrorMessage();
         fprintf(stderr, "Error while finalizing the slicer manager: %s!!!!", err.c_str());
     }
-    delete slicer;
 
     for (auto &pathwriter : pathwriters_arefiles) {
         if (!pathwriter->close()) {
