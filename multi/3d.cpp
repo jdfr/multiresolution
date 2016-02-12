@@ -594,8 +594,8 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         }
         free(meshfullpath);
 
-        double minz_nevermind, maxz_nevermind;
-        feedbackSlicer->getZLimits(&minz_nevermind, &maxz_nevermind);
+        double a, b, c, d, e, f;
+        feedbackSlicer->getLimits(&a, &b, &c, &d, &e, &f);
 
         feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
 

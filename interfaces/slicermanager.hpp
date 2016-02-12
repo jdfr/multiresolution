@@ -14,13 +14,14 @@ public:
     virtual bool terminate() { throw std::runtime_error("terminate not implemented!!!"); }
     virtual bool finalize() { throw std::runtime_error("finalize not implemented!!!"); }
     virtual std::string getErrorMessage() { throw std::runtime_error("getErrorMessage not implemented!!!"); }
-    virtual void getZLimits(double *minz, double *maxz) { throw std::runtime_error("getZLimits not implemented!!!"); }
+    virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz) { throw std::runtime_error("getZLimits not implemented!!!"); }
     virtual void sendZs(double *values, int numvalues) { throw std::runtime_error("sendZs not implemented!!!"); }
-    virtual std::vector<double> prepareSTLSimple(double zbase, double zstep) { throw std::runtime_error("prepareSTLSimple not implemented!!!"); }
-    virtual std::vector<double> prepareSTLSimple(double zstep) { throw std::runtime_error("prepareSTLSimple not implemented!!!"); }
     virtual int  askForNextSlice() { throw std::runtime_error("askForNextSlice not implemented!!!"); }
     virtual void readNextSlice(clp::Paths &nextSlice) { throw std::runtime_error("readNextSlice not implemented!!!"); }
 };
+
+std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep);
+std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep);
 
 enum SlicerManagerType {
     SlicerManagerExternal,

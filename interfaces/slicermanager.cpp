@@ -35,10 +35,8 @@ public:
     virtual bool terminate();
     virtual bool finalize();
     virtual std::string getErrorMessage() { return err; }
-    virtual void getZLimits(double *minz, double *maxz);
+    virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz);
     virtual void sendZs(double *values, int numvalues);
-    virtual std::vector<double> prepareSTLSimple(double zbase, double zstep);
-    virtual std::vector<double> prepareSTLSimple(double zstep);
     virtual int  askForNextSlice();
     virtual void readNextSlice(clp::Paths &nextSlice);
 };
@@ -77,7 +75,7 @@ bool ExternalSlicerManager::finalize() {
     return true;
 }
 
-void ExternalSlicerManager::getZLimits(double *minz, double *maxz) {
+void ExternalSlicerManager::getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz) {
     if (!repair) {
         int64 need_repair;
         if (!iopOUT.readInt64(need_repair)) {
@@ -89,14 +87,17 @@ void ExternalSlicerManager::getZLimits(double *minz, double *maxz) {
             return;
         }
     }
-    if (!iopOUT.readDouble(*minz)) {
-        err = "could not read minz value from the slicer!!!";
+    double limits[6];
+    if (!iopOUT.readDoubleP(limits, 6)) {
+        err = "could not read min/max values from the slicer!!!";
         return;
     }
-    if (!iopOUT.readDouble(*maxz)) {
-        err = "could not read maxz value from the slicer!!!";
-        return;
-    }
+    *minx = limits[0];
+    *maxx = limits[1];
+    *miny = limits[2];
+    *maxy = limits[3];
+    *minz = limits[4];
+    *maxz = limits[5];
 }
 
 void ExternalSlicerManager::sendZs(double *values, int numvalues) {
@@ -112,25 +113,20 @@ void ExternalSlicerManager::sendZs(double *values, int numvalues) {
     fflush(subp.pipeIN);
 }
 
-std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zbase, double zstep) {
-    double zmin= 0, zmax = 0;
-    getZLimits(&zmin, &zmax);
+std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep) {
     double zend = (zstep > 0) ? zmax : zmin;
     std::vector<double> zs;
     int numneeded = (int)((zend - zbase) / zstep);
     if (numneeded > 0) {
-        zs.reserve(numneeded+2);
+        zs.reserve(numneeded + 2);
         for (double j = zbase; j <= zmax; j += zstep) {
             zs.push_back(j);
         }
-        sendZs(&(zs[0]), (int)zs.size());
     }
     return zs;
 }
 
-std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zstep) {
-    double zmin = 0, zmax = 0;
-    getZLimits(&zmin, &zmax);
+std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep) {
     std::vector<double> zs;
     zs.reserve((int)((zmax - zmin) / std::abs(zstep)) + 2);
     if (zstep > 0) {
@@ -138,7 +134,6 @@ std::vector<double> ExternalSlicerManager::prepareSTLSimple(double zstep) {
     } else {
         for (double j = zmax + zstep / 2; j >= zmin; j += zstep) zs.push_back(j);
     }
-    sendZs(&(zs[0]), (int)zs.size());
     return zs;
 }
 

@@ -273,16 +273,15 @@ int main(int argc, const char** argv) {
     bool saveContours = false;
     std::vector<std::shared_ptr<ResultSingleTool>> results;
 
+    double minx, maxx, miny, maxy, minz, maxz;
+    slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
+
     try {
 
         if (multispec.global.useScheduler) {
 
             bool removeUnused = true; //!saveContours;
             SimpleSlicingScheduler sched(removeUnused, multispec);
-
-            double minz = 0, maxz = 0;
-
-            slicer->getZLimits(&minz, &maxz);
 
             if (multispec.global.schedMode == ManualScheduling) {
                 for (auto pair = multispec.global.schedSpec.begin(); pair != multispec.global.schedSpec.end(); ++pair) {
@@ -326,7 +325,7 @@ int main(int argc, const char** argv) {
                 }
             }
 
-            slicer->sendZs(&(rawZs[0]), schednuminputslices);
+            slicer->sendZs(&(rawZs.front()), schednuminputslices);
 
             if (show) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
@@ -402,10 +401,11 @@ int main(int argc, const char** argv) {
 
             std::vector<double> zs;
             if (multispec.global.use_z_base) {
-                zs = slicer->prepareSTLSimple(multispec.global.z_base, zstep);
+                zs = prepareSTLSimple(minz, maxz, multispec.global.z_base, zstep);
             } else {
-                zs = slicer->prepareSTLSimple(zstep);
+                zs = prepareSTLSimple(minz, maxz, zstep);
             }
+            slicer->sendZs(&zs.front(), zs.size());
 
             if (dryrun) {
                 printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
