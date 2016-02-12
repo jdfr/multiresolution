@@ -59,7 +59,7 @@ bool PathsFileWriter::close() {
     bool ok = true;
     if (isOpen) {
         if (!numRecordsSet) {
-            int numToSkip = sizeof(double) * (2 + (fileheader->numtools * (fileheader->useSched ? 2 : 1)));
+            int numToSkip = (int) (sizeof(double) * (2 + (fileheader->numtools * (fileheader->useSched ? 2 : 1))));
             if (fseek(f, numToSkip, SEEK_SET) == 0) {
                 if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
                     ok = false;

@@ -243,6 +243,9 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    double minx, maxx, miny, maxy, minz, maxz;
+    slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
+
     bool alsoContours = multispec.global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
@@ -272,9 +275,6 @@ int main(int argc, const char** argv) {
     //for now, we do not need to store intermediate results, but let the code live in case we need it later
     bool saveContours = false;
     std::vector<std::shared_ptr<ResultSingleTool>> results;
-
-    double minx, maxx, miny, maxy, minz, maxz;
-    slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
 
     try {
 
@@ -405,7 +405,7 @@ int main(int argc, const char** argv) {
             } else {
                 zs = prepareSTLSimple(minz, maxz, zstep);
             }
-            slicer->sendZs(&zs.front(), zs.size());
+            slicer->sendZs(&zs.front(), (int)zs.size());
 
             if (dryrun) {
                 printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
