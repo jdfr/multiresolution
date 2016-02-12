@@ -97,7 +97,6 @@ int main(int argc, const char** argv) {
     std::vector<std::shared_ptr<PathWriter>> pathwriters_raw;         //everything receiving raw slices
     std::vector<std::shared_ptr<PathWriter>> pathwriters_contour;     //everything receiving contours
     std::vector<std::shared_ptr<PathWriter>> pathwriters_toolpath;    //everything receiving toolpaths
-    std::vector<std::shared_ptr<PathsFileWriter>> pathwriters_native; //everything outputting in native format
     std::shared_ptr<PathsFileWriter> pathwriter_viewer;               //PathWriter in native format for the viewer
 
     try {
@@ -253,21 +252,19 @@ int main(int argc, const char** argv) {
 #ifdef STANDALONE_USEPYTHON
         if (show) {
             pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
-            pathwriters_native     .push_back(pathwriter_viewer);
-            pathwriters_toolpath   .push_back(pathwriters_native.back());
+            pathwriters_toolpath   .push_back(pathwriter_viewer);
             if (alsoContours) {
-                pathwriters_raw    .push_back(pathwriters_native.back());
-                pathwriters_contour.push_back(pathwriters_native.back());
+                pathwriters_raw    .push_back(pathwriter_viewer);
+                pathwriters_contour.push_back(pathwriter_viewer);
             }
         }
 #endif
         if (save) {
-            pathwriters_native     .push_back(std::make_shared<PathsFileWriter>(singleoutputfilename, (FILE*)NULL, header, saveFormat));
-            pathwriters_arefiles   .push_back(pathwriters_native.back());
-            pathwriters_toolpath   .push_back(pathwriters_native.back());
+            pathwriters_arefiles   .push_back(std::make_shared<PathsFileWriter>(singleoutputfilename, (FILE*)NULL, header, saveFormat));
+            pathwriters_toolpath   .push_back(pathwriters_arefiles.back());
             if (alsoContours) {
-                pathwriters_raw    .push_back(pathwriters_native.back());
-                pathwriters_contour.push_back(pathwriters_native.back());
+                pathwriters_raw    .push_back(pathwriters_arefiles.back());
+                pathwriters_contour.push_back(pathwriters_arefiles.back());
             }
         }
     }
