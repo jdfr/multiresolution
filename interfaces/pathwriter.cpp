@@ -17,6 +17,17 @@ bool PathsFileWriter::start() {
             return false;
         }
         if (!f_already_open) {
+            auto end = this->filename.end();
+            bool file_ends_in_paths = (this->filename.length() >= 6) &&
+                (tolower(*(end - 1)) == 's') &&
+                (tolower(*(end - 2)) == 'h') &&
+                (tolower(*(end - 3)) == 't') &&
+                (tolower(*(end - 4)) == 'a') &&
+                (tolower(*(end - 5)) == 'p') &&
+                       ((*(end - 6)) == '.');
+            if (!file_ends_in_paths) {
+                this->filename += ".paths";
+            }
             f = fopen(filename.c_str(), "wb");
             if (f == NULL) {
                 err = str("output pathsfile <", filename, ">: file could not be open");
@@ -179,11 +190,12 @@ template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, dou
     this->delegateWork      = !this->generic_all;
     this->filename          = std::move(file);
     if (this->generic_all) {
+        auto end = this->filename.end();
         bool file_ends_in_dxf = (this->filename.length() >= 4) &&
-            (tolower(*(this->filename.end() - 1)) == 'f') &&
-            (tolower(*(this->filename.end() - 2)) == 'x') &&
-            (tolower(*(this->filename.end() - 3)) == 'd') &&
-            ((*(this->filename.end() - 4)) == '.');
+            (tolower(*(end - 1)) == 'f') &&
+            (tolower(*(end - 2)) == 'x') &&
+            (tolower(*(end - 3)) == 'd') &&
+                   ((*(end - 4)) == '.');
         if (!file_ends_in_dxf) {
             this->filename += ".dxf";
         }
