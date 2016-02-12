@@ -331,9 +331,9 @@ int main(int argc, const char** argv) {
 
             slicer->sendZs(&(rawZs[0]), schednuminputslices);
 
-            if (!pathwriters_native.empty()) {
+            if (show) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
-                for (auto &w : pathwriters_native) w->setNumRecords(numoutputs);
+                pathwriter_viewer->setNumRecords(numoutputs);
             }
 
             if (saveContours) {
@@ -428,10 +428,10 @@ int main(int argc, const char** argv) {
                 results.reserve(numresults);
             }
 
-            if (!pathwriters_native.empty()) {
+            if (show) {
                 //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
                 numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
-                for (auto &w : pathwriters_native) w->setNumRecords(numoutputs);
+                pathwriter_viewer->setNumRecords(numoutputs);
             }
 
             for (int i = 0; i < numsteps; ++i) {

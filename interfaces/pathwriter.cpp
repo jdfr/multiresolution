@@ -12,8 +12,8 @@ bool PathWriter::close() {
 
 bool PathsFileWriter::start() {
     if (!isOpen) {
-        if (numRecords < 0) {
-            err = str("output pathsfile <", filename, ">: the number of records was not set (or incorrectly set)");
+        if (numRecordsSet && (numRecords < 0)) {
+            err = str("output pathsfile <", filename, ">: the number of records was incorrectly set");
             return false;
         }
         if (!f_already_open) {
@@ -51,18 +51,36 @@ bool PathsFileWriter::writePaths(clp::Paths &paths, int type, double radius, int
     }
     PathCloseMode mode = isClosed ? PathLoop : PathOpen;
     err = writeSlice(f, SliceHeader(paths, mode, type, ntool, z, saveFormat, scaling), paths, mode);
+    if (err.empty() && !numRecordsSet) ++numRecords;
     return err.empty();
 }
 
 bool PathsFileWriter::close() {
     bool ok = true;
     if (isOpen) {
+        if (!numRecordsSet) {
+            int numToSkip = sizeof(double) * (2 + (fileheader->numtools * (fileheader->useSched ? 2 : 1)));
+            if (fseek(f, numToSkip, SEEK_SET) == 0) {
+                if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
+                    ok = false;
+                    err = "fseek failed: could not write numRecords to file " + filename;
+                }
+            } else {
+                ok = false;
+                err = "fwrite failed: could not write numRecords to file " + filename;
+            }
+        }
         if (!f_already_open) {
-            bool ok = fclose(f) == 0;
-            if (ok) {
+            bool newok = fclose(f) == 0;
+            if (newok) {
                 f = NULL;
             } else {
-                err = str("output pathsfile <", filename, ">: could not be closed!!!");
+                if (ok) {
+                    ok = false;
+                    err = str("output pathsfile <", filename, ">: could not be closed!!!");
+                } else {
+                    err += ". Also, the file could not be closed!!!!";
+                }
             }
         }
         isOpen = false;
