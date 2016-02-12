@@ -152,6 +152,8 @@ set(CORESOURCES
   multi/motionPlanner.cpp
   multi/multislicer.hpp
   multi/multislicer.cpp
+  multi/pathsplitter.hpp
+  multi/pathsplitter.cpp
   multi/orientPaths.hpp
   multi/orientPaths.cpp
   multi/snapToGrid.hpp
