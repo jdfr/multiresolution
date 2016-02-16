@@ -30,9 +30,9 @@ std::string printPathInfo(const char * filename, bool verbose) {
     SliceHeader sliceheader;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         std::string err = sliceheader.readFromFile(f);
-        if (!err.empty())                   { fclose(f); return str("Error reading ", currentRecord, "-th slice header: ", err); }
-        if (sliceheader.alldata.size() < 7) { fclose(f); return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
-
+        if (!err.empty())                       { fclose(f); return str("Error reading ", currentRecord, "-th slice header: ", err); }
+        const int usual = 7;
+        if (sliceheader.alldata.size() < usual) { fclose(f); return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
 
         if (verbose) {
             fprintf(stdout, "Record %d\n", currentRecord);
@@ -50,6 +50,14 @@ std::string printPathInfo(const char * filename, bool verbose) {
             default:                   fprintf(stdout, "     coordinate format: unknown (%d)\n", sliceheader.saveFormat);
             }
             fprintf(stdout, "      %s scaling: %.20g\n", sliceheader.saveFormat == PATHFORMAT_INT64 ? "original" : "        ", sliceheader.scaling);
+            
+            if (sliceheader.alldata.size() > usual) {
+                for (int k = usual; k < sliceheader.alldata.size(); ++k) {
+                    fprintf(stdout, "      additional %d-th value:\n", k-usual);
+                    fprintf(stdout, "            as  int64: %lld\n", sliceheader.alldata[k].i);
+                    fprintf(stdout, "            as double: %g\n", sliceheader.alldata[k].d);
+                }
+            }
         } else {
             fprintf(stdout, "Record %d: ", currentRecord);
             switch (sliceheader.type) {
