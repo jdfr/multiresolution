@@ -1,6 +1,23 @@
 #include "pathwriter.hpp"
 #include <iomanip>
 
+void addExtension(std::string &filename, std::string ext) {
+    bool file_ends_in_ext = filename.length() > ext.length();
+    if (file_ends_in_ext) {
+        auto charf = filename.end() - ext.length();
+        for (auto chare = ext.begin(); chare != ext.end(); ++chare) {
+            file_ends_in_ext = (tolower(*charf) == tolower(*chare));
+            if (!file_ends_in_ext) {
+                break;
+            }
+            ++charf;
+        }
+    }
+    if (!file_ends_in_ext) {
+        filename += ext;
+    }
+}
+
 bool PathWriter::start() {
     throw std::runtime_error("Base method PathWriter::close() should never be called!");
 }
@@ -18,17 +35,7 @@ bool PathsFileWriter::start() {
             return false;
         }
         if (!f_already_open) {
-            auto end = this->filename.end();
-            bool file_ends_in_paths = (this->filename.length() >= 6) &&
-                (tolower(*(end - 1)) == 's') &&
-                (tolower(*(end - 2)) == 'h') &&
-                (tolower(*(end - 3)) == 't') &&
-                (tolower(*(end - 4)) == 'a') &&
-                (tolower(*(end - 5)) == 'p') &&
-                       ((*(end - 6)) == '.');
-            if (!file_ends_in_paths) {
-                this->filename += ".paths";
-            }
+            addExtension(this->filename, ".paths");
             f = fopen(filename.c_str(), "wb");
             if (f == NULL) {
                 err = str("output pathsfile <", filename, ">: file could not be open");
@@ -99,6 +106,18 @@ template class PathWriterMultiFile<DXFBinaryPathWriter>;
 template class DXFPathWriter<DXFAscii>;
 template class DXFPathWriter<DXFBinary>;
 
+template<typename T> void PathWriterMultiFile<T>::init(std::string file, const char * _extension, double _epsilon, bool _generic_for_type, bool _generic_for_ntool, bool _generic_for_z) {
+    epsilon           = _epsilon;
+    generic_for_ntool = _generic_for_ntool;
+    generic_for_z     = _generic_for_z;
+    generic_for_type  = _generic_for_type;
+    generic_all       = this->generic_for_ntool && this->generic_for_z && this->generic_for_type;
+    delegateWork      = !this->generic_all;
+    filename          = std::move(file);
+    extension         = _extension;
+    isopen            = false;
+}
+
 template<typename T> bool PathWriterMultiFile<T>::matchZNtool(int _type, int _ntool, double _z) {
     return generic_all || ((generic_for_ntool || (ntool == _ntool)) &&
                            (generic_for_z     || (std::fabs(z - _z) < epsilon)) &&
@@ -155,6 +174,7 @@ template<typename T> bool PathWriterMultiFile<T>::writePaths(clp::Paths &paths, 
         return ret;
     }
     if (!isopen) {
+        addExtension(filename, extension);
         if (!static_cast<T*>(this)->startWriter()) return false;
     }
     return static_cast<T*>(this)->writePathsSpecific(paths, type, radius, ntool, z, scaling, isClosed);
@@ -201,25 +221,7 @@ template<typename T> bool PathWriterMultiFile<T>::close() {
 }
 
 template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
-    this->epsilon           = _epsilon;
-    this->generic_for_ntool = _generic_ntool;
-    this->generic_for_z     = _generic_z;
-    this->generic_for_type  = _generic_type;
-    this->generic_all       = this->generic_for_ntool && this->generic_for_z && this->generic_for_type;
-    this->delegateWork      = !this->generic_all;
-    this->filename          = std::move(file);
-    if (this->generic_all) {
-        auto end = this->filename.end();
-        bool file_ends_in_dxf = (this->filename.length() >= 4) &&
-            (tolower(*(end - 1)) == 'f') &&
-            (tolower(*(end - 2)) == 'x') &&
-            (tolower(*(end - 3)) == 'd') &&
-                   ((*(end - 4)) == '.');
-        if (!file_ends_in_dxf) {
-            this->filename += ".dxf";
-        }
-    }
-    this->isopen = false;
+    this->init(std::move(file), ".dxf", _epsilon, _generic_type, _generic_ntool, _generic_z);
 }
 
 static_assert(sizeof(char) == 1, "To write binary DXF files we expect char to be 1 byte long!");
@@ -439,7 +441,9 @@ bool EnclosedPathWriter::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, i
     throw std::runtime_error("Base method EnclosedPathWriter::writeEnclosedPaths() should never be called!");
 }
 
-bool SplittingPathWriter::setup(SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, bool generic_type, bool generic_ntool, bool generic_z) {
+bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+    numtools = (int)_spec.numspecs;
+    isopen = false;
     //make sanity checks
     if (splitterconfs.empty()) {
         err = "Error: There are no splitting configurations";

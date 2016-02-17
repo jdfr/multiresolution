@@ -42,6 +42,7 @@ public:
     virtual ~PathWriterMultiFile() { close(); }
     bool writeToAll(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
 protected:
+    void init(std::string file, const char * extension, double epsilon, bool generic_for_type, bool generic_for_ntool, bool generic_for_z);
     bool matchZNtool(int type, int ntool, double z);
     int findOrCreateSubwriter(int type, double radius, int ntool, double z);
     //derived classes must implement a constructor without parameters, specificClose(), startWriter(), writePathsSpecific(), and endWriter()
@@ -55,6 +56,7 @@ protected:
     //this has to be a vector of pointers because if the vector gets bigger, it will destroy and recreate the objects, interfering with the life cycle we have designed
     std::vector<std::shared_ptr<T>> subwriters;
     FILE * f;
+    const char * extension;
 };
 
 enum DXFWMode { DXFAscii, DXFBinary };
@@ -83,8 +85,6 @@ public:
 //this class wraps any other PathWriter to act like an EnclosedPathWriter, but discarding the "enclosing" info
 class EnclosedPathWriterWrapper : public EnclosedPathWriter {
 public:
-    std::string err;
-    std::string filename;
     EnclosedPathWriterWrapper(std::shared_ptr<PathWriter> _sub) : sub(std::move(_sub)) {}
     virtual ~EnclosedPathWriterWrapper() { sub->close(); }
     virtual bool start() { return sub->start(); }
@@ -104,15 +104,14 @@ typedef std::function<std::shared_ptr<EnclosedPathWriter>(std::string, bool, boo
 //this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of EnclosedPathWriters
 class SplittingPathWriter : public PathWriter {
 public:
-    std::string err;
     //either a single PathSplitterConfig, or one for each tool
-    SplittingPathWriter(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) : numtools((int)_spec.numspecs), isopen(false) { filename = std::move(file); setup(callback, std::move(_splitterconfs), generic_type, generic_ntool, generic_z); }
+    SplittingPathWriter(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(_spec, callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
     virtual ~SplittingPathWriter() { close(); }
     virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
 protected:
-    bool setup(SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, bool generic_type, bool generic_ntool, bool generic_z);
+    bool setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
     std::vector<PathSplitter> splitters;                                 //one PathSplitter for each PathSplitterConfig
     std::vector<Matrix<std::shared_ptr<EnclosedPathWriter>>> subwriters; //one matrix of PathWriter for each PathSplitterConfig
     int numtools;
