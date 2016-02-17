@@ -12,6 +12,10 @@ public:
     virtual ~PathWriter() {}
     virtual bool start(); //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    //this method has to be implemented only for subclasses that are used by SplittingPathWriter. It should really be on a separate EnclosedPathWriter subclass,
+    //but then, we would like some objects to inherit both from EnclosedPathWriter and from the subclass PathWriterMultiFile, creating the need for virtual inheritance
+    //(and that does not make much sense when we are using CRTP in PathWriterMultiFile, after all).
+    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
 };
 
@@ -75,33 +79,10 @@ public:
 typedef DXFPathWriter<DXFAscii>  DXFAsciiPathWriter;
 typedef DXFPathWriter<DXFBinary> DXFBinaryPathWriter;
 
+typedef std::function<std::shared_ptr<PathWriter>(std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
 
-//abstract base class for writing enclosed paths
-class EnclosedPathWriter : public PathWriter {
-public:
-    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed);
-};
-
-//this class wraps any other PathWriter to act like an EnclosedPathWriter, but discarding the "enclosing" info
-class EnclosedPathWriterWrapper : public EnclosedPathWriter {
-public:
-    EnclosedPathWriterWrapper(std::shared_ptr<PathWriter> _sub) : sub(std::move(_sub)) {}
-    virtual ~EnclosedPathWriterWrapper() { sub->close(); }
-    virtual bool start() { return sub->start(); }
-    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-        return sub->writePaths(paths, type, radius, ntool, z, scaling, isClosed);
-    }
-    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-        return sub->writePaths(encl.paths, type, radius, ntool, z, scaling, isClosed);
-    }
-    virtual bool close() { return sub->close(); }
-protected:
-    std::shared_ptr<PathWriter> sub;
-};
-
-typedef std::function<std::shared_ptr<EnclosedPathWriter>(std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
-
-//this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of EnclosedPathWriters
+//this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of PathWriters,
+//using the method writeEnclosedPaths() instead of writePaths() for them
 class SplittingPathWriter : public PathWriter {
 public:
     //either a single PathSplitterConfig, or one for each tool
@@ -113,7 +94,7 @@ public:
 protected:
     bool setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
     std::vector<PathSplitter> splitters;                                 //one PathSplitter for each PathSplitterConfig
-    std::vector<Matrix<std::shared_ptr<EnclosedPathWriter>>> subwriters; //one matrix of PathWriter for each PathSplitterConfig
+    std::vector<Matrix<std::shared_ptr<PathWriter>>> subwriters; //one matrix of PathWriter for each PathSplitterConfig
     int numtools;
     bool justone;
     bool isopen;

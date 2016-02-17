@@ -24,6 +24,10 @@ bool PathWriter::start() {
 bool PathWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
     throw std::runtime_error("Base method PathWriter::writePaths() should never be called!");
 }
+bool PathWriter::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+    //this is the most sensible default definition for this method
+    return writePaths(encl.paths, type, radius, ntool, z, scaling, isClosed);
+}
 bool PathWriter::close() {
     throw std::runtime_error("Base method PathWriter::close() should never be called!");
 }
@@ -437,10 +441,6 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
 }
 
 
-bool EnclosedPathWriter::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    throw std::runtime_error("Base method EnclosedPathWriter::writeEnclosedPaths() should never be called!");
-}
-
 bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
     numtools = (int)_spec.numspecs;
     isopen = false;
@@ -482,7 +482,7 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
         //initialize subwriters
         auto numx = splitters.back().numx;
         auto numy = splitters.back().numy;
-        subwriters.emplace_back(Matrix<std::shared_ptr<EnclosedPathWriter>>(numx));
+        subwriters.emplace_back(Matrix<std::shared_ptr<PathWriter>>(numx));
         int num0x = (int)std::ceil(std::log10(numx-1));
         int num0y = (int)std::ceil(std::log10(numy-1));
         for (int x = 0; x < numx; ++x) {
