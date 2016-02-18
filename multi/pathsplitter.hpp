@@ -52,4 +52,18 @@ protected:
     bool singlex, singley;
 };
 
+inline void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::PolyTree &intermediate, clp::Paths &result) {
+    clipper.AddPath(clip, clp::ptClip, true);
+    clipper.AddPaths(subject, clp::ptSubject, subjectClosed);
+    if (subjectClosed) {
+        clipper.Execute(clp::ctIntersection, result, clp::pftNonZero, clp::pftNonZero);
+        clipper.Clear();
+    } else {
+        clipper.Execute(clp::ctIntersection, intermediate, clp::pftNonZero, clp::pftNonZero);
+        clipper.Clear();
+        OpenPathsFromPolyTree(intermediate, result);
+        intermediate.Clear();
+    }
+}
+
 #endif

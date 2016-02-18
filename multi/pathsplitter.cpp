@@ -108,17 +108,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
                 if (notfirstx) square[3].X -= shiftBecauseAngle.X;
                 if (notlasty)  square[3].Y -= shiftBecauseAngle.Y;
             }
-            clipper.AddPath(square, clp::ptClip, true);
-            clipper.AddPaths(paths, clp::ptSubject, pathsClosed);
-            if (pathsClosed) {
-                clipper.Execute(clp::ctIntersection, enclosed.paths, clp::pftNonZero, clp::pftNonZero);
-                clipper.Clear();
-            } else {
-                clipper.Execute(clp::ctIntersection, pt, clp::pftNonZero, clp::pftNonZero);
-                clipper.Clear();
-                OpenPathsFromPolyTree(pt, enclosed.paths);
-                pt.Clear();
-            }
+            clipPaths(clipper, square, paths, pathsClosed, pt, enclosed.paths);
         }
     }
     return true;
