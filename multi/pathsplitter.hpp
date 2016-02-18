@@ -15,7 +15,17 @@ typedef struct PathSplitterConfig {
     double wallAngle;             //angle of the walls with respect to the normal, in degrees
 } PathSplitterConfig;
 
-template<typename T> using Matrix = std::vector < std::vector<T> >;
+//wrapper to use a vector as a matrix
+template<typename T> class Matrix {
+public:
+    std::vector<T> data;
+    int numx, numy;
+    Matrix() : numx(0), numy(0) {}
+    Matrix(int _numx, int _numy) : numx(_numx), numy(_numy), data(numx*numy) {}
+    void clear() { numx = numy = 0; data.clear(); }
+    void reset(int _numx, int _numy) { numx = _numx; numy = _numy; data.clear(); data.resize(numx*numy); }
+    T& at(int x, int y) { return data[x*numy + y]; }
+};
 
 typedef std::vector<PathSplitterConfig> PathSplitterConfigs;
 

@@ -7,35 +7,36 @@
 bool PathSplitter::setup() {
     if (setup_done) return true;
     buffer.clear();
-    clp::cInt sqdmin = -config.margin;
-    clp::cInt sqdmax = config.displacement + config.margin;
+    //generate rigid checkerboard pattern as specified by the origin and displacement
+    clp::cInt sqdmin    = -config.margin;
+    clp::cInt sqdmax    = config.displacement + config.margin;
     double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement;
     double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement;
     double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement;
     double numstepsMaxY = ((double)(config.max.Y - config.origin.Y)) / config.displacement;
-    int sqminx = (int)std::floor(numstepsMinX);
-    int sqminy = (int)std::floor(numstepsMinY);
-    int sqmaxx = (int)std::ceil(numstepsMaxX);
-    int sqmaxy = (int)std::ceil(numstepsMaxY);
-    numx = sqmaxx - sqminx;
-    numy = sqmaxy - sqminy;
-    buffer.resize(numx, std::vector<EnclosedPaths>(numy));
+    int sqminx          = (int)std::floor(numstepsMinX);
+    int sqminy          = (int)std::floor(numstepsMinY);
+    int sqmaxx          = (int)std::ceil(numstepsMaxX);
+    int sqmaxy          = (int)std::ceil(numstepsMaxY);
+    numx                = sqmaxx - sqminx;
+    numy                = sqmaxy - sqminy;
+    buffer.reset(numx, numy);
     for (int x = 0; x < numx; ++x) {
+            clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement + config.origin.X;
         for (int y = 0; y < numy; ++y) {
-            clp::Path &square = buffer[x][y].originalSquare;
+            clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement + config.origin.Y;
+            clp::Path &square = buffer.at(x,y).originalSquare;
             square.reserve(4);
-            clp::cInt shiftx = ((clp::cInt)(x + sqminx)) * config.displacement + config.origin.X;
-            clp::cInt shifty = ((clp::cInt)(y + sqminy)) * config.displacement + config.origin.Y;
             square.emplace_back(shiftx + sqdmin, shifty + sqdmin);
             square.emplace_back(shiftx + sqdmax, shifty + sqdmin);
             square.emplace_back(shiftx + sqdmax, shifty + sqdmax);
             square.emplace_back(shiftx + sqdmin, shifty + sqdmax);
         }
     }
-    singlex = numx == 1;
-    singley = numy == 1;
-    angle90 = (singlex && singley) || (std::abs(config.wallAngle - 90.0) < 1e-6);
-    sinangle = std::sin(config.wallAngle * M_PI / 180.0);
+    singlex    = numx == 1;
+    singley    = numy == 1;
+    angle90    = (singlex && singley) || (std::abs(config.wallAngle - 90.0) < 1e-6);
+    sinangle   = std::sin(config.wallAngle * M_PI / 180.0);
     setup_done = true;
     return true;
 }
@@ -58,7 +59,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
     }
     for (int x = 0; x < numx; ++x) {
         for (int y = 0; y < numy; ++y) {
-            auto &enclosed = buffer[x][y];
+            auto &enclosed = buffer.at(x,y);
             auto &square = enclosed.actualSquare;
             enclosed.paths.clear();
             square = enclosed.originalSquare;
@@ -91,3 +92,4 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
     }
     return true;
 }
+
