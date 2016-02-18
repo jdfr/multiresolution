@@ -489,7 +489,7 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
             for (int y = 0; y < numy; ++y) {
                 int coded_y = ((x % 2) == 0) ? y : numy - y - 1;
                 std::string newfile = str(filename, ntoolname, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), coded_y);
-                subwriters.back().at(x, y) = callback(std::move(newfile), generic_type, generic_ntool, generic_z);
+                subwriters.back().at(x, y) = callback(splitters.back(), std::move(newfile), generic_type, generic_ntool, generic_z);
             }
         }
     }
