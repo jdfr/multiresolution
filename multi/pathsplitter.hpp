@@ -8,7 +8,7 @@ we must divide it in small blocks. The blocks are cuboids, placed in a
 checkerboard pattern, such that the walls are angled*/
 typedef struct PathSplitterConfig {
     clp::IntPoint origin;         //origin of coordinates for the checkerboard pattern (marks the bottom-left corner of the first square)
-    clp::cInt displacement;       //size of each chekerboard square
+    clp::IntPoint displacement;   //size of each chekerboard square
     clp::cInt margin;             //this is added to each square, so the window is a square of size displacement+2*margin
     clp::IntPoint min, max;       //min/max XY values (to set up the grid)
     double zmin;                  //min Z value (to set the groud)

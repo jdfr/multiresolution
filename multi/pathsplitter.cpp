@@ -9,11 +9,12 @@ bool PathSplitter::setup() {
     buffer.clear();
     //generate rigid checkerboard pattern as specified by the origin and displacement
     clp::cInt sqdmin    = -config.margin;
-    clp::cInt sqdmax    = config.displacement + config.margin;
-    double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement;
-    double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement;
-    double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement;
-    double numstepsMaxY = ((double)(config.max.Y - config.origin.Y)) / config.displacement;
+    clp::cInt sqdmaxX   = config.displacement.X + config.margin;
+    clp::cInt sqdmaxY   = config.displacement.Y + config.margin;
+    double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement.X;
+    double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement.Y;
+    double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement.X;
+    double numstepsMaxY = ((double)(config.max.Y - config.origin.Y)) / config.displacement.Y;
     int sqminx          = (int)std::floor(numstepsMinX);
     int sqminy          = (int)std::floor(numstepsMinY);
     int sqmaxx          = (int)std::ceil(numstepsMaxX);
@@ -22,15 +23,15 @@ bool PathSplitter::setup() {
     numy                = sqmaxy - sqminy;
     buffer.reset(numx, numy);
     for (int x = 0; x < numx; ++x) {
-            clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement + config.origin.X;
+            clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement.X + config.origin.X;
         for (int y = 0; y < numy; ++y) {
-            clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement + config.origin.Y;
+            clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement.Y + config.origin.Y;
             clp::Path &square = buffer.at(x,y).originalSquare;
             square.reserve(4);
-            square.emplace_back(shiftx + sqdmin, shifty + sqdmin);
-            square.emplace_back(shiftx + sqdmax, shifty + sqdmin);
-            square.emplace_back(shiftx + sqdmax, shifty + sqdmax);
-            square.emplace_back(shiftx + sqdmin, shifty + sqdmax);
+            square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
+            square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
+            square.emplace_back(shiftx + sqdmaxX, shifty + sqdmaxY);
+            square.emplace_back(shiftx + sqdmin,  shifty + sqdmaxY);
         }
     }
     singlex    = numx == 1;
@@ -50,8 +51,12 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
     clp::IntPoint shiftBecauseAngle;
     if (!angle90) {
         clp::cInt shiftBecauseAngle_value = (clp::cInt) (sinangle * ((z - config.zmin) / scaling));
-        if (shiftBecauseAngle_value >= config.displacement) {
-            err = "Error while splitting toolpaths: either the angle is too big or the Z value is too far from the base";
+        if (shiftBecauseAngle_value >= config.displacement.X) {
+            err = "Error while splitting toolpaths: either the angle is too big or the Z value is too far from the base (in X)";
+            return false;
+        }
+        if (shiftBecauseAngle_value >= config.displacement.Y) {
+            err = "Error while splitting toolpaths: either the angle is too big or the Z value is too far from the base (in Y)";
             return false;
         }
         shiftBecauseAngle.X = (singlex) ? 0 : shiftBecauseAngle_value;
