@@ -7,31 +7,57 @@
 bool PathSplitter::setup() {
     if (setup_done) return true;
     buffer.clear();
-    //generate rigid checkerboard pattern as specified by the origin and displacement
-    clp::cInt sqdmin    = -config.margin;
-    clp::cInt sqdmaxX   = config.displacement.X + config.margin;
-    clp::cInt sqdmaxY   = config.displacement.Y + config.margin;
-    double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement.X;
-    double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement.Y;
-    double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement.X;
-    double numstepsMaxY = ((double)(config.max.Y - config.origin.Y)) / config.displacement.Y;
-    int sqminx          = (int)std::floor(numstepsMinX);
-    int sqminy          = (int)std::floor(numstepsMinY);
-    int sqmaxx          = (int)std::ceil(numstepsMaxX);
-    int sqmaxy          = (int)std::ceil(numstepsMaxY);
-    numx                = sqmaxx - sqminx;
-    numy                = sqmaxy - sqminy;
-    buffer.reset(numx, numy);
-    for (int x = 0; x < numx; ++x) {
-            clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement.X + config.origin.X;
-        for (int y = 0; y < numy; ++y) {
-            clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement.Y + config.origin.Y;
-            clp::Path &square = buffer.at(x,y).originalSquare;
-            square.reserve(4);
-            square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
-            square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
-            square.emplace_back(shiftx + sqdmaxX, shifty + sqdmaxY);
-            square.emplace_back(shiftx + sqdmin,  shifty + sqdmaxY);
+    if (config.useOrigin) {
+        //generate rigid checkerboard pattern as specified by the origin and displacement
+        clp::cInt sqdmin    = -config.margin;
+        clp::cInt sqdmaxX   = config.displacement.X + config.margin;
+        clp::cInt sqdmaxY   = config.displacement.Y + config.margin;
+        double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement.X;
+        double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement.Y;
+        double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement.X;
+        double numstepsMaxY = ((double)(config.max.Y - config.origin.Y)) / config.displacement.Y;
+        int sqminx          = (int)std::floor(numstepsMinX);
+        int sqminy          = (int)std::floor(numstepsMinY);
+        int sqmaxx          = (int)std::ceil(numstepsMaxX);
+        int sqmaxy          = (int)std::ceil(numstepsMaxY);
+        numx                = sqmaxx - sqminx;
+        numy                = sqmaxy - sqminy;
+        buffer.reset(numx, numy);
+        for (int x = 0; x < numx; ++x) {
+                clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement.X + config.origin.X;
+            for (int y = 0; y < numy; ++y) {
+                clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement.Y + config.origin.Y;
+                clp::Path &square = buffer.at(x,y).originalSquare;
+                square.reserve(4);
+                square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
+                square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
+                square.emplace_back(shiftx + sqdmaxX, shifty + sqdmaxY);
+                square.emplace_back(shiftx + sqdmin,  shifty + sqdmaxY);
+            }
+        }
+    } else {
+        //evenly distribute space among squares, using an effective displacement possible smaller than the specified one
+        clp::cInt sizeX   = config.max.X - config.min.X;
+        clp::cInt sizeY   = config.max.Y - config.min.Y;
+        numx              = (int)std::ceil(sizeX / config.displacement.X);
+        numy              = (int)std::ceil(sizeY / config.displacement.Y);
+        double dispX      = sizeX / (double)numx;
+        double dispY      = sizeY / (double)numy;
+        clp::cInt sqdmin  = -config.margin;
+        clp::cInt sqdmaxX = ((clp::cInt)dispX) + config.margin;
+        clp::cInt sqdmaxY = ((clp::cInt)dispY) + config.margin;
+        buffer.reset(numx, numy);
+        for (int x = 0; x < numx; ++x) {
+                clp::cInt shiftx  = config.min.X + (clp::cInt)(x*dispX);
+            for (int y = 0; y < numy; ++y) {
+                clp::cInt shifty  = config.min.Y + (clp::cInt)(y*dispY);
+                clp::Path &square = buffer.at(x, y).originalSquare;
+                square.reserve(4);
+                square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
+                square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
+                square.emplace_back(shiftx + sqdmaxX, shifty + sqdmaxY);
+                square.emplace_back(shiftx + sqdmin,  shifty + sqdmaxY);
+            }
         }
     }
     singlex    = numx == 1;
