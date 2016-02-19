@@ -427,7 +427,8 @@ void showError(Configuration &config, SnapToGridSpec &snapspec, size_t inputIdx,
     for (int k = 0; k < gridinfo.npoints; ++k) {
         addPointAsPlus(snapspec, grid, gridinfo.grid[k]);
     }
-    SHOWCONTOURS(config, str("Error while snapping point ", gridinfo.numPoint, " of path ", inputIdx, ", errcode: ", errcode), &grid, &errpoint, &input);
+    const char * additional = (errcode >= 5) ? " (this may be alleviated by removing --safestep from the affected process specification)" : "";
+    SHOWCONTOURS(config, str("Error while snapping point ", gridinfo.numPoint, " of path ", inputIdx, ", errcode: ", errcode, additional), &grid, &errpoint, &input);
 }
 
 bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err) {
@@ -447,7 +448,8 @@ bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Path
         if (result>1) {
             showError(config, snapspec, i, inputs[i], gridinfo, result);
             std::ostringstream fmt;
-            fmt << "error in snapPathToGrid for the path " << i << "/" << (s - 1) << ".\n    ERRORCODE: " << result << "\n    numPoint: " << gridinfo.numPoint << "\n    X=" << gridinfo.point.X << "\n    Y=" << gridinfo.point.Y << "\n";
+            const char * additional = (result >= 5) ? "\n    This may be alleviated by removing --safestep from the affected process specification\n" : "\n";
+            fmt << "error in snapPathToGrid for the path " << i << "/" << (s - 1) << ".\n    ERRORCODE: " << result << "\n    numPoint: " << gridinfo.numPoint << "\n    X=" << gridinfo.point.X << "\n    Y=" << gridinfo.point.Y << additional;
             err = fmt.str();
             return false;
         }

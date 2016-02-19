@@ -39,9 +39,9 @@ public:
       low-res processes, measured with some scanning technology.*/
     void takeAdditionalAdditiveContours(double z, clp::Paths &additional) { additionalAdditiveContours.emplace(z, std::move(additional)); }
     void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool);
-    MultiSpec &spec;
+    std::shared_ptr<MultiSpec> spec;
     Multislicer multi;
-    ToolpathManager(MultiSpec &s) : spec(s), slicess(s.numspecs), multi(s) {}
+    ToolpathManager(std::shared_ptr<MultiSpec> s) : spec(std::move(s)), slicess(spec->numspecs), multi(s) {}
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
     void removeUsedSlicesPastZ(double z);
     void removeAdditionalContoursPastZ(double z);
@@ -142,7 +142,7 @@ public:
 
     void clear() { input.clear(); output.clear(); err = std::string(); has_err = false; input_idx = output_idx = 0; zmin = zmax = 0.0; rm.clear(); }
 
-    SimpleSlicingScheduler(bool _removeUnused, MultiSpec &s) : removeUnused(_removeUnused), has_err(false), tm(s), rm(*this) {}
+    SimpleSlicingScheduler(bool _removeUnused, std::shared_ptr<MultiSpec> s) : removeUnused(_removeUnused), has_err(false), tm(std::move(s)), rm(*this) {}
     void createSlicingSchedule(double minz, double maxz, double epsilon, SchedulingMode mode);
 
     void computeNextInputSlices();

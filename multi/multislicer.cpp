@@ -55,13 +55,13 @@ void Multislicer::removeHighResDetails(size_t k, clp::Paths &contours, clp::Path
 
     //remove high-resolution positive details from paths
     //opened <- opening(paths, radius)
-    offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    offsetDo2(offset, opened, (double)-spec.pp[k].radius, (double)spec.pp[k].radius, contours, lowres, clp::jtRound, clp::etClosedPolygon);
+    offset.ArcTolerance = (double)spec->pp[k].arctolG;
+    offsetDo2(offset, opened, (double)-spec->pp[k].radius, (double)spec->pp[k].radius, contours, lowres, clp::jtRound, clp::etClosedPolygon);
 
     //add high-resolution negative space
     //aux1 <- closing(opened, substep)
-    //offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    offsetDo2(offset, aux1, (double)spec.pp[k].substep, (double)-spec.pp[k].substep * 1.0, opened, lowres, clp::jtRound, clp::etClosedPolygon);
+    //offset.ArcTolerance = (double)spec->pp[k].arctolG;
+    offsetDo2(offset, aux1, (double)spec->pp[k].substep, (double)-spec->pp[k].substep * 1.0, opened, lowres, clp::jtRound, clp::etClosedPolygon);
 
     //separate negative space
     //lowres <- aux1 - opened
@@ -74,13 +74,13 @@ void Multislicer::removeHighResDetails(size_t k, clp::Paths &contours, clp::Path
     non-existent high-resolution negative space. To avoid this problem, we
     apply here an opening with a very small radius.
     TODO: We are taking smallRadius, but we should determine an optimal radius*/
-    offset.ArcTolerance = (double)spec.pp[k + 1].arctolR; //arctolsmall//arctolgridstep
-    offsetDo2(offset, lowres, (double)-spec.pp[k + 1].radius, (double)spec.pp[k + 1].radius, lowres, aux1, clp::jtRound, clp::etClosedPolygon);
+    offset.ArcTolerance = (double)spec->pp[k + 1].arctolR; //arctolsmall//arctolgridstep
+    offsetDo2(offset, lowres, (double)-spec->pp[k + 1].radius, (double)spec->pp[k + 1].radius, lowres, aux1, clp::jtRound, clp::etClosedPolygon);
 
     //dilate separated negative space
     //aux1 <- dilate(lowres, dilatestep)
-    offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    offsetDo(offset, aux1, (double)spec.pp[k].dilatestep, lowres, clp::jtRound, clp::etClosedPolygon);
+    offset.ArcTolerance = (double)spec->pp[k].arctolG;
+    offsetDo(offset, aux1, (double)spec->pp[k].dilatestep, lowres, clp::jtRound, clp::etClosedPolygon);
 
     //remove high-resolution negative details from paths
     //lowres <- opened - aux1
@@ -92,17 +92,17 @@ void Multislicer::removeHighResDetails(size_t k, clp::Paths &contours, clp::Path
 void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1, clp::Paths &aux2) {
 
     //remove high-res negative details.
-    offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    double negativeHighResFactor = (double)spec.pp[k].substep * 1.1; //minimal factor
-    if (spec.global.addsub.fattening.eraseHighResNegDetails && (((double)spec.global.addsub.fattening.eraseHighResNegDetails_radius) > negativeHighResFactor)) {
-        negativeHighResFactor = (double)spec.global.addsub.fattening.eraseHighResNegDetails_radius;
+    offset.ArcTolerance = (double)spec->pp[k].arctolG;
+    double negativeHighResFactor = (double)spec->pp[k].substep * 1.1; //minimal factor
+    if (spec->global.addsub.fattening.eraseHighResNegDetails && (((double)spec->global.addsub.fattening.eraseHighResNegDetails_radius) > negativeHighResFactor)) {
+        negativeHighResFactor = (double)spec->global.addsub.fattening.eraseHighResNegDetails_radius;
     }
     offsetDo2(offset, lowres, negativeHighResFactor, -negativeHighResFactor, contours, aux1, clp::jtRound, clp::etClosedPolygon);
 
-    if (spec.global.addsub.fattening.useGradualFattening) {
+    if (spec->global.addsub.fattening.useGradualFattening) {
         clp::Paths fat, thin, next;
-        double r = (double)spec.pp[k].radius;
-        if (spec.pp[k].addInternalClearance) {
+        double r = (double)spec->pp[k].radius;
+        if (spec->pp[k].addInternalClearance) {
             r *= 2;
         }
         //compute the low-res contours with a naive toolpath
@@ -112,7 +112,7 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
         //TODO: expose smallNeg as a configurable parameter!!!
         double smallNeg = r*0.01; //remove spurious ultrathin components
         offsetDo2(offset, thin, -smallNeg, smallNeg, thin, aux1, clp::jtRound, clp::etClosedPolygon);
-        //SHOWCONTOURS(spec.global.config, "initial fat and thin", &lowres, &fat, &thin);
+        //SHOWCONTOURS(spec->global.config, "initial fat and thin", &lowres, &fat, &thin);
 
         //if thin is empty, we have nothing more to do, since we have no high-res areas!
         if (thin.empty()) return;
@@ -124,8 +124,8 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
         //    -radiusFactor should be strictly decreasing in the range (1, 0]
         //    -inflateFactor should be strictly increasing in the range [0,1]
         //    -SUCH THAT, in each step, (radiusFactor+inflateFactor)>=1
-        auto endi = spec.global.addsub.fattening.gradual.end();
-        for (auto step = spec.global.addsub.fattening.gradual.begin(); step != endi; ++step) {
+        auto endi = spec->global.addsub.fattening.gradual.end();
+        for (auto step = spec->global.addsub.fattening.gradual.begin(); step != endi; ++step) {
             double gradradius  = r*step->radiusFactor;
             double gradinflate = r*step->inflateFactor;
             if (gradradius != 0.0) {
@@ -146,7 +146,7 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
                 } else {
                     subresult = &aux1;
                 }
-                //SHOWCONTOURS(spec.global.config, str("fat, thin, next, subresult ", step-spec.global.addsub.fattening.gradual.begin()), &fat, &thin, &next, subresult);
+                //SHOWCONTOURS(spec->global.config, str("fat, thin, next, subresult ", step-spec->global.addsub.fattening.gradual.begin()), &fat, &thin, &next, subresult);
                 //accumulate the result
                 clipper2.AddPaths(*subresult, clp::ptSubject, true);
                 //if we are not in the last iteration, prepare the vars for the next one!
@@ -170,7 +170,7 @@ void Multislicer::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::P
         //clp::Paths old_lowres = lowres;
         clipper2.Execute(clp::ctUnion, lowres, clp::pftNonZero, clp::pftNonZero);
         clipper2.Clear();
-        //SHOWCONTOURS(spec.global.config, "contour before and after overwriting", &old_lowres, &lowres);
+        //SHOWCONTOURS(spec->global.config, "contour before and after overwriting", &old_lowres, &lowres);
     }
 
     //RESULT IS RETURNED IN lowres
@@ -186,8 +186,8 @@ void Multislicer::doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths, clp:
     //now, offset all previous contours, and accumulate them
     clp::Paths previousContours;
     clipper.AddPaths(toolpaths, clp::ptSubject, false);
-    double globalRadius = (double)spec.pp[k].radius + (double)spec.pp[k].radiusRemoveCommon;
-    offset.ArcTolerance = (double)spec.pp[k].arctolG;
+    double globalRadius = (double)spec->pp[k].radius + (double)spec->pp[k].radiusRemoveCommon;
+    offset.ArcTolerance = (double)spec->pp[k].arctolG;
     offsetDo(offset, aux1, globalRadius, contours_alreadyfilled, clp::jtRound, clp::etClosedPolygon);
     clipper.AddPaths(aux1, clp::ptClip, true);
     //execute the difference. NOTE: for intersected paths, the result can be either an open path or a pair of open paths for each path sharing a common arc with lower resolution contours.
@@ -203,42 +203,41 @@ bool Multislicer::generateToolPath(size_t k, bool nextProcessSameKind, clp::Path
     use gridstep's arcTolerance because we have details at that scale,
     after removing negative details).*/
     //toolpath <- erode(contour, radius)
-    offset.ArcTolerance = (double)spec.pp[k].arctolG;
-    offsetDo(offset, temp_toolpath, (double)-spec.pp[k].radius, contour, clp::jtRound, clp::etClosedPolygon);
+    offset.ArcTolerance = (double)spec->pp[k].arctolG;
+    offsetDo(offset, temp_toolpath, (double)-spec->pp[k].radius, contour, clp::jtRound, clp::etClosedPolygon);
     //clp::Paths beforesnap = temp_toolpath;
 
     //IT IS RECOMMENDED TO DO SNAPPING FOR ALL PATHS, BECAUSE IT SEEMS TO REMOVE SLIGHT IMPERFECTIONS WHICH CAN CAUSE PROBLEMS LATER
 
     //We ALSO add a SNAPTOGRID operation to get a finely tuned
     //big-radius toolpath.
-    if (spec.pp[k].applysnap) {
+    if (spec->pp[k].applysnap) {
         //toolpath <- opening(toolpath, safestep)
         if (nextProcessSameKind) {
-            offsetDo2(offset, temp_toolpath, -spec.pp[k].safestep, spec.pp[k].safestep, temp_toolpath, aux1, clp::jtRound, clp::etClosedPolygon);
+            offsetDo2(offset, temp_toolpath, -spec->pp[k].safestep, spec->pp[k].safestep, temp_toolpath, aux1, clp::jtRound, clp::etClosedPolygon);
         } else {
-            spec.pp[k].snapspec.mode = SnapDilate;
+            spec->pp[k].snapspec.mode = SnapDilate;
         }
         //aux1 <- snapToGrid(toolpath, gridstep, doErosion)
-        bool ok = snapClipperPathsToGrid(spec.global.config, aux1, temp_toolpath, spec.pp[k].snapspec, *err);
+        bool ok = snapClipperPathsToGrid(spec->global.config, aux1, temp_toolpath, spec->pp[k].snapspec, *err);
         if (!ok) return false;
         std::swap(aux1, temp_toolpath);
     } else {
-        if (spec.pp[k].addInternalClearance) {
-            offsetDo2(offset, temp_toolpath, (double)-spec.pp[k].radius, (double)spec.pp[k].radius, temp_toolpath, aux1, clp::jtRound, clp::etClosedPolygon);
+        if (spec->pp[k].addInternalClearance) {
+            offsetDo2(offset, temp_toolpath, (double)-spec->pp[k].radius, (double)spec->pp[k].radius, temp_toolpath, aux1, clp::jtRound, clp::etClosedPolygon);
         } else {
-            if (spec.pp[k].burrLength>0) {
+            if (spec->pp[k].burrLength>0) {
                 //toolpath <- opening(toolpath, safestep)
                 double oldmiter = offset.MiterLimit;
                 offset.MiterLimit = 10;
-                offsetDo2(offset, temp_toolpath, (double)-spec.pp[k].burrLength, (double)spec.pp[k].burrLength, temp_toolpath, aux1, clp::jtSquare, clp::etClosedPolygon);
+                offsetDo2(offset, temp_toolpath, (double)-spec->pp[k].burrLength, (double)spec->pp[k].burrLength, temp_toolpath, aux1, clp::jtSquare, clp::etClosedPolygon);
                 offset.MiterLimit = oldmiter; //should not be necessary, but just in case...
             }
         }
     }
 
-    //SHOWCONTOURS(spec.global.config, "contour, toolpath before and after snap", &contour, &beforesnap, &temp_toolpath);
-    //add to the end the initial point of each contour in the toolpath (this is unconditionally necessary to make the interface with the company's c# app to work seamlessly for open and closed paths, but it is also necessary to correctly operate with the toolpath as a set of open paths in clipperlib)
-required overwriting by setting very low values in --medialaxis-radius (also implicitly requiring to not set --clearance). The new options can be safely combined with --clearance, at least for the first process.
+    //SHOWCONTOURS(spec->global.config, "contour, toolpath before and after snap", &contour, &beforesnap, &temp_toolpath);
+    //add to the end the initial point of each contour in the toolpath (this is unconditionally necessary to make the interface with with the company's c# app to work seamlessly for open and closed paths, but it is also necessary to correctly operate with the toolpath as a set of open paths in clipperlib)
     applyToPaths<copyOpenToClosedPath, ReserveCapacity>(temp_toolpath, toolpaths);
     return true;
 }
@@ -307,8 +306,8 @@ void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAr
         clp::PolyTreeToPaths(pt, lines);
     }
     clipper.Clear();
-    if (spec.pp[k].applysnap) {
-        verySimpleSnapPathsToGrid(lines, spec.pp[k].snapspec);
+    if (spec->pp[k].applysnap) {
+        verySimpleSnapPathsToGrid(lines, spec->pp[k].snapspec);
     }
     //IMPORTANT: these lambdas test if the line distance is below the threshold. If diagonal lines are possible, a new lambda must be added to handle them!
     if (horizontal) {
@@ -344,7 +343,7 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
         offsetDo(offset, next, -infillingRadius, current, clp::jtRound, clp::etClosedPolygon);
     }
     if (false){//applySnapConcentricInfilling) {
-        bool ok = snapClipperPathsToGrid(spec.global.config, smoothed, next, concentricInfillingSnapSpec, *err);
+        bool ok = snapClipperPathsToGrid(spec->global.config, smoothed, next, concentricInfillingSnapSpec, *err);
         if (!ok) return false;
         MOVETO(smoothed, next);
     }
@@ -364,19 +363,19 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
 }
 
 bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::Paths &contoursToBeInfilled) {
-    infillingRadius = (double)spec.pp[k].radius;
-    infillingUseClearance = spec.pp[k].addInternalClearance;
+    infillingRadius = (double)spec->pp[k].radius;
+    infillingUseClearance = spec->pp[k].addInternalClearance;
     accumInfillingsHolder.clear();
     accumInfillings = &accumInfillingsHolder;//&result.toolpaths[k]; //this gets inserted in real time
-    infillingRecursive = spec.pp[k].infillingRecursive || (!spec.pp[k].medialAxisFactorsForInfillings.empty());
-    switch (spec.pp[k].infillingMode) {
+    infillingRecursive = spec->pp[k].infillingRecursive || (!spec->pp[k].medialAxisFactorsForInfillings.empty());
+    switch (spec->pp[k].infillingMode) {
     case InfillingConcentric: {
         HoledPolygons hps;
         AddPathsToHPs(infillingAreas, hps);
         //use the stepping grid for this process, but switch to snapSimple
-        applySnapConcentricInfilling = spec.pp[k].applysnap;
+        applySnapConcentricInfilling = spec->pp[k].applysnap;
         if (applySnapConcentricInfilling) {
-            concentricInfillingSnapSpec = spec.pp[k].snapspec;
+            concentricInfillingSnapSpec = spec->pp[k].snapspec;
             concentricInfillingSnapSpec.mode = SnapSimple;
         }
         for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
@@ -385,8 +384,8 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
         break;
     } case InfillingRectilinearV:
       case InfillingRectilinearH:
-        if (spec.pp[k].infillingWhole) {
-            processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec.pp[k].infillingMode == InfillingRectilinearH);
+        if (spec->pp[k].infillingWhole) {
+            processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec->pp[k].infillingMode == InfillingRectilinearH);
         } else {
             HoledPolygons hps;
             AddPathsToHPs(infillingAreas, hps);
@@ -395,7 +394,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
                 subinfillings.clear();
                 BBox bb = getBB(*hp);
                 hp->moveToPaths(subinfillings);
-                processInfillingsRectilinear(k, subinfillings, bb, spec.pp[k].infillingMode == InfillingRectilinearH);
+                processInfillingsRectilinear(k, subinfillings, bb, spec->pp[k].infillingMode == InfillingRectilinearH);
             }
         }
         break;
@@ -434,7 +433,7 @@ void Multislicer::applyMedialAxisNotAggregated(size_t k, std::vector<double> &me
     const clp::cInt TOLERANCE = 0;
 #endif
     for (auto medialAxisFactor = medialAxisFactors.begin(); medialAxisFactor != medialAxisFactors.end(); ++medialAxisFactor) {
-        double factor = (double)spec.pp[k].radius * (*medialAxisFactor);
+        double factor = (double)spec->pp[k].radius * (*medialAxisFactor);
         double minwidth = factor / 2.0;
         double maxwidth = factor * 2.0;
         newhps->clear();
@@ -458,7 +457,7 @@ void Multislicer::applyMedialAxisNotAggregated(size_t k, std::vector<double> &me
             clipper.AddPath(hp->contour, clp::ptSubject, true);
             clipper.AddPaths(hp->holes, clp::ptSubject, true);
             clp::PolyTree pt;
-            operateInflatedLinesAndContoursInClipper(clp::ctDifference, pt, accum_medialaxis, (double)spec.pp[k].radius, &aux, inflated_acumulator);
+            operateInflatedLinesAndContoursInClipper(clp::ctDifference, pt, accum_medialaxis, (double)spec->pp[k].radius, &aux, inflated_acumulator);
             AddPolyTreeToHPs(pt, *newhps);
             MOVETO(accum_medialaxis, medialaxis_accumulator);
         }
@@ -489,16 +488,16 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     //INTERIM HACK FOR add/sub
     bool nextProcessSameKind, previousProcessSameKind;
     if (k == 0) {
-        nextProcessSameKind = !spec.global.addsub.addsubWorkflowMode;
+        nextProcessSameKind = !spec->global.addsub.addsubWorkflowMode;
         previousProcessSameKind = true;
     } else {
         nextProcessSameKind = true;
-        previousProcessSameKind = !spec.global.addsub.addsubWorkflowMode;
+        previousProcessSameKind = !spec->global.addsub.addsubWorkflowMode;
     }
 
-    bool CUSTOMINFILLINGS = (spec.pp[k].infillingMode == InfillingConcentric)   ||
-                            (spec.pp[k].infillingMode == InfillingRectilinearH) ||
-                            (spec.pp[k].infillingMode == InfillingRectilinearV);
+    bool CUSTOMINFILLINGS = (spec->pp[k].infillingMode == InfillingConcentric)   ||
+                            (spec->pp[k].infillingMode == InfillingRectilinearH) ||
+                            (spec->pp[k].infillingMode == InfillingRectilinearV);
 
     clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
     infillingAreas->clear();
@@ -507,18 +506,18 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     clp::Paths &lowres = AUX2;
     clp::Paths *contourToProcess;
 
-    bool notthelast = (k + 1) < spec.numspecs;
+    bool notthelast = (k + 1) < spec->numspecs;
 
     //this only makes sense if there is a tool with higher resolution down the line
-    if (spec.pp[k].doPreprocessing) {
+    if (spec->pp[k].doPreprocessing) {
         if (nextProcessSameKind) {
             if (notthelast) {
                 removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
             } else {
-                if ((spec.numspecs > 1) && spec.pp[k-1].applysnap) {
+                if ((spec->numspecs > 1) && spec->pp[k-1].applysnap) {
                     //if we applied snapping previously, we need to remove the small linings
-                    offset.ArcTolerance = (double)spec.pp[k].arctolG;
-                    offsetDo2(offset, lowres, -(double)spec.pp[k].dilatestep, (double)spec.pp[k].dilatestep, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
+                    offset.ArcTolerance = (double)spec->pp[k].arctolG;
+                    offsetDo2(offset, lowres, -(double)spec->pp[k].dilatestep, (double)spec->pp[k].dilatestep, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
                 } else {
                     lowres = contours_tofill;
                 }
@@ -529,16 +528,16 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         }
         contourToProcess = &lowres;
     } else {
-        if (spec.pp[k].noPreprocessingOffset == 0.0) {
+        if (spec->pp[k].noPreprocessingOffset == 0.0) {
             contourToProcess = &contours_tofill;
         } else {
-            offset.ArcTolerance = (double)spec.pp[k].arctolG;
-            offsetDo2(offset, lowres, -spec.pp[k].noPreprocessingOffset, spec.pp[k].noPreprocessingOffset, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
+            offset.ArcTolerance = (double)spec->pp[k].arctolG;
+            offsetDo2(offset, lowres, -spec->pp[k].noPreprocessingOffset, spec->pp[k].noPreprocessingOffset, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
             contourToProcess = &lowres;
         }
     }
 
-    if (!spec.pp[k].computeToolpaths) {
+    if (!spec->pp[k].computeToolpaths) {
         output.contours = *contourToProcess; //TODO: do not use deep copy if possible
     } else {
         clp::Paths &unprocessedToolPaths = AUX3;
@@ -547,30 +546,30 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             return false;
         }
 
-        //SHOWCONTOURS(spec.global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
+        //SHOWCONTOURS(spec->global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
 
         //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths)
-        offsetDo(offset, output.contours, (double)spec.pp[k].radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+        offsetDo(offset, output.contours, (double)spec->pp[k].radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
 
         //if required, discard common toolpaths.
-        bool discardCommonToolpaths = spec.useContoursAlreadyFilled(k);
+        bool discardCommonToolpaths = spec->useContoursAlreadyFilled(k);
 
         if (discardCommonToolpaths) {
             doDiscardCommonToolPaths(k, output.toolpaths, contours_alreadyfilled, AUX4);
         }
-        if (nextProcessSameKind && CUSTOMINFILLINGS && spec.pp[k].infillingRecursive) {
+        if (nextProcessSameKind && CUSTOMINFILLINGS && spec->pp[k].infillingRecursive) {
             output.infillingsIndependentContours.resize(1);
-            offsetDo(offset, output.infillingsIndependentContours[0], (double)spec.pp[k].radius, output.toolpaths, clp::jtRound, clp::etOpenRound);
+            offsetDo(offset, output.infillingsIndependentContours[0], (double)spec->pp[k].radius, output.toolpaths, clp::jtRound, clp::etOpenRound);
         }
 
         //generate the infilling contour only if necessary
-        output.alsoInfillingAreas = (spec.pp[k].infillingMode == InfillingJustContours);
+        output.alsoInfillingAreas = (spec->pp[k].infillingMode == InfillingJustContours);
         //the generation of the infilling regions depends on the flag discardCommonToolpaths
-        if (spec.pp[k].infillingMode != InfillingNone) {
+        if (spec->pp[k].infillingMode != InfillingNone) {
             if (discardCommonToolpaths) {
                 //this is more expensive than the alternative, but necessary for possibly open toolpaths
                 if (output.infillingsIndependentContours.empty()) {
-                    operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.toolpaths, (double)spec.pp[k].radius, &AUX4, (clp::Paths*)NULL);
+                    operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.toolpaths, (double)spec->pp[k].radius, &AUX4, (clp::Paths*)NULL);
                 } else {
                     clipperDo(clipper, *infillingAreas, clp::ctDifference, output.contours, output.infillingsIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
                 }
@@ -578,8 +577,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
                 //TODO: change the constant 0.3 by a parameter (that is, a parameter to tune the shrink factor for the the infilling, if no clearance is needed)
                 //ALTERNATIVE TODO: make the shrink factor a non-conditional parameter, but the user should then remember to set it appropriately if clearance is required
                 //0.99: cannot be 1.0, clipping / round-off errors crop up
-                double shrinkFactor = (spec.pp[k].addInternalClearance) ? 0.99 : 0.3;
-                offsetDo(offset, *infillingAreas, -(double)spec.pp[k].radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+                double shrinkFactor = (spec->pp[k].addInternalClearance) ? 0.99 : 0.3;
+                offsetDo(offset, *infillingAreas, -(double)spec->pp[k].radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
             }
         }
 
@@ -595,33 +594,33 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         AUX4.clear();
         intermediate_medialaxis = &AUX4;
 
-        //if ((!output.infillingsIndependentContours.empty()) && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
-        if (nextProcessSameKind && CUSTOMINFILLINGS && (!spec.pp[k].medialAxisFactorsForInfillings.empty())) {
-            //showContours(output.infillingsIndependentContours, ShowContoursInfo(spec.global.config, "see infilling contours"));
+        //if ((!output.infillingsIndependentContours.empty()) && (!spec->pp[k].medialAxisFactorsForInfillings.empty())) {
+        if (nextProcessSameKind && CUSTOMINFILLINGS && (!spec->pp[k].medialAxisFactorsForInfillings.empty())) {
+            //showContours(output.infillingsIndependentContours, ShowContoursInfo(spec->global.config, "see infilling contours"));
             clipperDo(clipper, accumNonCoveredByInfillings, clp::ctDifference, *infillingAreas, output.infillingsIndependentContours, clp::pftNonZero, clp::pftNonZero);
             //elsewhere in the code we use !infillingsIndependentContours.empty() as a test to see if we are doing recursive infillings, so we clear it to make sure we do not break that logic
-            if (!spec.pp[k].infillingRecursive) output.infillingsIndependentContours.clear();
-            //SHOWCONTOURS(spec.global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
-            applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis);
+            if (!spec->pp[k].infillingRecursive) output.infillingsIndependentContours.clear();
+            //SHOWCONTOURS(spec->global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
+            applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis);
         }
 
-        if (!spec.pp[k].medialAxisFactors.empty()) {
+        if (!spec->pp[k].medialAxisFactors.empty()) {
 
             //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
             clp::Paths *intermediate_paths = &AUX3;
 
             clipperDo(clipper, *intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
-            //SHOWCONTOURS(spec.global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+            //SHOWCONTOURS(spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
 
             //but now, apply the medial axis algorithm!!!!
-            applyMedialAxisNotAggregated(k, spec.pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
+            applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
         }
     }
 
     if (output.infillingsIndependentContours.empty() && nextProcessSameKind) {
         //in this case, we are not interested in having the medial axis contours as a separated set of contours
         unitePaths(clipper, output.contours, output.medialAxisIndependentContours, output.contours);
-        if (spec.global.alsoContours) {
+        if (spec->global.alsoContours) {
             COPYTO(output.contours, output.contoursToShow);
         }
         output.medialAxisIndependentContours.clear();
@@ -632,14 +631,14 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         3D profile of these holes cannot be approximated by eroding them
         as for holes in contours.*/
         unitePaths(clipper, output.contours, output.contours);
-        if (spec.global.alsoContours) {
+        if (spec->global.alsoContours) {
             COPYTO(output.contours, output.contoursToShow);
             COPYTO(output.medialAxisIndependentContours, output.contoursToShow);
             COPYTO(output.infillingsIndependentContours, output.contoursToShow);
         }
     }
 
-    if (spec.pp[k].computeToolpaths) {
+    if (spec->pp[k].computeToolpaths) {
         /*TODO: right now, the motion planning makes little sense. it would be better to do each island separately:
         -do one HoledPolygon
         -do its outer medial axes (possibly merge with the next step)
@@ -661,9 +660,9 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
         */
         bool use_infillings = CUSTOMINFILLINGS && !accumInfillingsHolder.empty();
-        bool use_medialaxis = !spec.pp[k].medialAxisFactors.empty() && !intermediate_medialaxis->empty();
-        bool add_medialaxis_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner || !use_infillings) && use_medialaxis;
-        bool add_infillings_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec.global.applyMotionPlanner) && use_infillings;
+        bool use_medialaxis = !spec->pp[k].medialAxisFactors.empty() && !intermediate_medialaxis->empty();
+        bool add_medialaxis_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec->global.applyMotionPlanner || !use_infillings) && use_medialaxis;
+        bool add_infillings_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec->global.applyMotionPlanner) && use_infillings;
         if (add_medialaxis_now) {
             MOVETO(*intermediate_medialaxis, output.toolpaths);
             intermediate_medialaxis->clear();
@@ -673,11 +672,11 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             accumInfillingsHolder.clear();
         }
 
-        if (spec.global.applyMotionPlanner) {
+        if (spec->global.applyMotionPlanner) {
             //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this (and probably be ruined as well)
 
             //trying to do the thing below does not feel very good
-            verySimpleMotionPlanner(spec.startState, PathOpen, output.toolpaths); //these are open toolpaths (contains a mix of open and actually closed ones)
+            verySimpleMotionPlanner(spec->startState, PathOpen, output.toolpaths); //these are open toolpaths (contains a mix of open and actually closed ones)
 
             /*the order IS important (start_near is a side-effected configuration value),
             and should be the same as the output order in the gcode pipeline (alternatively,
@@ -687,11 +686,11 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             if (!LUMP_CONTOURS_AND_INFILLINGS_TOGETHER) {
                 if (use_infillings) {
                     //INVARIANT: add_medialaxis_now is false
-                    if (!spec.pp[k].medialAxisFactors.empty()) {
+                    if (!spec->pp[k].medialAxisFactors.empty()) {
                         MOVETO(*intermediate_medialaxis, accumInfillingsHolder);
                         intermediate_medialaxis->clear();
                     }
-                    verySimpleMotionPlanner(spec.startState, PathOpen, accumInfillingsHolder);
+                    verySimpleMotionPlanner(spec->startState, PathOpen, accumInfillingsHolder);
                     MOVETO(accumInfillingsHolder, output.toolpaths);
                     accumInfillingsHolder.clear();
                 }
@@ -705,18 +704,18 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
 
 int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int kinit, int kend) {
-    if (spec.global.substractiveOuter) {
-        addOuter(contours_tofill, spec.global.limitX, spec.global.limitY);
+    if (spec->global.substractiveOuter) {
+        addOuter(contours_tofill, spec->global.limitX, spec->global.limitY);
     }
-    if (spec.global.correct || spec.global.substractiveOuter) {
+    if (spec->global.correct || spec->global.substractiveOuter) {
         orientPaths(contours_tofill);
     }
     if (kinit < 0) kinit = 0;
-    if (kend < 0) kend = (int)spec.numspecs - 1;
+    if (kend < 0) kend = (int)spec->numspecs - 1;
     ++kend;
     int k;
     for (k = kinit; k < kend; ++k) {
-        if (spec.useContoursAlreadyFilled(k)) {
+        if (spec->useContoursAlreadyFilled(k)) {
             clipper.AddPaths(contours_alreadyfilled, clp::ptSubject, true);
             if (k > kinit) {
                 if (outputs[k - 1]->infillingsIndependentContours.empty()) {
@@ -730,18 +729,18 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
             clipper.Clear();
         }
         //clp::Paths MYAUX = contours_tofill;
-        //SHOWCONTOURS(spec.global.config, "before_applying_process_1", &contours_tofill);
-        //SHOWCONTOURS(spec.global.config, "before_applying_process_2", &contours_alreadyfilled);
+        //SHOWCONTOURS(spec->global.config, "before_applying_process_1", &contours_tofill);
+        //SHOWCONTOURS(spec->global.config, "before_applying_process_2", &contours_alreadyfilled);
         bool ok = applyProcess(*(outputs[k]), contours_tofill, contours_alreadyfilled, k);
-        //SHOWCONTOURS(spec.global.config, str("after_applying_process ", k), &contours_tofill, &(outputs[k]->contours));
+        //SHOWCONTOURS(spec->global.config, str("after_applying_process ", k), &contours_tofill, &(outputs[k]->contours));
         if (!ok) break;
-        if (spec.global.substractiveOuter) {
-            removeOuter(outputs[k]->toolpaths,          spec.global.outerLimitX, spec.global.outerLimitY);
+        if (spec->global.substractiveOuter) {
+            removeOuter(outputs[k]->toolpaths,          spec->global.outerLimitX, spec->global.outerLimitY);
             if (outputs[k]->alsoInfillingAreas) {
-                removeOuter(outputs[k]->infillingAreas, spec.global.outerLimitX, spec.global.outerLimitY);
+                removeOuter(outputs[k]->infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
             }
         }
-        bool nextProcessSameKind = (!spec.global.addsub.addsubWorkflowMode) || (k > 0);
+        bool nextProcessSameKind = (!spec->global.addsub.addsubWorkflowMode) || (k > 0);
         if (nextProcessSameKind) {
             if (outputs[k]->infillingsIndependentContours.empty()) {
                 clipperDo(clipper, contours_tofill, clp::ctDifference, contours_tofill, outputs[k]->contours, clp::pftNonZero, clp::pftNonZero);
@@ -751,7 +750,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
                 AddPaths(clipper, outputs[k]->medialAxisIndependentContours, clp::ptClip, true);
                 clipper.Execute(clp::ctDifference, contours_tofill, clp::pftNonZero, clp::pftNonZero);
                 clipper.Clear();
-                //SHOWCONTOURS(spec.global.config, "after_applying_infillings_1", &(contours_tofill));
+                //SHOWCONTOURS(spec->global.config, "after_applying_infillings_1", &(contours_tofill));
             }
         } else {
             //clp::Paths MYAUX = contours_tofill;
@@ -760,9 +759,9 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
             AddPaths(clipper, contours_tofill, clp::ptClip, true);
             clipper.Execute(clp::ctDifference, contours_tofill, clp::pftNonZero, clp::pftNonZero);
             clipper.Clear();
-            //SHOWCONTOURS(spec.global.config, "output contours", &MYAUX, &outputs[k]->contours, &contours_tofill);
+            //SHOWCONTOURS(spec->global.config, "output contours", &MYAUX, &outputs[k]->contours, &contours_tofill);
             //clipperDo(clipper, contours_tofill, clp::ctDifference, outputs[k]->contours, contours_tofill, clp::pftEvenOdd, clp::pftEvenOdd);
-            //SHOWCONTOURS(spec.global.config, "after_addsub_switch", &MYAUX, &outputs[k]->contours, &contours_tofill);// , &contours_alreadyfilled);
+            //SHOWCONTOURS(spec->global.config, "after_addsub_switch", &MYAUX, &outputs[k]->contours, &contours_tofill);// , &contours_alreadyfilled);
         }
     }
     return k;

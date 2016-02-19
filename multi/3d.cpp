@@ -10,7 +10,7 @@
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesPastZ(double z) {
     //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
-    bool sliceUpwards = spec.global.sliceUpwards;
+    bool sliceUpwards = spec->global.sliceUpwards;
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
         slices->erase(std::remove_if(slices->begin(), slices->end(),
             [z, sliceUpwards](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sliceUpwards ? (sz->z < z) : (sz->z > z)); }
@@ -19,7 +19,7 @@ void ToolpathManager::removeUsedSlicesPastZ(double z) {
 }
 
 void ToolpathManager::removeAdditionalContoursPastZ(double z) {
-    bool sliceUpwards = spec.global.sliceUpwards;
+    bool sliceUpwards = spec->global.sliceUpwards;
     for (auto additional = additionalAdditiveContours.begin(); additional != additionalAdditiveContours.end();) {
         bool erase = sliceUpwards ? (additional->first < z) : (additional->first > z);
         if (erase) {
@@ -46,7 +46,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         offsetDo(multi.offset, auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
     }
     if (auxUpdate.empty()) return;
-    if (spec.global.addsub.addsubWorkflowMode) {
+    if (spec->global.addsub.addsubWorkflowMode) {
         //here, computeContoursAlreadyFilled will always be false
         if (ntool_contour == 0) {
             //contour auxUpdate is additive
@@ -62,18 +62,18 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         // processToComputeIsAdditive should always be true here
         if (computeContoursAlreadyFilled) multi.clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
     }
-    //SHOWCONTOURS(spec.global.config, "deflating_contour", &contours, &auxUpdate);
+    //SHOWCONTOURS(spec->global.config, "deflating_contour", &contours, &auxUpdate);
 }
 
 //remove from the input contours the parts that are already there from previous slices
 void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool) {
 
-    bool processToComputeIsAdditive = !spec.global.addsub.addsubWorkflowMode || ntool == 0;
-    bool computeContoursAlreadyFilled = spec.useContoursAlreadyFilled(ntool);
+    bool processToComputeIsAdditive = !spec->global.addsub.addsubWorkflowMode || ntool == 0;
+    bool computeContoursAlreadyFilled = spec->useContoursAlreadyFilled(ntool);
 
     /*the following logic for getting parts to add and parts to substract hinges on
     the multislicer using always additive processes as default (and substractive for k>0
-    if the flag spec.global.addsubWorkflowMode is set). Of course, it should be fine to
+    if the flag spec->global.addsubWorkflowMode is set). Of course, it should be fine to
     pretend that the software is valid also if we invert all additive/subtractive processes*/
     //for subtractive process: initialContour <- previously_computed_additive_contours - rawSlice - previously_computed_subtractive_contours
     //for additive process:    initialContour <- rawSlice - previously_computed_additive_contours
@@ -87,14 +87,14 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //process additional additive contours: for applyContours() logic to take them as additive, we earmark them as coming from ntool=0
     //OF COURSE, THIS WORKS ONLY AS LONG AS WE HAVE THE CONVENTION THAT add/sub PROCESSES ARE ADDITIVE FOR ntool=0 AND SUBTRACTIVE FOR ntool>0
     for (auto & additional : additionalAdditiveContours) {
-        if (std::fabs(additional.first - z) < spec.global.z_epsilon) {
+        if (std::fabs(additional.first - z) < spec->global.z_epsilon) {
             if (appliedAdditional) {
                 printf("WARNING: tried to apply more than one instance of additional additive contours for raw slice at z=%f, for tool=%d!\n", z, ntool);
             } else {
                 applyContours(additional.second, 0, processToComputeIsAdditive, computeContoursAlreadyFilled, 0.0);
                 //we have received feedback for additional contours.
                 //If flag ignoreRedundantAdditiveContours is true, ignore stored additive contours
-                doNotUseStoredAdditiveContours = spec.global.addsub.ignoreRedundantAdditiveContours;
+                doNotUseStoredAdditiveContours = spec->global.addsub.ignoreRedundantAdditiveContours;
                 appliedAdditional = true;
             }
         }
@@ -104,20 +104,20 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     }
 
     //process previously computed contours
-    for (int ntool_contour = 0; ntool_contour < spec.numspecs; ++ntool_contour) {
+    for (int ntool_contour = 0; ntool_contour < spec->numspecs; ++ntool_contour) {
         
         //do not use any stored additive contour if we have received feedback
         if (doNotUseStoredAdditiveContours) {
-            bool contourIsAdditive = !spec.global.addsub.addsubWorkflowMode || ntool_contour == 0;
+            bool contourIsAdditive = !spec->global.addsub.addsubWorkflowMode || ntool_contour == 0;
             if (contourIsAdditive) continue;
         }
 
-        multi.offset.ArcTolerance = (double)spec.pp[ntool_contour].arctolG;
+        multi.offset.ArcTolerance = (double)spec->pp[ntool_contour].arctolG;
         for (auto slice = slicess[ntool_contour].begin(); slice != slicess[ntool_contour].end(); ++slice) {
             if (!(*slice)->contours.empty()) { 
-                double currentWidth = spec.pp[ntool_contour].profile->getWidth((*slice)->z - z);
+                double currentWidth = spec->pp[ntool_contour].profile->getWidth((*slice)->z - z);
                 if (currentWidth > 0) {
-                    double diffwidth = spec.pp[ntool_contour].radius - currentWidth;
+                    double diffwidth = spec->pp[ntool_contour].radius - currentWidth;
                     if ((*slice)->infillingsIndependentContours.empty()) {
                         //if infilling contours were not generated, we make do with the contours, which are actually cheaper to handle!
                         auto &contours = (*slice)->contours;
@@ -139,7 +139,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
         multi.clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
         multi.clipper2.Clear();
     }
-    //SHOWCONTOURS(spec.global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
+    //SHOWCONTOURS(spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
 
 
@@ -151,7 +151,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
 */
 bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
 
-    if (spec.global.addsub.addsubWorkflowMode) spec.global.inputSub.clear();
+    if (spec->global.addsub.addsubWorkflowMode) spec->global.inputSub.clear();
 
     updateInputWithProfilesFromPreviousSlices(auxInitial, rawSlice, z, ntool);
 
@@ -169,10 +169,10 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
         slicess.pop_back();
         return ret;
     }
-    if (spec.global.substractiveOuter) {
-        removeOuter(output.toolpaths, spec.global.outerLimitX, spec.global.outerLimitY);
+    if (spec->global.substractiveOuter) {
+        removeOuter(output.toolpaths, spec->global.outerLimitX, spec->global.outerLimitY);
         if (output.alsoInfillingAreas) {
-            removeOuter(output.infillingAreas, spec.global.outerLimitX, spec.global.outerLimitY);
+            removeOuter(output.infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
         }
     }
 
@@ -181,7 +181,7 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
 
 
 void RawSlicesManager::removeUsedRawSlices() {
-    bool sliceUpwards = sched.tm.spec.global.sliceUpwards;
+    bool sliceUpwards = sched.tm.spec->global.sliceUpwards;
     for (int k = 0; k < raw.size(); ++k) {
         if (raw[k].inUse) {
             if (raw[k].numRemainingUses < 0) {
@@ -206,18 +206,18 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
         throw std::runtime_error("option ScheduleLaserSimple not implemented!!!!");
         break;
     case ScheduleTwoPhotonSimple:
-        if (tm.spec.global.schedMode==ManualScheduling) {
-            input.reserve(tm.spec.global.schedSpec.size());
-            for (auto pair = tm.spec.global.schedSpec.begin(); pair != tm.spec.global.schedSpec.end(); ++pair) {
+        if (tm.spec->global.schedMode==ManualScheduling) {
+            input.reserve(tm.spec->global.schedSpec.size());
+            for (auto pair = tm.spec->global.schedSpec.begin(); pair != tm.spec->global.schedSpec.end(); ++pair) {
                 input.push_back(InputSliceData(pair->z, pair->ntool));
             }
         } else {
             double extent = maxz - minz;
             int num = 0;
-            for (int k = 0; k < tm.spec.numspecs; ++k) num += (int)(extent / tm.spec.pp[k].profile->sliceHeight) + 3;
+            for (int k = 0; k < tm.spec->numspecs; ++k) num += (int)(extent / tm.spec->pp[k].profile->sliceHeight) + 3;
             input.reserve(num);
-            bool sliceUpwards = tm.spec.global.sliceUpwards;
-            std::vector<double> zbase(tm.spec.numspecs, sliceUpwards ? minz : maxz);
+            bool sliceUpwards = tm.spec->global.sliceUpwards;
+            std::vector<double> zbase(tm.spec->numspecs, sliceUpwards ? minz : maxz);
             recursiveSimpleInputScheduler(0, zbase, sliceUpwards ? maxz : minz);
         }
         if (!input.empty()) {
@@ -228,9 +228,9 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
 }
 
 bool testSliceNotNearEnd(double z, double zend, int process, ToolpathManager &tm) {
-    double zspan = (tm.spec.global.sliceUpwards) ? (zend - z) : (z - zend);
+    double zspan = (tm.spec->global.sliceUpwards) ? (zend - z) : (z - zend);
     //why 0.25: 0.5 because it is the offset when voxels are symmetric respect to their Z slice, 0.2 to give some slack and not discard slices that protude slightly
-    return zspan >= tm.spec.pp[process].profile->sliceHeight*(0.5 - 0.2);
+    return zspan >= tm.spec->pp[process].profile->sliceHeight*(0.5 - 0.2);
 }
 
 /*this is adequate for additive processes, as it assumes that voxels are symmetric over the Z axis.
@@ -246,16 +246,16 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
     int process;
     bool nextpok;
     int nextp          = process_spec + 1;
-    bool sliceUpwards  = tm.spec.global.sliceUpwards;
-    if (tm.spec.global.schedTools.empty()) {
+    bool sliceUpwards  = tm.spec->global.sliceUpwards;
+    if (tm.spec->global.schedTools.empty()) {
         process        = process_spec;
-        nextpok        = nextp < tm.spec.numspecs;
+        nextpok        = nextp < tm.spec->numspecs;
     } else {
-        process        = tm.spec.global.schedTools[process_spec];
-        nextpok        = nextp < tm.spec.global.schedTools.size();
+        process        = tm.spec->global.schedTools[process_spec];
+        nextpok        = nextp < tm.spec->global.schedTools.size();
     }
 
-    double sliceHeight = tm.spec.pp[process].profile->sliceHeight;
+    double sliceHeight = tm.spec->pp[process].profile->sliceHeight;
     if (!sliceUpwards) {
            sliceHeight = -sliceHeight;
     }
@@ -321,8 +321,8 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
     for (int k = 0; k < input.size(); ++k) {
         if (useinraw[k]) {
             rm.raw[kraw].z = rm.rawZs[kraw] = input[k].z;
-            //if tm.spec.global.avoidVerticalOverwriting is set, numRemainingUses has to be computed in conjunction with filling requiredRawSlices
-            rm.raw[kraw].numRemainingUses = (tm.spec.global.avoidVerticalOverwriting) ? 0 : remainingUsesRaw_zs_output_order[initialMapInputToRaw[k]];
+            //if tm.spec->global.avoidVerticalOverwriting is set, numRemainingUses has to be computed in conjunction with filling requiredRawSlices
+            rm.raw[kraw].numRemainingUses = (tm.spec->global.avoidVerticalOverwriting) ? 0 : remainingUsesRaw_zs_output_order[initialMapInputToRaw[k]];
             rm.raw[kraw].inUse = false;
             rm.raw[kraw].wasUsed = false;
             rm.raw[kraw].slice.clear();
@@ -343,12 +343,12 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
         }
     }
 
-    if (tm.spec.global.avoidVerticalOverwriting) {
+    if (tm.spec->global.avoidVerticalOverwriting) {
         //TODO: reserve space for each input.requiredRawSlices, to avoid memory fragmentation!!!!
         for (int k = 0; k < input.size(); ++k) {
             int ntool = input[k].ntool;
             double inputz = input[k].z;
-            double voxelSemiZ = tm.spec.pp[ntool].profile->getVoxelSemiHeight();
+            double voxelSemiZ = tm.spec->pp[ntool].profile->getVoxelSemiHeight();
             for (int m = 0; m < rm.raw.size(); ++m) {
                 double val = std::fabs(rm.raw[m].z - inputz);
                 if (val <= voxelSemiZ) {
@@ -374,12 +374,12 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
 void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
     //get indexes for sorting inputs by Z
     output_idx = 0;
-    num_output_by_tool.resize(tm.spec.numspecs, 0);
+    num_output_by_tool.resize(tm.spec->numspecs, 0);
     output.resize(input.size());
     std::vector<int> order_to_output(input.size());
     std::iota(order_to_output.begin(), order_to_output.end(), 0);
     auto comparator = [this](int a, int b) { double df = input[a].z - input[b].z; return (df < 0.0) || ((df == 0) && (input[a].ntool < input[b].ntool)); };
-    if (tm.spec.global.sliceUpwards) {
+    if (tm.spec->global.sliceUpwards) {
         std::sort(order_to_output. begin(), order_to_output. end(), comparator);
     } else {
         std::sort(order_to_output.rbegin(), order_to_output.rend(), comparator);
@@ -400,10 +400,10 @@ void RawSlicesManager::receiveNextRawSlice(clp::Paths &input) {
     raw[raw_idx].wasUsed = raw[raw_idx].inUse = true;
     raw[raw_idx].slice = std::move(input);
     ++raw_idx;
-    if (sched.tm.spec.global.substractiveOuter) {
-        addOuter(raw[raw_idx].slice, sched.tm.spec.global.limitX, sched.tm.spec.global.limitY);
+    if (sched.tm.spec->global.substractiveOuter) {
+        addOuter(raw[raw_idx].slice, sched.tm.spec->global.limitX, sched.tm.spec->global.limitY);
     }
-    if (sched.tm.spec.global.correct || sched.tm.spec.global.substractiveOuter) {
+    if (sched.tm.spec->global.correct || sched.tm.spec->global.substractiveOuter) {
         orientPaths(raw[raw_idx].slice);
     }
 }
@@ -419,7 +419,7 @@ bool RawSlicesManager::singleRawSliceReady(int raw_idx, int input_idx) {
 }
 
 bool RawSlicesManager::rawReady(int input_idx) {
-    if (sched.tm.spec.global.avoidVerticalOverwriting) {
+    if (sched.tm.spec->global.avoidVerticalOverwriting) {
         std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
         if (raw_idxs.empty()) { //catch this error condition before it propagates!
             sched.has_err = true;
@@ -438,7 +438,7 @@ bool RawSlicesManager::rawReady(int input_idx) {
 
 clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
     //here, we trust that rawReady() has returned TRUE PREVIOUSLY, Otherwise... CLUSTERFUCK!!!!
-    if (sched.tm.spec.global.avoidVerticalOverwriting) {
+    if (sched.tm.spec->global.avoidVerticalOverwriting) {
         std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
         if (raw_idxs.size() == 1) {
             //trivial case
@@ -468,13 +468,13 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                 if (inputz == rawz) {
                     next = &raw[*raw_idx].slice;
                 } else {
-                    double width_at_raw = sched.tm.spec.pp[ntool].profile->getWidth(inputz - rawz);
+                    double width_at_raw = sched.tm.spec->pp[ntool].profile->getWidth(inputz - rawz);
                     if (width_at_raw <= 0) {
                         sched.has_err = true;
                         sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the voxel's width at the raw slice Z was illegal: ", width_at_raw);
                         return NULL;
                     }
-                    double diffwidth = sched.tm.spec.pp[ntool].radius - width_at_raw;
+                    double diffwidth = sched.tm.spec->pp[ntool].radius - width_at_raw;
                     if (diffwidth < 0) {
                         sched.has_err = true;
                         sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the diffwidth is below 0: ", diffwidth);
@@ -524,9 +524,9 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
             giveNextOutputSlice();
             }
             }*/
-            if (removeUnused && (tm.spec.global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
-                bool sliceUpwards = tm.spec.global.sliceUpwards;
-                double zlimit = input[input_idx].z - tm.spec.pp[0].profile->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
+            if (removeUnused && (tm.spec->global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
+                bool sliceUpwards = tm.spec->global.sliceUpwards;
+                double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
                 tm.removeUsedSlicesPastZ(zlimit);
                 tm.removeAdditionalContoursPastZ(zlimit);
                 rm.removeUsedRawSlices();
@@ -557,7 +557,7 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
 
 
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
-    if (sched.tm.spec.global.fb.feedbackMesh) {
+    if (sched.tm.spec->global.fb.feedbackMesh) {
 
 #ifdef SLICER_USE_DEBUG_FILE
         //make sure that the log file is not the same as for the other slicer instance!
@@ -573,7 +573,7 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         config.update("SLICER_DEBUGFILE", oldValue);
 #endif
 
-        char *meshfullpath = fullPath(sched.tm.spec.global.fb.feedbackFile.c_str());
+        char *meshfullpath = fullPath(sched.tm.spec->global.fb.feedbackFile.c_str());
         if (meshfullpath == NULL) {
             return std::string("Error trying to resolve canonical path to the feedback mesh file");
         }
@@ -614,19 +614,19 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         return std::string();
     } else {
 
-        FILE * f = fopen(sched.tm.spec.global.fb.feedbackFile.c_str(), "rb");
-        if (f == NULL) { return str("Could not open input file ", sched.tm.spec.global.fb.feedbackFile); }
+        FILE * f = fopen(sched.tm.spec->global.fb.feedbackFile.c_str(), "rb");
+        if (f == NULL) { return str("Could not open input file ", sched.tm.spec->global.fb.feedbackFile); }
         IOPaths iop_f(f);
 
         FileHeader fileheader;
         std::string err = fileheader.readFromFile(f);
-        if (!err.empty()) { fclose(f); return str("Error reading file header for ", sched.tm.spec.global.fb.feedbackFile, ": ", err); }
+        if (!err.empty()) { fclose(f); return str("Error reading file header for ", sched.tm.spec->global.fb.feedbackFile, ": ", err); }
 
         SliceHeader sliceheader;
         for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
             std::string e = sliceheader.readFromFile(f);
-            if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec.global.fb.feedbackFile, ": ", err); break; }
-            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec.global.fb.feedbackFile, ": header is too short!"); break; }
+            if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": ", err); break; }
+            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": header is too short!"); break; }
             if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
                 clp::Paths paths;
                 if (sliceheader.saveFormat == PATHFORMAT_INT64) {
@@ -640,10 +640,10 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
                         break;
                     }
                 } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
-                    err = str("Error reading feedback from pathsfile ", sched.tm.spec.global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
+                    err = str("Error reading feedback from pathsfile ", sched.tm.spec->global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
                     break;
                 } else {
-                    err = str("Error reading feedback from pathsfile ", sched.tm.spec.global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
+                    err = str("Error reading feedback from pathsfile ", sched.tm.spec->global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
                     break;
                 }
                 sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);

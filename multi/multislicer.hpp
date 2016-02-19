@@ -27,7 +27,7 @@ typedef struct SingleProcessOutput {
 
 class Multislicer {
 protected:
-    MultiSpec &spec;
+    std::shared_ptr<MultiSpec> spec;
     std::string *err; //this must be set up by applyXXX() methods
     //these variables are here to avoid recurring std::vector growing costs, but they are not intended to be used directly, but aliased as method parameters
     clp::Paths AUX1, AUX2, AUX3, AUX4;
@@ -40,7 +40,7 @@ public:
     clp::ClipperOffset offset;
     clp::Clipper clipper;
     clp::Clipper clipper2; //we need this in order to conduct more than one clipping in parallel, if necessary
-    Multislicer(MultiSpec &_spec) : spec(_spec) {}
+    Multislicer(std::shared_ptr<MultiSpec> _spec) : spec(std::move(_spec)) {}
     void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); accumInfillingsHolder.clear();  accumInflatedMedialAxis.clear(); accumNonCoveredByInfillings.clear();  infillingsIndependentContours = NULL; }
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the 
     //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm

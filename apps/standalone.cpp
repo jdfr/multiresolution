@@ -89,7 +89,7 @@ int main(int argc, const char** argv) {
     bool dryrun;
     
     Configuration config;
-    MultiSpec multispec(config);
+    std::shared_ptr<MultiSpec> multispec = std::make_shared<MultiSpec>(config);
     bool doscale = true;
     MetricFactors factors;
 
@@ -136,7 +136,7 @@ int main(int argc, const char** argv) {
         factors.init(config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        std::string err = parseAll(multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], getScale(factors));
+        std::string err = parseAll(*multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], getScale(factors));
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
@@ -197,7 +197,7 @@ int main(int argc, const char** argv) {
                 std::shared_ptr<PathWriter> w;
                 std::string fn          = std::move(mainOpts[dxf_mode].as<std::string>());
                 const bool generic_type = true;
-                double epsilon          = multispec.global.z_epsilon*factors.internal_to_input;
+                double epsilon          = multispec->global.z_epsilon*factors.internal_to_input;
                 if (dxfmode == DXFAscii) {
                     w = std::make_shared<DXFAsciiPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
                 } else {
@@ -246,12 +246,12 @@ int main(int argc, const char** argv) {
     double minx, maxx, miny, maxy, minz, maxz;
     slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
 
-    bool alsoContours = multispec.global.alsoContours;
+    bool alsoContours = multispec->global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
-    int numtools = (int)multispec.numspecs;
+    int numtools = (int)multispec->numspecs;
     if (save || show) {
-        std::shared_ptr<FileHeader> header = std::make_shared<FileHeader>(multispec, factors);
+        std::shared_ptr<FileHeader> header = std::make_shared<FileHeader>(*multispec, factors);
 #ifdef STANDALONE_USEPYTHON
         if (show) {
             pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
@@ -278,18 +278,18 @@ int main(int argc, const char** argv) {
 
     try {
 
-        if (multispec.global.useScheduler) {
+        if (multispec->global.useScheduler) {
 
             bool removeUnused = true; //!saveContours;
             SimpleSlicingScheduler sched(removeUnused, multispec);
 
-            if (multispec.global.schedMode == ManualScheduling) {
-                for (auto pair = multispec.global.schedSpec.begin(); pair != multispec.global.schedSpec.end(); ++pair) {
+            if (multispec->global.schedMode == ManualScheduling) {
+                for (auto pair = multispec->global.schedSpec.begin(); pair != multispec->global.schedSpec.end(); ++pair) {
                     pair->z *= factors.input_to_internal;
                 }
             }
 
-            sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec.global.z_epsilon, ScheduleTwoPhotonSimple);
+            sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec->global.z_epsilon, ScheduleTwoPhotonSimple);
 
             if (sched.has_err) {
                 fprintf(stderr, "Error while trying to create the slicing schedule: %s\n", sched.err.c_str());
@@ -317,7 +317,7 @@ int main(int argc, const char** argv) {
                 return 0;
             }
 
-            if (multispec.global.fb.feedback) {
+            if (multispec->global.fb.feedback) {
                 std::string err = applyFeedback(config, factors, sched, rawZs, sched.rm.rawZs);
                 if (!err.empty()) {
                     fprintf(stderr, err.c_str());
@@ -376,7 +376,7 @@ int main(int argc, const char** argv) {
                     }
                     printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
                     double zscaled = single->z                          * factors.internal_to_input;
-                    double rad     = multispec.pp[single->ntool].radius * factors.internal_to_input;
+                    double rad     = multispec->pp[single->ntool].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
                         if (!pathwriter->writePaths(single->toolpaths, PATHTYPE_TOOLPATH, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
                             fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
@@ -397,11 +397,11 @@ int main(int argc, const char** argv) {
             Multislicer multi(multispec);
             std::vector<ResultSingleTool> res;
             std::vector<SingleProcessOutput*> ress(numtools);
-            double zstep = multispec.global.z_uniform_step;
+            double zstep = multispec->global.z_uniform_step;
 
             std::vector<double> zs;
-            if (multispec.global.use_z_base) {
-                zs = prepareSTLSimple(minz, maxz, multispec.global.z_base, zstep);
+            if (multispec->global.use_z_base) {
+                zs = prepareSTLSimple(minz, maxz, multispec->global.z_base, zstep);
             } else {
                 zs = prepareSTLSimple(minz, maxz, zstep);
             }
@@ -472,7 +472,7 @@ int main(int argc, const char** argv) {
                 }
 
                 for (int k = 0; k < numtools; ++k) {
-                    double rad     = multispec.pp[k].radius * factors.internal_to_input;
+                    double rad     = multispec->pp[k].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
                         if (!pathwriter->writePaths(ress[k]->toolpaths, PATHTYPE_TOOLPATH, rad, k, zs[i], factors.internal_to_input, false)) {
                             fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
