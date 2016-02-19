@@ -2,6 +2,7 @@
 #define SNAPTOGRID_HEADER
 
 #include "common.hpp"
+#include "config.hpp"
 
 enum SnapMode {
     SnapDilate, //snap by dilating the contour
@@ -31,7 +32,7 @@ typedef struct {
 
 //sophisticated functions: do snapping while dilating/eroding and simplifying the contours
 int snapPathToGrid(ClipperLib::Path &outputs, ClipperLib::Path &inputs, SnapToGridSpec &spec, gridInfo *gridinfo=NULL);
-bool snapClipperPathsToGrid(clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err);
+bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err);
 
 //unsophisticated versions, suitable for open , very short, slightly processed toolpaths (ignores spec.mode: always works as if it is SnapSimple)
 void verySimpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec);

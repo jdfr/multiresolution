@@ -219,7 +219,7 @@ bool Multislicer::generateToolPath(size_t k, bool nextProcessSameKind, clp::Path
             spec.pp[k].snapspec.mode = SnapDilate;
         }
         //aux1 <- snapToGrid(toolpath, gridstep, doErosion)
-        bool ok = snapClipperPathsToGrid(aux1, temp_toolpath, spec.pp[k].snapspec, *err);
+        bool ok = snapClipperPathsToGrid(spec.global.config, aux1, temp_toolpath, spec.pp[k].snapspec, *err);
         if (!ok) return false;
         std::swap(aux1, temp_toolpath);
     } else {
@@ -344,7 +344,7 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
         offsetDo(offset, next, -infillingRadius, current, clp::jtRound, clp::etClosedPolygon);
     }
     if (false){//applySnapConcentricInfilling) {
-        bool ok = snapClipperPathsToGrid(smoothed, next, concentricInfillingSnapSpec, *err);
+        bool ok = snapClipperPathsToGrid(spec.global.config, smoothed, next, concentricInfillingSnapSpec, *err);
         if (!ok) return false;
         MOVETO(smoothed, next);
     }

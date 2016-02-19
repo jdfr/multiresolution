@@ -1,5 +1,6 @@
 
 #include "snapToGrid.hpp"
+#include "showcontours.hpp"
 #include <sstream>
 #include <cmath>
 //#include <stdio.h> 
@@ -388,7 +389,48 @@ int snapPathToGrid(ClipperLib::Path &outputs, ClipperLib::Path &inputs, SnapToGr
   return 0;
 }
 
-bool snapClipperPathsToGrid(clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err) {
+const double factor = 30.0;
+
+void addPointAsPlus(SnapToGridSpec &snapspec, clp::Paths &lines, clp::IntPoint p) {
+    lines.emplace_back(2);
+    lines.back()[0].X = p.X - (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[0].Y = p.Y;
+    lines.back()[1].X = p.X + (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[1].Y = p.Y;
+    lines.emplace_back(2);
+    lines.back()[0].X = p.X;
+    lines.back()[0].Y = p.Y - (clp::cInt)(snapspec.gridstepY * factor);
+    lines.back()[1].X = p.X;
+    lines.back()[1].Y = p.Y + (clp::cInt)(snapspec.gridstepY * factor);
+}
+
+void addPointAsCross(SnapToGridSpec &snapspec, clp::Paths &lines, clp::IntPoint p) {
+    lines.emplace_back(2);
+    lines.back()[0].X = p.X - (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[0].Y = p.Y - (clp::cInt)(snapspec.gridstepY * factor);
+    lines.back()[1].X = p.X + (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[1].Y = p.Y + (clp::cInt)(snapspec.gridstepY * factor);
+    lines.emplace_back(2);
+    lines.back()[0].X = p.X + (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[0].Y = p.Y - (clp::cInt)(snapspec.gridstepY * factor);
+    lines.back()[1].X = p.X - (clp::cInt)(snapspec.gridstepX * factor);
+    lines.back()[1].Y = p.Y + (clp::cInt)(snapspec.gridstepY * factor);
+}
+
+void showError(Configuration &config, SnapToGridSpec &snapspec, size_t inputIdx, clp::Path &_input, gridInfo &gridinfo, int errcode) {
+    clp::Paths grid;
+    clp::Paths errpoint;
+    clp::Paths input(1, _input);
+    errpoint.reserve(2);
+    grid.reserve(gridinfo.npoints * 2);
+    addPointAsCross(snapspec, errpoint, gridinfo.point);
+    for (int k = 0; k < gridinfo.npoints; ++k) {
+        addPointAsPlus(snapspec, grid, gridinfo.grid[k]);
+    }
+    SHOWCONTOURS(config, str("Error while snapping point ", gridinfo.numPoint, " of path ", inputIdx, ", errcode: ", errcode), &grid, &errpoint, &input);
+}
+
+bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err) {
     gridInfo gridinfo;
     size_t s = inputs.size();
     output.resize(s);
@@ -403,6 +445,7 @@ bool snapClipperPathsToGrid(clp::Paths &output, clp::Paths &inputs, SnapToGridSp
         INTO ACCOUNT THAT IT IS AN OPEN PATH*/
         numout += result == 0;
         if (result>1) {
+            showError(config, snapspec, i, inputs[i], gridinfo, result);
             std::ostringstream fmt;
             fmt << "error in snapPathToGrid for the path " << i << "/" << (s - 1) << ".\n    ERRORCODE: " << result << "\n    numPoint: " << gridinfo.numPoint << "\n    X=" << gridinfo.point.X << "\n    Y=" << gridinfo.point.Y << "\n";
             err = fmt.str();
