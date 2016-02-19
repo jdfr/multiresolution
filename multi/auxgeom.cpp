@@ -2,6 +2,13 @@
 #include "config.hpp"
 #include <cmath>
 
+//const int maxpower = 27;
+const int maxpower = 31;
+const clp::cInt MAX32 = (((clp::cInt)1) << maxpower) - 1;
+const clp::cInt MIN32 = -MAX32;
+//do not feel confortable using up all the space in int32, so give it a little slack
+const double TRANSFORMATION_CEILING = MAX32 - (1 << 10);
+
 std::string handleClipperException(clp::clipperException &e) {
     if (strcmp(e.what(), "Coordinate outside allowed range") == 0) {
         return std::string("ClipperLib error! polygon coordinates were too big!");
@@ -31,7 +38,11 @@ void printClipperPaths(clp::Paths &paths, const char * name, FILE* f) {
 double distance_to(const clp::IntPoint &point1, const clp::IntPoint &point2) {
     clp::cInt dx = point1.X-point2.X;
     clp::cInt dy = point1.Y-point2.Y;
-    return sqrt(dx*dx+dy*dy);
+    if ((dx<TRANSFORMATION_CEILING) & (dx>-TRANSFORMATION_CEILING) & (dy<TRANSFORMATION_CEILING) & (dy>-TRANSFORMATION_CEILING)) {
+        return sqrt(dx*dx + dy*dy); //only use this route if no overflow is possible in dx*dx + dy*dy
+    } else {
+        return sqrt(((double)dx)*dx + ((double)dy)*dy); //lose precision, but do safe arithmetic!
+    }
 }
 
 //distance from point to middle of the segment
@@ -189,13 +200,6 @@ BBox getBB(HoledPolygons &hps) {
 
     return bb;
 }
-
-//const int maxpower = 27;
-const int maxpower = 31;
-const clp::cInt MAX32 = (((clp::cInt)1) << maxpower) - 1;
-const clp::cInt MIN32 = -MAX32;
-//do not feel confortable using up all the space in int32, so give it a little slack
-const double TRANSFORMATION_CEILING = MAX32 - (1 << 10);
 
 Transformation BBox::fitToInt32() {
     if ((this->minx > MIN32) && (this->maxx < MAX32) &&
