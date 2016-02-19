@@ -57,9 +57,6 @@ double distancePS(clp::IntPoint &p, Segment &s);
 
 double distance_to(const clp::IntPoint &point1, const clp::IntPoint &point2);
 
-void extend_path_start(clp::Path &path, double distance);
-void extend_path_end(clp::Path &path, double distance);
-
 enum PathMode {openMode, closedMode};
 
 void addPathToSegments(clp::Path &path, Segments &segments, PathMode mode);
