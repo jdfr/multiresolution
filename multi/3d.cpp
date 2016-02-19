@@ -7,19 +7,6 @@
 #include <numeric>
 #include <algorithm>
 
-//this macro is for any object with a std::string err field;
-#define MAKE_ERR(obj, ...) { \
-  std::ostringstream fmt;    \
-  fmt << __VA_ARGS__;       \
-  (obj).err = fmt.str();          \
-}
-
-//this macro is for methods with access to a SimpleSlicingScheduler object
-#define MAKE_SCHED_ERR(sched, ...) { \
-  (sched).has_err = true;            \
-  MAKE_ERR(sched, __VA_ARGS__) \
-}
-
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesPastZ(double z) {
     //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
@@ -178,8 +165,8 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
     contours_alreadyfilled.clear();
     output.has_err = !output.err.empty();
     if (!ret) {
+        err = str("error in applyProcess() at height z= ", z, ", process ", ntool, ": ", output.err, "\n");
         slicess.pop_back();
-        MAKE_ERR(*this, "error in applyProcess() at height z= " << z << ", process " << ntool << "\n");
         return ret;
     }
     if (spec.global.substractiveOuter) {
@@ -424,7 +411,8 @@ void RawSlicesManager::receiveNextRawSlice(clp::Paths &input) {
 bool RawSlicesManager::singleRawSliceReady(int raw_idx, int input_idx) {
     //catch errors before the scheduler's state gets mangled beyond debuggability
     if ((!raw[raw_idx].inUse) && raw[raw_idx].wasUsed) {
-        MAKE_SCHED_ERR(sched, "error: a raw slice at idx_raw=" << raw_idx << " was previously freed but it is required NOW at input_idx=" << input_idx);
+        sched.has_err = true;
+        sched.err     = str("error: a raw slice at idx_raw=", raw_idx, " was previously freed but it is required NOW at input_idx=", input_idx);
         return false;
     }
     return raw[raw_idx].inUse;
@@ -434,7 +422,8 @@ bool RawSlicesManager::rawReady(int input_idx) {
     if (sched.tm.spec.global.avoidVerticalOverwriting) {
         std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
         if (raw_idxs.empty()) { //catch this error condition before it propagates!
-            MAKE_SCHED_ERR(sched, "error: avoidVerticalOverwriting is set, but at input_idx=" << input_idx << " no raw slices were required!!!!");
+            sched.has_err = true;
+            sched.err     = str("error: avoidVerticalOverwriting is set, but at input_idx=", input_idx, " no raw slices were required!!!!");
             return false;
         }
         for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
@@ -481,12 +470,14 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                 } else {
                     double width_at_raw = sched.tm.spec.pp[ntool].profile->getWidth(inputz - rawz);
                     if (width_at_raw <= 0) {
-                        MAKE_SCHED_ERR(sched, "error for input slice with input_idx=" << input_idx << " at z=" << inputz << ", a raw slice with raw_idx=" << *raw_idx << " at z=" << rawz << " was required, but the voxel's width at the raw slice Z was illegal: " << width_at_raw);
+                        sched.has_err = true;
+                        sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the voxel's width at the raw slice Z was illegal: ", width_at_raw);
                         return NULL;
                     }
                     double diffwidth = sched.tm.spec.pp[ntool].radius - width_at_raw;
                     if (diffwidth < 0) {
-                        MAKE_SCHED_ERR(sched, "error for input slice with input_idx=" << input_idx << " at z=" << inputz << ", a raw slice with raw_idx=" << *raw_idx << " at z=" << rawz << " was required, but the diffwidth is below 0: " << diffwidth);
+                        sched.has_err = true;
+                        sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the diffwidth is below 0: ", diffwidth);
                         return NULL;
                     }
                     //we use jtSquare here because it is way faster than jtRound and we do not strictly need the extra shape precision provided by jtRound
