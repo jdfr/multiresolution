@@ -62,7 +62,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         // processToComputeIsAdditive should always be true here
         if (computeContoursAlreadyFilled) multi.clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
     }
-    //SHOWCONTOURS(spec->global.config, "deflating_contour", &contours, &auxUpdate);
+    //SHOWCONTOURS(*spec->global.config, "deflating_contour", &contours, &auxUpdate);
 }
 
 //remove from the input contours the parts that are already there from previous slices
@@ -139,7 +139,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
         multi.clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
         multi.clipper2.Clear();
     }
-    //SHOWCONTOURS(spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
+    //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
 
 
@@ -150,8 +150,6 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
       -do that recursively for each process, from lowest to highest
 */
 bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
-
-    if (spec->global.addsub.addsubWorkflowMode) spec->global.inputSub.clear();
 
     updateInputWithProfilesFromPreviousSlices(auxInitial, rawSlice, z, ntool);
 

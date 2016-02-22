@@ -28,7 +28,7 @@ typedef struct SharedLibraryState {
     std::vector<clp::cInt> processRadiuses;
     std::shared_ptr<SimpleSlicingScheduler> sched;
     std::shared_ptr<Multislicer> multi;
-    SharedLibraryState(std::shared_ptr<Configuration> _config) : config(std::move(_config)) { spec = std::make_shared<MultiSpec>(*config); }
+    SharedLibraryState(std::shared_ptr<Configuration> _config) : config(std::move(_config)) { spec = std::make_shared<MultiSpec>(config); }
 } SharedLibraryState;
 
 
@@ -96,8 +96,8 @@ LIBRARY_API  BSTR getErrorText(void* value) {
 
 StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::string> &args, bool doscale) {
     SharedLibraryState *state = new SharedLibraryState(config);
-    if (state->spec->global.config.has_err) {
-        state->err = state->spec->global.config.err;
+    if (state->spec->global.config->has_err) {
+        state->err = state->spec->global.config->err;
         return state;
     }
     state->factors.init(*config, doscale);
@@ -188,7 +188,6 @@ LIBRARY_API  ResultsHandle computeResult(SharedLibrarySlice* slice, StateHandle 
     size_t numspecs = state->spec->numspecs;
     SharedLibraryResult * result = new SharedLibraryResult(numspecs);
 
-    GlobalSpec &global = state->spec->global;
     if (slice->paths->size() > 0) {
         //this is a very ugly hack to compromise between part of the code requiring vector<shared_ptr<T>>
         //because of convoluted co-ownership requirements and other part happily using vector<T>
@@ -299,7 +298,7 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
             *z *= internal_to_input;
         }
 
-        std::string err = applyFeedback(state->spec->global.config, state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
+        std::string err = applyFeedback(*state->spec->global.config, state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
         if (!err.empty()) {
             state->err = err;
             voidSlices3DSpecInfo(ret);

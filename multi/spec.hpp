@@ -46,7 +46,7 @@ typedef struct AddSubSpec {
 typedef struct GlobalSpec {
     typedef struct ZNTool { double z; unsigned int ntool; ZNTool() {}; ZNTool(double _z, unsigned int _ntool) : z(_z), ntool(_ntool) {} } ZNTool;
     //currently, having a reference to the Configuration here is useful only for debugging with showContours
-    Configuration &config;
+    std::shared_ptr<Configuration> config;
     SchedulerMode schedMode;
     FeedbackSpec fb;
     AddSubSpec addsub;
@@ -64,10 +64,9 @@ typedef struct GlobalSpec {
     double z_uniform_step; //this parameter is the uniform step if useScheduler is false. Unlike most other metric parameters, this is in the mesh's native units!!!!
     double z_epsilon; //epsilon to consider that to Z values are the same.
     //not mean to be read from the command line (for internal use)
-    clp::Paths inputSub; //this is used if flag "addsubWorkflowMode" is set
     bool substractiveOuter;
     clp::cInt outerLimitX, outerLimitY;
-    GlobalSpec(Configuration &_config) : config(_config), inputSub(0) {}
+    GlobalSpec(std::shared_ptr<Configuration> _config) : config(std::move(_config)) {}
 } GlobalSpec;
 
 

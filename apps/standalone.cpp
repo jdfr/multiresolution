@@ -88,8 +88,8 @@ int main(int argc, const char** argv) {
 
     bool dryrun;
     
-    Configuration config;
-    std::shared_ptr<MultiSpec> multispec = std::make_shared<MultiSpec>(config);
+    std::shared_ptr<Configuration> config = std::make_shared<Configuration>();
+    std::shared_ptr<MultiSpec>  multispec = std::make_shared<MultiSpec>(config);
     bool doscale = true;
     MetricFactors factors;
 
@@ -129,11 +129,11 @@ int main(int argc, const char** argv) {
 
         if (!fileExists(configfilename.c_str())) { fprintf(stderr, "Could not open config file %s!!!!", configfilename.c_str()); return -1; }
 
-        config.load(configfilename.c_str());
+        config->load(configfilename.c_str());
 
-        if (config.has_err) { fprintf(stderr, config.err.c_str()); return -1; }
+        if (config->has_err) { fprintf(stderr, config->err.c_str()); return -1; }
 
-        factors.init(config, doscale);
+        factors.init(*config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
         std::string err = parseAll(*multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], getScale(factors));
@@ -223,12 +223,12 @@ int main(int argc, const char** argv) {
         }
     }
 
-    std::shared_ptr<SlicerManager> slicer = getSlicerManager(config, SlicerManagerExternal);
+    std::shared_ptr<SlicerManager> slicer = getSlicerManager(*config, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
     std::shared_ptr<SlicesViewer> slicesViewer;
     if (show) {
-        slicesViewer = std::make_shared<SlicesViewer>(config, "view slices", use2d, viewparams.c_str());
+        slicesViewer = std::make_shared<SlicesViewer>(*config, "view slices", use2d, viewparams.c_str());
         std::string err = slicesViewer->start();
         if (!err.empty()) {
             fprintf(stderr, "Error while trying to launch SlicerViewer script: %s\n", err.c_str());
@@ -318,7 +318,7 @@ int main(int argc, const char** argv) {
             }
 
             if (multispec->global.fb.feedback) {
-                std::string err = applyFeedback(config, factors, sched, rawZs, sched.rm.rawZs);
+                std::string err = applyFeedback(*config, factors, sched, rawZs, sched.rm.rawZs);
                 if (!err.empty()) {
                     fprintf(stderr, err.c_str());
                     return -1;
