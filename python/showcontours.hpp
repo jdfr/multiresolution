@@ -31,9 +31,13 @@ void showContours(std::vector<clp::Paths*> &contours, ShowContoursInfo &info);
 
 //this is a hack to write the list of contours to show as a list of pointers of variable length, automagically generating required calling boilerplate
 template<typename STR, typename... Args> void SHOWCONTOURS(Configuration &config, STR windowname, Args... args) {
+#ifndef CORELIB_USEPYTHON
+    fprintf(stderr, "Cannot show graphical representation of contours!\n");
+#else
     std::vector<clp::Paths*> toshowv = { args... };
     ShowContoursInfo info(config, windowname);
     showContours(toshowv, info);
+#endif
 }
 
 #endif

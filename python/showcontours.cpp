@@ -5,6 +5,9 @@
 #include <sstream>
 
 void showContours(std::vector<clp::Paths> &contours, ShowContoursInfo &info) {
+#ifndef CORELIB_USEPYTHON
+    fprintf(stderr, "Cannot show graphical representation of contours!\n");
+#else
     //int n = 10;
     //n = contours.size() < n ? contours.size() : n;
     auto n = contours.size();
@@ -16,9 +19,13 @@ void showContours(std::vector<clp::Paths> &contours, ShowContoursInfo &info) {
     args[0] = args[n - 1];
     args[n - 1] = first;
     showContours(args, info);
+#endif
 }
 
 void showContours(std::vector<clp::Paths*> &contours, ShowContoursInfo &info) {
+#ifndef CORELIB_USEPYTHON
+    fprintf(stderr, "Cannot show graphical representation of contours!\n");
+#else
     if (contours.empty()) {
         return;
     }
@@ -69,5 +76,5 @@ void showContours(std::vector<clp::Paths*> &contours, ShowContoursInfo &info) {
     }
 
     subp.wait();
-
+#endif
 }

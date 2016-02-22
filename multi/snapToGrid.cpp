@@ -446,10 +446,15 @@ bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Path
         INTO ACCOUNT THAT IT IS AN OPEN PATH*/
         numout += result == 0;
         if (result>1) {
+#ifdef CORELIB_USEPYTHON
             showError(config, snapspec, i, inputs[i], gridinfo, result);
+#endif
             std::ostringstream fmt;
             const char * additional = (result >= 5) ? "\n    This may be alleviated by removing --safestep from the affected process specification\n" : "\n";
             fmt << "error in snapPathToGrid for the path " << i << "/" << (s - 1) << ".\n    ERRORCODE: " << result << "\n    numPoint: " << gridinfo.numPoint << "\n    X=" << gridinfo.point.X << "\n    Y=" << gridinfo.point.Y << additional;
+#ifndef CORELIB_USEPYTHON
+            fmt << "\n    To see a graphical representation of the configuration that led to this error, please recompile the project with python support.\n"
+#endif
             err = fmt.str();
             return false;
         }
