@@ -1,4 +1,4 @@
-#include "pathwriter.hpp"
+#include "pathwriter_multifile.hpp"
 #include "simpleparsing.hpp"
 #include <iomanip>
 

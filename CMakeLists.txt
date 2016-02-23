@@ -168,6 +168,8 @@ set(CORESOURCES
   interfaces/pathsfile.cpp
   interfaces/pathwriter.hpp
   interfaces/pathwriter.cpp
+  interfaces/pathwriter_multifile.hpp
+  interfaces/pathwriter_multifile.cpp
   interfaces/slicermanager.hpp
   interfaces/slicermanager.cpp
   interfaces/subprocess.hpp

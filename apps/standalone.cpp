@@ -3,7 +3,7 @@
 #include "parsing.hpp"
 #include "slicermanager.hpp"
 #include "3d.hpp"
-#include "pathwriter.hpp"
+#include "pathwriter_multifile.hpp"
 #include <iostream>
 
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
