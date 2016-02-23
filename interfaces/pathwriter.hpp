@@ -101,4 +101,6 @@ protected:
     bool isopen;
 };
 
+void addExtension(std::string &filename, std::string ext);
+
 #endif
