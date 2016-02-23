@@ -26,8 +26,8 @@ typedef int OutputSliceInfo_PathType;
 
 #if ( defined(_WIN32) || defined(_WIN64) ) 
 #    if (!(defined(_MSC_VER) || defined(__GNUC__))) //THIS IS VALID ONLY FOR MSVS AND MINGW
-#    error Compiler not supported for now
-#endif
+#        error Compiler not supported for now
+#    endif
 #    ifdef LIBRARY_EXPORTS
 #        define LIBRARY_API __declspec(dllexport)
 #    else
