@@ -42,6 +42,36 @@ void verySimpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec) {
     }
 }
 
+void skipRepeatedPoints(ClipperLib::Path &path) {
+    int npts  = (int)path.size();
+    bool copy = false;
+    auto prev = path.begin();
+    for (auto point = prev + 1; point != path.end(); ++point) {
+        if ((point->X == prev->X) && (point->Y == prev->Y)) {
+            --npts;
+            copy = true;
+        } else {
+            if (copy) *(prev + 1) = *point;
+            ++prev;
+        }
+
+    }
+    if (npts != path.size()) path.resize(npts);
+}
+
+void simpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec) {
+    verySimpleSnapPathToGrid(path, spec);
+    skipRepeatedPoints(path);
+}
+
+void simpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec) {
+    verySimpleSnapPathsToGrid(paths, spec);
+    for (auto &path : paths) {
+        skipRepeatedPoints(path);
+    }
+}
+
+
 #define BOTHOVER0(a,b)    ( ( ((a)>0) - ((b)>0) ) == 0 )
 #define NOTBOTHOVER0(a,b) ( ( ((a)>0) - ((b)>0) ) != 0 )
 
