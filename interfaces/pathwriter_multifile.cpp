@@ -1,13 +1,8 @@
 #include "pathwriter_multifile.hpp"
 
-#define ISASCII  (mode==DXFAscii)
-#define ISBINARY (mode==DXFBinary)
-
-template class PathWriterMultiFile<DXFAsciiPathWriter>;
-template class PathWriterMultiFile<DXFBinaryPathWriter>;
-
-template class DXFPathWriter<DXFAscii>;
-template class DXFPathWriter<DXFBinary>;
+/************************************************
+****************GENERIC CODE*********************
+*************************************************/
 
 template<typename T> void PathWriterMultiFile<T>::init(std::string file, const char * _extension, double _epsilon, bool _generic_for_type, bool _generic_for_ntool, bool _generic_for_z) {
     epsilon = _epsilon;
@@ -123,6 +118,16 @@ template<typename T> bool PathWriterMultiFile<T>::close() {
     return ok;
 }
 
+/************************************************
+********CODE SPECIFIC TO DXF WRITING*************
+*************************************************/
+
+template class PathWriterMultiFile<DXFAsciiPathWriter>;
+template class PathWriterMultiFile<DXFBinaryPathWriter>;
+
+template class DXFPathWriter<DXFAscii>;
+template class DXFPathWriter<DXFBinary>;
+
 template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
     this->init(std::move(file), ".dxf", _epsilon, _generic_type, _generic_ntool, _generic_z);
 }
@@ -134,13 +139,13 @@ template<DXFWMode mode> std::shared_ptr<DXFPathWriter<mode>> DXFPathWriter<mode>
 static_assert(sizeof(char) == 1, "To write binary DXF files we expect char to be 1 byte long!");
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
-    this->f = fopen(this->filename.c_str(), ISASCII ? "wt" : "wb");
+    this->f = fopen(this->filename.c_str(), (mode == DXFAscii) ? "wt" : "wb");
     if (this->f == NULL) {
         this->err = str("DXF output file <", this->filename, ">: file could not be open");
         return false;
     }
     this->isopen = true;
-    if (ISASCII) {
+    if (mode == DXFAscii) {
         const char * HEADERA =
             //DXF header
             "0\nSECTION\n"
@@ -187,7 +192,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::endWriter() {
     if (this->isopen && this->err.empty()) {
-        if (ISASCII) {
+        if (mode == DXFAscii) {
             const char * ENDA =
                 "0\nENDSEC\n"
                 "0\nEOF";
@@ -224,7 +229,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
         double elevation = this->generic_for_z ? z : 0.0;
         for (auto & path : paths) {
             if (path.empty()) continue;
-            if (ISASCII) {
+            if (mode == DXFAscii) {
                 if (fprintf(this->f,
                     "0\nPOLYLINE\n"
                     "8\n0\n" //the layer
@@ -277,7 +282,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                 }
             }
             for (auto &point : path) {
-                if (ISASCII) {
+                if (mode == DXFAscii) {
                     if (fprintf(this->f,
                         "0\nVERTEX\n"
                         "8\n0\n" //the layer
@@ -326,7 +331,7 @@ template<DXFWMode mode> bool DXFPathWriter<mode>::writePathsSpecific(clp::Paths 
                     }
                 }
             }
-            if (ISASCII) {
+            if (mode == DXFAscii) {
                 if (fprintf(this->f, "0\nSEQEND\n") < 0) {
                     this->err = str("Error writing polyline end to file <", this->filename, "> in DXFPathWriter::writePathsSpecific()");
                     return false;
