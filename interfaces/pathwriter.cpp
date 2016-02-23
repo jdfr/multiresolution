@@ -154,7 +154,7 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
     if (!generic_for_ntool) N       = str(".N", _ntool);
     if (!generic_for_z)     Z       = str(".Z", _z);
     std::string newfilename         = str(filename, Type, N, Z, ".dxf");
-    subwriters.push_back(std::make_shared<T>(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
+    subwriters.push_back(static_cast<T*>(this)->createSubWriter(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
     subwriters.back()->type         = _type;
     subwriters.back()->radius       = _radius;
     subwriters.back()->ntool        = _ntool;
@@ -226,6 +226,10 @@ template<typename T> bool PathWriterMultiFile<T>::close() {
 
 template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
     this->init(std::move(file), ".dxf", _epsilon, _generic_type, _generic_ntool, _generic_z);
+}
+
+template<DXFWMode mode> std::shared_ptr<DXFPathWriter<mode>> DXFPathWriter<mode>::createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z) {
+    return std::make_shared<DXFPathWriter<mode>>(std::move(file), epsilon, generic_type, _generic_ntool, _generic_z);
 }
 
 static_assert(sizeof(char) == 1, "To write binary DXF files we expect char to be 1 byte long!");
