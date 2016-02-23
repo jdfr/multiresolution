@@ -565,7 +565,7 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         config.update("SLICER_DEBUGFILE", feedbackdebugfile);
 #endif
 
-        std::shared_ptr<SlicerManager> feedbackSlicer = getSlicerManager(config, SlicerManagerExternal);
+        std::shared_ptr<SlicerManager> feedbackSlicer = getSlicerManager(config, factors, SlicerManagerExternal);
 
 #ifdef SLICER_USE_DEBUG_FILE
         config.update("SLICER_DEBUGFILE", oldValue);

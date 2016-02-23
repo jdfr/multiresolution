@@ -28,6 +28,6 @@ enum SlicerManagerType {
     SlicerManagerNative
 };
 
-std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, SlicerManagerType type);
+std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, MetricFactors &factors, SlicerManagerType type);
 
 #endif

@@ -223,7 +223,7 @@ int main(int argc, const char** argv) {
         }
     }
 
-    std::shared_ptr<SlicerManager> slicer = getSlicerManager(*config, SlicerManagerExternal);
+    std::shared_ptr<SlicerManager> slicer = getSlicerManager(*config, factors, SlicerManagerExternal);
     //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
 #ifdef STANDALONE_USEPYTHON
     std::shared_ptr<SlicesViewer> slicesViewer;
