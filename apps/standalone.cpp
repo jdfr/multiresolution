@@ -12,11 +12,31 @@
 #    include "sliceviewer.hpp"
 #endif
 
-typedef std::pair<po::options_description, po::positional_options_description> MainSpec;
+typedef struct MainSpec {
+    po::options_description main;
+    po::positional_options_description mainPositional;
+    po::options_description dxf;
+    std::vector<const po::options_description*> allopts;
+    std::vector<po::parsed_options> optsBySystem;
+    int mainOptsIdx;
+    int dxfOptsIdx;
+    int globalOptsIdx;
+    int perProcOptsIdx;
+    MainSpec();
+    void slurpAllOptions(int argc, const char ** argv);
+    void usage();
+    inline po::variables_map getMap(int idx) {
+        po::variables_map map;
+        po::store(optsBySystem[idx], map);
+        return map;
+    }
+    inline bool nonEmptyOpts(int idx) {
+        return !optsBySystem[idx].options.empty();
+    }
+} MainSpec;
 
-MainSpec mainOptions() {
-    po::options_description opts("Main options");
-    opts.add_options()
+MainSpec::MainSpec() : main("Main options"), dxf("DXF options") {
+    main.add_options()
         ("help,h",
             "produce help message")
         ("config,q",
@@ -31,6 +51,14 @@ MainSpec mainOptions() {
         ("save-format",
             po::value<std::string>()->default_value("integer"),
             "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
+        ("show,w",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
+        ("dry-run,y",
+            "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
+        ;
+    mainPositional.add("load", 1).add("save", 1);
+    dxf.add_options()
         ("dxf-toolpaths",
             po::value<std::string>()->value_name("filename"),
             "Output toolpaths in a *.dxf file")
@@ -44,35 +72,24 @@ MainSpec mainOptions() {
             "If this option is specified, a different DXF output file is generated for each Z value")
         ("dxf-by-tool",
             "If this option is specified, a different DXF output file is generated for each process. Note: if --dxf-by-z is also specified, a different file is generated for each combination of Z and process")
-        ("show,w",
-            po::value<std::vector<std::string>>()->multitoken(),
-            "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
-        ("dry-run,y",
-            "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
-    po::positional_options_description positional;
-    positional.add("load", 1).add("save", 1);
-    return MainSpec(opts, positional);
+    allopts.reserve(4);
+    mainOptsIdx    = (int)allopts.size(); allopts.push_back(&main);
+    dxfOptsIdx     = (int)allopts.size(); allopts.push_back(&dxf);
+    globalOptsIdx  = (int)allopts.size(); allopts.push_back(globalOptions());
+    perProcOptsIdx = (int)allopts.size(); allopts.push_back(perProcessOptions());
 }
 
-const int mainOptsIdx    = 0;
-const int globalOptsIdx  = 1;
-const int perProcOptsIdx = 2;
-std::vector<po::parsed_options> slurpAllOptions(MainSpec &mainSpec, int argc, const char ** argv) {
-    std::vector<const po::options_description*> optss;
-    optss.reserve(3);
-    optss.push_back(&mainSpec.first);
-    optss.push_back(globalOptions());
-    optss.push_back(perProcessOptions());
-    auto args = getArgs(argc, argv);
-    return sortOptions(optss, mainSpec.second, mainOptsIdx, NULL, args);
+void MainSpec::slurpAllOptions(int argc, const char ** argv) {
+    auto args    = getArgs(argc, argv);
+    optsBySystem = sortOptions(allopts, mainPositional, mainOptsIdx, NULL, args);
 }
 
-void usage(MainSpec &mainSpec) {
-    std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n"
-              << mainSpec.first         << '\n'
-              << *(globalOptions())     << '\n'
-              << *(perProcessOptions()) << '\n';
+void MainSpec::usage() {
+    std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
+    for (auto opts : allopts) {
+        std::cout << *opts << "\n";
+    }
 }
 
 int main(int argc, const char** argv) {
@@ -100,18 +117,17 @@ int main(int argc, const char** argv) {
     std::shared_ptr<PathsFileWriter> pathwriter_viewer;               //PathWriter in native format for the viewer
 
     try {
-        MainSpec mainSpec = mainOptions();
+        MainSpec mainSpec;
         if (argc == 1) {
-            usage(mainSpec);
+            mainSpec.usage();
             return 1;
         }
-        std::vector<po::parsed_options> optsBySystem = slurpAllOptions(mainSpec, argc, argv);
+        mainSpec.slurpAllOptions(argc, argv);
 
-        po::variables_map mainOpts;
-        po::store(optsBySystem[mainOptsIdx], mainOpts);
+        po::variables_map mainOpts = mainSpec.getMap(mainSpec.mainOptsIdx);
 
         if (mainOpts.count("help")) {
-            usage(mainSpec);
+            mainSpec.usage();
             return 1;
         }
 
@@ -136,7 +152,7 @@ int main(int argc, const char** argv) {
         factors.init(*config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        std::string err = parseAll(*multispec, optsBySystem[globalOptsIdx], optsBySystem[perProcOptsIdx], getScale(factors));
+        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], getScale(factors));
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
@@ -175,41 +191,43 @@ int main(int argc, const char** argv) {
             }
         }
 
-        std::string dxfm = std::move(mainOpts["dxf-format"].as<std::string>());
-        char t = tolower(dxfm[0]);
-        DXFWMode dxfmode;
-        if (t == 'b') {
-            dxfmode = DXFBinary;
-        } else if (t == 'a') {
-            dxfmode = DXFAscii;
-        } else {
-            fprintf(stderr, "DXF format parameter must start by either 'b' (binary) or 'a' (ascii): <%s>\n", dxfm.c_str());
-            return -1;
-        }
-        bool generic_by_ntool = mainOpts.count("dxf-by-tool") == 0;
-        bool generic_by_z     = mainOpts.count("dxf-by-z")    == 0;
-        auto dxf_modes = { "dxf-toolpaths", "dxf-contours" };
-        std::vector<std::shared_ptr<PathWriter>>* specific_pathwriter_vector [] = { &pathwriters_toolpath, &pathwriters_contour };
-
-        int k = 0;
-        for (auto &dxf_mode : dxf_modes) {
-            if (mainOpts.count(dxf_mode) != 0) {
-                std::shared_ptr<PathWriter> w;
-                std::string fn          = std::move(mainOpts[dxf_mode].as<std::string>());
-                const bool generic_type = true;
-                double epsilon          = multispec->global.z_epsilon*factors.internal_to_input;
-                if (dxfmode == DXFAscii) {
-                    w = std::make_shared<DXFAsciiPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
-                } else {
-                    w = std::make_shared<DXFBinaryPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
-                }
-                pathwriters_arefiles.push_back(w);
-                specific_pathwriter_vector[k]->push_back(w);
+        if (mainSpec.nonEmptyOpts(mainSpec.dxfOptsIdx)) {
+            po::variables_map dxfOpts = mainSpec.getMap(mainSpec.dxfOptsIdx);
+            std::string dxfm = std::move(dxfOpts["dxf-format"].as<std::string>());
+            char t = tolower(dxfm[0]);
+            DXFWMode dxfmode;
+            if (t == 'b') {
+                dxfmode = DXFBinary;
+            } else if (t == 'a') {
+                dxfmode = DXFAscii;
+            } else {
+                fprintf(stderr, "DXF format parameter must start by either 'b' (binary) or 'a' (ascii): <%s>\n", dxfm.c_str());
+                return -1;
             }
-            ++k;
+            bool generic_by_ntool = dxfOpts.count("dxf-by-tool") == 0;
+            bool generic_by_z = dxfOpts.count("dxf-by-z") == 0;
+            auto dxf_modes = { "dxf-toolpaths", "dxf-contours" };
+            std::vector<std::shared_ptr<PathWriter>>* specific_pathwriter_vector[] = { &pathwriters_toolpath, &pathwriters_contour };
+
+            int k = 0;
+            for (auto &dxf_mode : dxf_modes) {
+                if (dxfOpts.count(dxf_mode) != 0) {
+                    std::shared_ptr<PathWriter> w;
+                    std::string fn = std::move(dxfOpts[dxf_mode].as<std::string>());
+                    const bool generic_type = true;
+                    double epsilon = multispec->global.z_epsilon*factors.internal_to_input;
+                    if (dxfmode == DXFAscii) {
+                        w = std::make_shared<DXFAsciiPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                    } else {
+                        w = std::make_shared<DXFBinaryPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
+                    }
+                    pathwriters_arefiles.push_back(w);
+                    specific_pathwriter_vector[k]->push_back(w);
+                }
+                ++k;
+            }
         }
 
-        mainOpts = po::variables_map();
     } catch (std::exception &e) {
         fprintf(stderr, e.what()); return -1;
     }
