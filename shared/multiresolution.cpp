@@ -105,7 +105,7 @@ StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::st
         state->err = state->factors.err;
         return state;
     }
-    std::string err = parseAll(*state->spec, NULL, args, getScale(state->factors));
+    std::string err = parseAll(*state->spec, NULL, args, state->factors);
     if (!err.empty()) { state->err = err; return state; }
     if (state->spec->global.useScheduler) {
         bool removeUnused = true;

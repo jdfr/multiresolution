@@ -1,6 +1,9 @@
 #include "parsing.hpp"
 #include "pathsfile.hpp"
 
+inline double    getScaled(double    val, double scale, bool doscale) { return doscale ? val*scale : val; }
+inline clp::cInt getScaled(clp::cInt val, double scale, bool doscale) { return doscale ? (clp::cInt)(val*scale) : val; }
+
 po::options_description globalOptionsGenerator() {
     po::options_description opts("Slicing engine options (global)");
     opts.add_options()
@@ -207,8 +210,9 @@ std::vector<po::parsed_options> sortOptions(std::vector<const po::options_descri
     return sortedoptions;
 }
 
-std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double scale) {
-    bool doscale = scale != 0.0;
+std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, MetricFactors &factors) {
+    bool doscale = factors.doparamscale;
+    double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
     po::variables_map vm;
     try {
         po::store(optionList, vm);
@@ -299,7 +303,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
     if (!schedSet) return std::string("Exactly one of these options must be set: slicing-uniform, slicing-scheduler, slicing-manual");
     spec.useScheduler = spec.schedMode != UniformScheduling;
     if (vm.count("z-epsilon")) {
-        spec.z_epsilon = getScaled(vm["z-epsilon"].as<double>(), scale, doscale);
+        spec.z_epsilon = vm["z-epsilon"].as<double>() * factors.input_to_internal;
     };
 
     const std::string &direction = vm["slicing-direction"].as<std::string>();
@@ -335,7 +339,9 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, double
 }
 
 //this method CANNOT be called until GlobalSpec::parseOptions has been called
-std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, double scale) {
+std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors) {
+    bool doscale = factors.doparamscale;
+    double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
     typedef std::pair<int, po::parsed_options> OptionsByTool;
     std::vector<OptionsByTool> optionsByTool;
     optionsByTool.reserve(3); //reasonable number to reserve
@@ -393,7 +399,6 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
 
     spec.initializeVectors(maxProcess + 1);
 
-    bool doscale = scale != 0.0;
     for (auto & optionsListByTool : optionsByTool) {
         po::variables_map vm;
         try {
@@ -443,14 +448,6 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
             spec.pp[k].noPreprocessingOffset = getScaled(vm["no-preprocessing"].as<double>(), scale, doscale);
         }
 
-        //if (vm.count("smoothing")) {
-        //    spec.pp[k].burrLength = (clp::cInt)getScaled(vm["smoothing"].as<double>(), scale, doscale);
-        //} else {
-        //    if ((!spec.pp[k].applysnaps) && (!spec.pp[k].addInternalClearance)) {
-        //        return str("For process ", k, ": If option --snap is not specified and option --clearance is not specified, option --smoothing MUST be specified");
-        //    }
-        //}
-
         if (vm.count("medialaxis-radius")) {
             spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
         }
@@ -475,18 +472,18 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, dou
     return spec.populateParameters();
 }
 
-std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, double scale) {
-    std::string err = parseGlobal(spec.global, globalOptionList, scale);
+std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors) {
+    std::string err = parseGlobal(spec.global, globalOptionList, factors);
     if (!err.empty()) return err;
-    return parsePerProcess(spec, perProcOptionList, scale);
+    return parsePerProcess(spec, perProcOptionList, factors);
 }
 
-std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, double scale) {
+std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, MetricFactors &factors) {
     try {
         std::vector<const po::options_description*> optss = { globalOptions(), perProcessOptions() };
         po::positional_options_description emptypos;
         auto sorted = sortOptions(optss, emptypos, 0, CommandLineOrigin, args);
-        return parseAll(spec, sorted[0], sorted[1], scale);
+        return parseAll(spec, sorted[0], sorted[1], factors);
     } catch (std::exception & e) {
         return std::string(e.what());
     }

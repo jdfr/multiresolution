@@ -17,7 +17,6 @@ FEATURE-RICH FUNCTIONALITY FOR READING ARGUMENTS
 #pragma   GCC diagnostic pop
 #endif
 
-
 namespace po = boost::program_options;
 
 /*Functions to parse the command line.
@@ -32,17 +31,13 @@ const po::options_description * perProcessOptions();
 
 std::vector<po::parsed_options> sortOptions(std::vector<const po::options_description*> &optss, const po::positional_options_description &posit, int positionalArgumentsIdx, const char *CommandLineOrigin, std::vector<std::string> &args);
 po::parsed_options parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args);
-inline double getScale(MetricFactors &factors) { return factors.doparamscale ? factors.param_to_internal : 0.0; }
 
 std::vector<std::string> getArgs(int argc, const char ** argv, int numskip=1);
 
-inline double    getScaled(double    val, double scale, bool doscale) { return doscale ? val*scale : val; }
-inline clp::cInt getScaled(clp::cInt val, double scale, bool doscale) { return doscale ? (clp::cInt)(val*scale) : val; }
-
-std::string parseGlobal    (GlobalSpec &spec, po::parsed_options &optionList, double scale = 0.0);
-std::string parsePerProcess( MultiSpec &spec, po::parsed_options &optionList, double scale = 0.0);
-std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, double scale = 0.0);
-std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, double scale = 0.0);
+std::string parseGlobal    (GlobalSpec &spec, po::parsed_options &optionList, MetricFactors &factors);
+std::string parsePerProcess( MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors);
+std::string parseAll       ( MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors);
+std::string parseAll       ( MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args,               MetricFactors &factors);
 
 void composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output);
 void composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output);

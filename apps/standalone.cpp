@@ -131,8 +131,8 @@ int Main(int argc, const char** argv) {
             return 1;
         }
 
-        dryrun   = mainOpts.count("dry-run")  != 0;
-        save     = mainOpts.count("save")     != 0;
+        dryrun = mainOpts.count("dry-run") != 0;
+        save = mainOpts.count("save") != 0;
 
         std::string meshfilename;
         if (mainOpts.count("load")) {
@@ -152,7 +152,7 @@ int Main(int argc, const char** argv) {
         factors.init(*config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], getScale(factors));
+        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], factors);
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
