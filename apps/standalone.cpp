@@ -92,7 +92,7 @@ void MainSpec::usage() {
     }
 }
 
-int main(int argc, const char** argv) {
+int Main(int argc, const char** argv) {
     std::string meshfullpath;
 
     bool show, use2d, useviewparams;
@@ -512,7 +512,7 @@ int main(int argc, const char** argv) {
         std::string err = handleClipperException(e);
         fprintf(stderr, err.c_str());
     } catch (std::exception &e) {
-        fprintf(stderr, "Unhandled exception: %s\n", e.what()); return -1;
+        fprintf(stderr, "Unhandled exception while computing the output.\n   Exception    type: %s\n   Exception message: %s\n", typeid(e).name(), e.what()); return -1;
     }
 
     results.clear();
@@ -536,4 +536,19 @@ int main(int argc, const char** argv) {
 #endif
 
     return 0;
+}
+
+int main(int argc, const char** argv) {
+    try {
+        return Main(argc, argv);
+    } catch (std::exception &e) {
+        fprintf(stderr, "Unhandled exception NOT while computing the output.\n   Exception    type: %s\n   Exception message: %s\n", typeid(e).name(), e.what()); return -1;
+    } catch (std::string &e) {
+        fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): %s\n", e.c_str());
+    } catch (const char *e) {
+        fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): ");
+        fflush( stderr);
+        fprintf(stderr, "%s\n", e);
+    }
+    return -1;
 }
