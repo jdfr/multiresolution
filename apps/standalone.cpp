@@ -191,7 +191,7 @@ int Main(int argc, const char** argv) {
             }
         }
 
-        if (mainSpec.nonEmptyOpts(mainSpec.dxfOptsIdx)) {
+        if (!dryrun && mainSpec.nonEmptyOpts(mainSpec.dxfOptsIdx)) {
             po::variables_map dxfOpts = mainSpec.getMap(mainSpec.dxfOptsIdx);
             std::string dxfm = std::move(dxfOpts["dxf-format"].as<std::string>());
             char t = tolower(dxfm[0]);
