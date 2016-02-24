@@ -99,6 +99,7 @@ int Main(int argc, const char** argv) {
     std::string viewparams;
 
     bool save;
+    bool saveDXF  = false;
     int64 saveFormat;
 
     std::string singleoutputfilename;
@@ -132,7 +133,7 @@ int Main(int argc, const char** argv) {
         }
 
         dryrun = mainOpts.count("dry-run") != 0;
-        save = mainOpts.count("save") != 0;
+        save   = mainOpts.count("save") != 0;
 
         std::string meshfilename;
         if (mainOpts.count("load")) {
@@ -223,6 +224,7 @@ int Main(int argc, const char** argv) {
                     }
                     pathwriters_arefiles.push_back(w);
                     specific_pathwriter_vector[k]->push_back(w);
+                    saveDXF = true;
                 }
                 ++k;
             }
@@ -237,7 +239,7 @@ int Main(int argc, const char** argv) {
     if (dryrun) {
         save = show = false;
     } else {
-        if (!save && !show) {
+        if (!save && !show && !saveDXF) {
             fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
             return -1;
         }
