@@ -57,7 +57,7 @@ MainSpec::MainSpec() : main("Main options"), dxf("DXF options") {
         ("dry-run,y",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
-    mainPositional.add("load", 1).add("save", 1);
+    //mainPositional.add("load", 1).add("save", 1);
     dxf.add_options()
         ("dxf-toolpaths",
             po::value<std::string>()->value_name("filename"),
@@ -228,6 +228,8 @@ int main(int argc, const char** argv) {
             }
         }
 
+    } catch (po::too_many_positional_options_error &) {
+        fprintf(stderr, "Error parsing options: you have probably missed the value for some option!\n"); return -1;
     } catch (std::exception &e) {
         fprintf(stderr, e.what()); return -1;
     }
