@@ -22,7 +22,7 @@ public:
     std::vector<T> data;
     int numx, numy;
     Matrix() : numx(0), numy(0) {}
-    Matrix(int _numx, int _numy) : numx(_numx), numy(_numy), data(numx*numy) {}
+    Matrix(int _numx, int _numy) : numx(_numx), numy(_numy), data(_numx*_numy) {}
     void clear() { numx = numy = 0; data.clear(); }
     void reset(int _numx, int _numy) { numx = _numx; numy = _numy; data.clear(); data.resize(numx*numy); }
     T& at(int x, int y) { return data[x*numy + y]; }
