@@ -119,21 +119,19 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
     }
     //flag to decide if we must include the tool number in the file path (to avoid possible filename conflicts)
     bool non_generic_ntool_name = !justone && (numtools > 1)  && generic_ntool;
-    printf("!justone=%d, numtools>1=%d, generic_ntool=%d, non_generic_ntool_name=%d\n", !justone, (numtools > 1), generic_ntool, non_generic_ntool_name);
     //initialize stuff
     splitters.reserve(splitterconfs.size());
     subwriters.reserve(splitterconfs.size());
     for (auto conf = splitterconfs.begin(); conf != splitterconfs.end(); ++conf) {
         std::string ntoolname;
+        int n = (int)(conf - splitterconfs.begin());
         if (non_generic_ntool_name) {
-            auto n = conf - splitterconfs.begin();
             ntoolname = str(".N", n);
         }
 
         //initialize splitters
         splitters.emplace_back(std::move(*conf));
         if (!splitters.back().setup()) {
-            auto n = conf - splitterconfs.begin();
             err = str("Error while setting up the ", n, "-th path splitter: ", splitters.back().err);
             return false;
         }
@@ -148,7 +146,7 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
             for (int y = 0; y < numy; ++y) {
                 int coded_y = ((x % 2) == 0) ? y : numy - y - 1;
                 std::string newfile = str(filename, ntoolname, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), coded_y);
-                subwriters.back().at(x, y) = callback(splitters.back(), std::move(newfile), generic_type, generic_ntool, generic_z);
+                subwriters.back().at(x, y) = callback(n, splitters.back(), std::move(newfile), generic_type, generic_ntool, generic_z);
             }
         }
     }

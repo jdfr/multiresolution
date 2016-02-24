@@ -36,7 +36,7 @@ protected:
     bool isOpen, f_already_open, numRecordsSet;
 };
 
-typedef std::function<std::shared_ptr<PathWriter>(PathSplitter&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
+typedef std::function<std::shared_ptr<PathWriter>(int, PathSplitter&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
 
 //this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of PathWriters,
 //using the method writeEnclosedPaths() instead of writePaths() for them
