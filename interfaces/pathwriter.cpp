@@ -101,8 +101,9 @@ bool PathsFileWriter::close() {
 }
 
 bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+    filename = std::move(file);
     numtools = (int)_spec.numspecs;
-    isopen = false;
+    isopen   = false;
     //make sanity checks
     if (splitterconfs.empty()) {
         err = "Error: There are no splitting configurations";
