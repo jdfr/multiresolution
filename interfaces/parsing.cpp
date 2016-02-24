@@ -122,8 +122,16 @@ std::pair<std::string, std::string> at_option_parser(std::string const&s) {
         return std::pair<std::string, std::string>();
 }
 
+po::parsed_options parseOptions(po::options_description &opts, const po::positional_options_description &posit, std::vector<std::string> &args) {
+    auto parser = po::command_line_parser(args).options(opts).extra_parser(at_option_parser);
+    if (posit.max_total_count() > 0) {
+        parser.positional(posit);
+    }
+    return parser.run();
+}
+
 std::string parseAndInsertResponseFileOptions(po::options_description &opts, const po::positional_options_description &posit, std::vector<std::string> &args, const char * CommandLineOrigin, po::parsed_options &result) {
-    po::parsed_options original = po::command_line_parser(args).options(opts).positional(posit).extra_parser(at_option_parser).run();
+    po::parsed_options original = parseOptions(opts, posit, args);
     result.m_options_prefix = original.m_options_prefix;
     for (auto &option : original.options) {
         if (strcmp("response-file", option.string_key.c_str()) == 0) {
