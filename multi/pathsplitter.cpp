@@ -39,8 +39,8 @@ bool PathSplitter::setup() {
         //evenly distribute space among squares, using an effective displacement possible smaller than the specified one
         clp::cInt sizeX   = config.max.X - config.min.X;
         clp::cInt sizeY   = config.max.Y - config.min.Y;
-        numx              = (int)std::ceil(sizeX / config.displacement.X);
-        numy              = (int)std::ceil(sizeY / config.displacement.Y);
+        numx              = (int)std::ceil((double)sizeX / config.displacement.X);
+        numy              = (int)std::ceil((double)sizeY / config.displacement.Y);
         double dispX      = sizeX / (double)numx;
         double dispY      = sizeY / (double)numy;
         clp::cInt sqdmin  = -config.margin;
