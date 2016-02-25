@@ -12,6 +12,8 @@ public:
     virtual bool close();
     virtual ~PathWriterMultiFile() { close(); }
     bool writeToAll(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    bool generic_for_ntool, generic_for_z, generic_for_type, generic_all, delegateWork;
+    std::vector<std::shared_ptr<T>> subwriters;
 protected:
     void init(std::string file, const char * extension, double epsilon, bool generic_for_type, bool generic_for_ntool, bool generic_for_z);
     bool matchZNtool(int type, int ntool, double z);
@@ -22,10 +24,8 @@ protected:
     int type;
     int ntool;
     bool isopen;
-    bool generic_for_ntool, generic_for_z, generic_for_type, generic_all, delegateWork;
     int currentSubwriter;
     //this has to be a vector of pointers because if the vector gets bigger, it will destroy and recreate the objects, interfering with the life cycle we have designed
-    std::vector<std::shared_ptr<T>> subwriters;
     FILE * f;
     const char * extension;
 };
