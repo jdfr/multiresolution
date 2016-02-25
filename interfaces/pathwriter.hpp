@@ -48,7 +48,9 @@ public:
     virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
+    virtual bool finishAfterClose() { return true; } //this method will get called after closing all subwritters, if everything is OK up to that point
 protected:
+    SplittingPathWriter() {} //this constructor is to be used by subclasses
     bool setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
     std::vector<PathSplitter> splitters;                                 //one PathSplitter for each PathSplitterConfig
     std::vector<Matrix<std::shared_ptr<PathWriter>>> subwriters; //one matrix of PathWriter for each PathSplitterConfig

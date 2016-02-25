@@ -180,6 +180,9 @@ bool SplittingPathWriter::close() {
             }
         }
     }
+    if (ok) {
+        ok = finishAfterClose();
+    }
     return ok;
 }
 
