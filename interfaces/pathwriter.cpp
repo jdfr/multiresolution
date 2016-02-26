@@ -131,7 +131,7 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
         }
 
         //initialize splitters
-        splitters.emplace_back(std::move(*conf));
+        splitters.emplace_back(std::move(*conf));// , &_spec);
         if (!splitters.back().setup()) {
             err = str("Error while setting up the ", n, "-th path splitter: ", splitters.back().err);
             return false;

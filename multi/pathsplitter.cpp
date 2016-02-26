@@ -1,5 +1,5 @@
 #include "pathsplitter.hpp"
-#include "config.hpp"
+#include "showcontours.hpp"
 #include <cmath>
 
 #define M_PI 3.14159265358979323846
@@ -59,6 +59,14 @@ bool PathSplitter::setup() {
                 square.emplace_back(shiftx + sqdmin,  shifty + sqdmaxY);
             }
         }
+    }
+    if (spec != NULL) {
+        clp::Paths squares;
+        for (auto &encl : buffer.data) {
+            squares.push_back(encl.originalSquare);
+            squares.back().push_back(squares.back().front());
+        }
+        SHOWCONTOURS(*spec->global.config, "PathSplitter squares", &squares);
     }
     singlex    = numx == 1;
     singley    = numy == 1;
