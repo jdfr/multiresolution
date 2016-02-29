@@ -37,9 +37,11 @@ public:
         clp::Path actualSquare;   //this is generated in processPaths(): it can be manipulated by callers
         clp::Path originalSquare; //this is generated in setup():: it should not be overwritten by callers
     } EnclosedPaths;
+    clp::IntPoint originalSize;
     std::string err;
     Matrix<EnclosedPaths> buffer;
     int numx, numy; //matrix sizes
+    bool angle90;
     PathSplitterConfig config;
     PathSplitter(PathSplitterConfig _config, MultiSpec *_spec = NULL) : config(std::move(_config)), setup_done(false), spec(_spec) {}
     bool setup();
@@ -48,7 +50,6 @@ protected:
     MultiSpec *spec;
     clp::Clipper clipper;
     double sinangle;
-    bool angle90;
     bool setup_done;
     bool singlex, singley;
 };

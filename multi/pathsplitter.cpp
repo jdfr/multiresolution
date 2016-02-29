@@ -12,6 +12,8 @@ bool PathSplitter::setup() {
         clp::cInt sqdmin    = -config.margin;
         clp::cInt sqdmaxX   = config.displacement.X + config.margin;
         clp::cInt sqdmaxY   = config.displacement.Y + config.margin;
+        originalSize.X      = sqdmaxX - sqdmin;
+        originalSize.Y      = sqdmaxY - sqdmin;
         double numstepsMinX = ((double)(config.min.X - config.origin.X)) / config.displacement.X;
         double numstepsMinY = ((double)(config.min.Y - config.origin.Y)) / config.displacement.Y;
         double numstepsMaxX = ((double)(config.max.X - config.origin.X)) / config.displacement.X;
@@ -46,6 +48,8 @@ bool PathSplitter::setup() {
         clp::cInt sqdmin  = -config.margin;
         clp::cInt sqdmaxX = ((clp::cInt)dispX) + config.margin;
         clp::cInt sqdmaxY = ((clp::cInt)dispY) + config.margin;
+        originalSize.X    = sqdmaxX - sqdmin;
+        originalSize.Y    = sqdmaxY - sqdmin;
         buffer.reset(numx, numy);
         for (int x = 0; x < numx; ++x) {
                 clp::cInt shiftx  = config.min.X + (clp::cInt)(x*dispX);
