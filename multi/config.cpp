@@ -126,22 +126,27 @@ long GetFileSize(const char *filename) {
     return rc == 0 ? stat_buf.st_size : -1;
 }
 
-std::string get_file_contents(const char *filename, bool &ok) {
+std::string get_file_contents(const char *filename, bool binary, bool &ok) {
     ok = true;
     long fsize = GetFileSize(filename);
-    FILE *fp = fopen(filename, "rb"); //do not mess with encodings here
+    FILE *fp = fopen(filename, binary ? "rb" : "rt");
     if (fp) {
         std::string contents;
         contents.resize(fsize);
-        fread(&contents[0], 1, contents.size(), fp);
+        size_t num = fread(&contents[0], 1, contents.size(), fp);
         fclose(fp);
+        if (binary) {
+            if (num != fsize) {
+                ok = false;
+                return str("error reading file <", filename, ">\n");
+            }
+        } else {
+            contents.resize(num); //avoid problems with trailing zeros/garbage in text mode
+        }
         return(contents);
     } else {
-        std::ostringstream fmt;
-        fmt << "could not open file <" << filename << ">\n";
-        std::string err = fmt.str();
         ok = false;
-        return err;
+        return str("could not open file <", filename, ">\n");
     }
 }
 
@@ -207,7 +212,8 @@ static inline std::string &trim(std::string &s) {
 
 void Configuration::load(const char *filename) {
     bool ok = true;
-    std::string contents = get_file_contents(filename, ok);
+    const bool binary = true;
+    std::string contents = get_file_contents(filename, binary, ok);
     has_err = !ok;
     if (!ok) {
         err = std::move(contents);

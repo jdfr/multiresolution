@@ -140,7 +140,8 @@ std::string parseAndInsertResponseFileOptions(po::options_description &opts, con
         if (strcmp("response-file", option.string_key.c_str()) == 0) {
             if (option.value.empty()) return str("error ", CommandLineOrigin, ": cannot use response-file option without filename value");
             bool ok;
-            std::string responsecontents = get_file_contents(option.value[0].c_str(), ok);
+            const bool binary = false;
+            std::string responsecontents = get_file_contents(option.value[0].c_str(), binary, ok);
             if (!ok) return str("error: ", responsecontents);
             auto addArgs = normalizedSplit(responsecontents);
             std::string origin = str("in file ", option.value[0]);

@@ -13,7 +13,8 @@ void ParamReader::setState(std::string &args, ParamMode mode) {
         argidx = 0;
     } else {
         bool ok = true;
-        std::string contents = get_file_contents(args.c_str(), ok);
+        const bool binary = false;
+        std::string contents = get_file_contents(args.c_str(), binary, ok);
         if (ok) {
             setState(contents, ParamString);
         } else {

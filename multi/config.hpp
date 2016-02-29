@@ -7,7 +7,7 @@
 #include <sstream>
 
 //slurp file
-std::string get_file_contents(const char *filename, bool &ok);
+std::string get_file_contents(const char *filename, bool binary, bool &ok);
 
 std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars);
 std::vector<std::string> split(std::string &input, const char *escape_chars, const char *separator_chars, const char * quote_chars, char startComment, char endComment);
