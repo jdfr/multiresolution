@@ -121,33 +121,37 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
     //flag to decide if we must include the tool number in the file path (to avoid possible filename conflicts)
     bool non_generic_ntool_name = !justone && (numtools > 1)  && generic_ntool;
     //initialize stuff
-    splitters.reserve(splitterconfs.size());
-    subwriters.reserve(splitterconfs.size());
+    states.reserve(splitterconfs.size());
+    std::string prefix;
     for (auto conf = splitterconfs.begin(); conf != splitterconfs.end(); ++conf) {
-        std::string ntoolname;
         int n = (int)(conf - splitterconfs.begin());
         if (non_generic_ntool_name) {
-            ntoolname = str(".N", n);
+            prefix = str(filename, ".N", n);
+        } else {
+            prefix = filename; //assign each iteration because the state takes ownership of the string
         }
 
-        //initialize splitters
-        splitters.emplace_back(std::move(*conf));// , &_spec);
-        if (!splitters.back().setup()) {
-            err = str("Error while setting up the ", n, "-th path splitter: ", splitters.back().err);
+        states.emplace_back(prefix, std::move(*conf));// , &_spec);
+        auto &splitter   = states.back().splitter;
+        auto &subwriters = states.back().subwriters;
+
+        //initialize splitter
+        if (!splitter.setup()) {
+            err = str("Error while setting up the ", n, "-th path splitter: ", states.back().splitter.err);
             return false;
         }
 
         //initialize subwriters
-        auto numx = splitters.back().numx;
-        auto numy = splitters.back().numy;
-        subwriters.emplace_back(Matrix<std::shared_ptr<PathWriter>>(numx, numy));
+        auto numx = splitter.numx;
+        auto numy = splitter.numy;
+        subwriters.reset(numx, numy);
         int num0x = (int)std::ceil(std::log10(numx-1));
         int num0y = (int)std::ceil(std::log10(numy-1));
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 int coded_y = ((x % 2) == 0) ? y : numy - y - 1;
-                std::string newfile = str(filename, ntoolname, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), coded_y);
-                subwriters.back().at(x, y) = callback(n, splitters.back(), std::move(newfile), generic_type, generic_ntool, generic_z);
+                std::string newfile = str(states.back().filename_prefix, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), coded_y);
+                subwriters.at(x, y) = callback(n, splitter, std::move(newfile), generic_type, generic_ntool, generic_z);
             }
         }
     }
@@ -157,10 +161,10 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
 
 bool SplittingPathWriter::start() {
     if (!isopen) {
-        for (auto &sub : subwriters) {
-            for (auto &subsub : sub.data) {
-                if (!subsub->start()) {
-                    err = str("Error starting subwriter ", subsub->filename, ": ", subsub->err);
+        for (auto &state : states) {
+            for (auto &subw : state.subwriters.data) {
+                if (!subw->start()) {
+                    err = str("Error starting subwriter ", subw->filename, ": ", subw->err);
                     return false;
                 }
             }
@@ -172,10 +176,10 @@ bool SplittingPathWriter::start() {
 
 bool SplittingPathWriter::close() {
     bool ok = true;
-    for (auto &sub : subwriters) {
-        for (auto &subsub : sub.data) {
-            if (!subsub->close()) {
-                err = str("Error closing subwriter ", subsub->filename, ": ", subsub->err);
+    for (auto &state : states) {
+        for (auto &subw : state.subwriters.data) {
+            if (!subw->close()) {
+                err = str("Error closing subwriter ", subw->filename, ": ", subw->err);
                 ok = false;
             }
         }
@@ -187,9 +191,9 @@ bool SplittingPathWriter::close() {
 }
 
 bool SplittingPathWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    int idx        = (subwriters.size() == 1) ? 0 : ntool;
-    auto &splitter = splitters[idx];
-    auto &subw     = subwriters[idx];
+    int idx        = (states.size() == 1) ? 0 : ntool;
+    auto &splitter = states[idx].splitter;
+    auto &subw     = states[idx].subwriters;
     if (!splitter.processPaths(paths, isClosed, z, scaling)) {
         err = str("For paths of tool ", ntool, ", z ", z, "type ", type, ": ", splitter.err);
         return false;

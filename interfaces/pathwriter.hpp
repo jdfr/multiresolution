@@ -38,6 +38,13 @@ protected:
 
 typedef std::function<std::shared_ptr<PathWriter>(int, PathSplitter&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
 
+typedef struct SplittingPathWriterState {
+    PathSplitter splitter;
+    std::string filename_prefix;
+    Matrix<std::shared_ptr<PathWriter>> subwriters;
+    SplittingPathWriterState(std::string prefix, PathSplitterConfig config, MultiSpec *spec = NULL) : splitter(std::move(config), spec), filename_prefix(std::move(prefix)) {}
+} SplittingPathWriterState;
+
 //this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of PathWriters,
 //using the method writeEnclosedPaths() instead of writePaths() for them
 class SplittingPathWriter : public PathWriter {
@@ -52,8 +59,7 @@ public:
 protected:
     SplittingPathWriter() {} //this constructor is to be used by subclasses
     bool setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
-    std::vector<PathSplitter> splitters;                                 //one PathSplitter for each PathSplitterConfig
-    std::vector<Matrix<std::shared_ptr<PathWriter>>> subwriters; //one matrix of PathWriter for each PathSplitterConfig
+    std::vector<SplittingPathWriterState> states; //one state for each PathSplitterConfig
     int numtools;
     bool justone;
     bool isopen;
