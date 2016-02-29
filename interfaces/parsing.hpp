@@ -5,7 +5,8 @@
 FEATURE-RICH FUNCTIONALITY FOR READING ARGUMENTS
 *********************************************************/
 
-#include "pathwriter_multifile.hpp"
+#include "pathwriter_dxf.hpp"
+#include "pathwriter_nanoscribe.hpp"
 
 //in BOOST 1.55, boost::program_options causes a warning about use of deprecated std::auto_ptr in gcc 5.2 (auto_ptr will dissapear in c++17)
 #ifdef __GNUC__

@@ -169,7 +169,11 @@ set(CORESOURCES
   interfaces/pathwriter.hpp
   interfaces/pathwriter.cpp
   interfaces/pathwriter_multifile.hpp
-  interfaces/pathwriter_multifile.cpp
+  interfaces/pathwriter_multifile.tpp
+  interfaces/pathwriter_dxf.hpp
+  interfaces/pathwriter_dxf.cpp
+  interfaces/pathwriter_nanoscribe.hpp
+  interfaces/pathwriter_nanoscribe.cpp
   interfaces/slicermanager.hpp
   interfaces/slicermanager.cpp
   interfaces/subprocess.hpp
