@@ -269,9 +269,10 @@ bool getDoubleConfigVal(Configuration &config, const char *name, std::string &er
     return true;
 }
 
-void MetricFactors::init(Configuration &config, bool _doparamscale) {
-    init_done = true;
-    doparamscale = _doparamscale;
+void MetricFactors::init(Configuration &config, bool _doparamscale, bool _donanoscribe) {
+    init_done         = true;
+    doparamscale      = _doparamscale;
+    donanoscribescale = _donanoscribe;
     if (!getDoubleConfigVal(config, "INPUT_TO_SLICER_FACTOR", err, input_to_slicer))    return;
     if (!getDoubleConfigVal(config, "SLICER_TO_INTERNAL_FACTOR", err, slicer_to_internal)) return;
     input_to_internal = input_to_slicer * slicer_to_internal;
@@ -285,4 +286,16 @@ void MetricFactors::init(Configuration &config, bool _doparamscale) {
         param_to_internal = 1;
         internal_to_param = 1;
     }
+    if (donanoscribescale) {
+        loadNanoscribeFactors(config);
+    } else {
+        nanoscribe_to_internal = 1;
+        internal_to_nanoscribe = 1;
+    }
+}
+
+void MetricFactors::loadNanoscribeFactors(Configuration &config) {
+    if (!getDoubleConfigVal(config, "NANOSCRIBE_TO_INTERNAL_FACTOR", err, nanoscribe_to_internal)) return;
+    internal_to_nanoscribe = 1 / nanoscribe_to_internal;
+    donanoscribescale      = true;
 }

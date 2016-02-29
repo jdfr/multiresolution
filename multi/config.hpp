@@ -36,12 +36,15 @@ typedef struct MetricFactors {
     std::string err;
     double input_to_internal, internal_to_input,
            input_to_slicer, slicer_to_internal,
-           param_to_internal, internal_to_param;
+           param_to_internal, internal_to_param,
+           internal_to_nanoscribe, nanoscribe_to_internal;
     bool doparamscale;
+    bool donanoscribescale;
     bool init_done;
     MetricFactors() : init_done(false) {}
-    MetricFactors(Configuration &config, bool _doscale) { init(config, _doscale); };
-    void init(Configuration &config, bool _doscale);
+    MetricFactors(Configuration &config, bool _doparamscale, bool _donanoscribe=false) { init(config, _doparamscale, _donanoscribe); };
+    void init(Configuration &config, bool _doparamscale, bool _donanoscribe=false);
+    void loadNanoscribeFactors(Configuration &config);
 } MetricFactors;
 
 //this is a hack to convert a series of things to a string

@@ -16,10 +16,12 @@ typedef struct MainSpec {
     po::options_description main;
     po::positional_options_description mainPositional;
     po::options_description dxf;
+    po::options_description nano;
     std::vector<const po::options_description*> allopts;
     std::vector<po::parsed_options> optsBySystem;
     int mainOptsIdx;
     int dxfOptsIdx;
+    int nanoOptsIdx;
     int globalOptsIdx;
     int perProcOptsIdx;
     MainSpec();
@@ -35,7 +37,7 @@ typedef struct MainSpec {
     }
 } MainSpec;
 
-MainSpec::MainSpec() : main("Main options"), dxf("DXF options") {
+MainSpec::MainSpec() : main("Main options"), dxf("DXF options"), nano("Nanoscribe options") {
     main.add_options()
         ("help,h",
             "produce help message")
@@ -73,9 +75,10 @@ MainSpec::MainSpec() : main("Main options"), dxf("DXF options") {
         ("dxf-by-tool",
             "If this option is specified, a different DXF output file is generated for each process. Note: if --dxf-by-z is also specified, a different file is generated for each combination of Z and process")
         ;
-    allopts.reserve(4);
+    allopts.reserve(5);
     mainOptsIdx    = (int)allopts.size(); allopts.push_back(&main);
     dxfOptsIdx     = (int)allopts.size(); allopts.push_back(&dxf);
+    nanoOptsIdx    = (int)allopts.size(); allopts.push_back(nanoGlobalOptions());
     globalOptsIdx  = (int)allopts.size(); allopts.push_back(globalOptions());
     perProcOptsIdx = (int)allopts.size(); allopts.push_back(perProcessOptions());
 }
@@ -100,6 +103,7 @@ int Main(int argc, const char** argv) {
 
     bool save;
     bool saveDXF  = false;
+    bool saveNano = false;
     int64 saveFormat;
 
     std::string singleoutputfilename;
@@ -116,6 +120,8 @@ int Main(int argc, const char** argv) {
     std::vector<std::shared_ptr<PathWriter>> pathwriters_contour;     //everything receiving contours
     std::vector<std::shared_ptr<PathWriter>> pathwriters_toolpath;    //everything receiving toolpaths
     std::shared_ptr<PathsFileWriter> pathwriter_viewer;               //PathWriter in native format for the viewer
+
+    NanoscribeSpec nanoSpec;
 
     try {
         MainSpec mainSpec;
@@ -153,7 +159,21 @@ int Main(int argc, const char** argv) {
         factors.init(*config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], factors);
+        po::variables_map nanoGlobalOpts;
+        bool nonEmptyNanoGlobal = !dryrun && mainSpec.nonEmptyOpts(mainSpec.nanoOptsIdx);
+        if (nonEmptyNanoGlobal) {
+            nanoGlobalOpts = mainSpec.getMap(mainSpec.nanoOptsIdx);
+        }
+        ContextToParseNanoOptions nanoContext(factors, &nanoGlobalOpts, nanoSpec);
+        ContextToParseNanoOptions *nanoCtxPtr = &nanoContext;
+        if (nonEmptyNanoGlobal) {
+            factors.loadNanoscribeFactors(*config);
+            if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
+            parseNanoGlobal(nanoCtxPtr);
+            saveNano = true;
+        }
+
+        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], factors, nanoCtxPtr);
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
@@ -239,7 +259,7 @@ int Main(int argc, const char** argv) {
     if (dryrun) {
         save = show = false;
     } else {
-        if (!save && !show && !saveDXF) {
+        if (!save && !show && !saveDXF && !saveNano) {
             fprintf(stderr, "ERROR: computed contours would be neither saved nor shown!!!!!\n");
             return -1;
         }
@@ -267,6 +287,20 @@ int Main(int argc, const char** argv) {
 
     double minx, maxx, miny, maxy, minz, maxz;
     slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
+    if (nanoSpec.useSpec) {
+        //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
+        clp::IntPoint mn((clp::cInt)(minx * factors.input_to_internal),
+                         (clp::cInt)(miny * factors.input_to_internal)),
+                      mx((clp::cInt)(maxx * factors.input_to_internal),
+                         (clp::cInt)(maxy * factors.input_to_internal));
+        for (auto & split : nanoSpec.splits) {
+            split.min = mn;
+            split.max = mx;
+        }
+        std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(*multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+        pathwriters_arefiles.push_back(pathsplitter);
+        pathwriters_toolpath.push_back(pathsplitter);
+    }
 
     bool alsoContours = multispec->global.alsoContours;
     clp::Paths rawslice, dummy;
@@ -526,7 +560,7 @@ int Main(int argc, const char** argv) {
 
     for (auto &pathwriter : pathwriters_arefiles) {
         if (!pathwriter->close()) {
-            fprintf(stderr, "Error trying to close file <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
+            fprintf(stderr, "Error trying to close writer <%s>: %s\n", pathwriter->filename.c_str(), pathwriter->err.c_str());
         }
     }
 

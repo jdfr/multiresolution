@@ -2,6 +2,8 @@
 *.user
 *.filters
 *.paths
+*.gwl
+*.dxf
 obj*
 bin*
 buildr.bat

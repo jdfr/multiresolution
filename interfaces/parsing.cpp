@@ -54,6 +54,74 @@ po::options_description globalOptionsGenerator() {
     return opts;
 }
 
+#define PER_PROCESS_NANOPREFIX "pp-"
+#define PREFIXNANONAME(x) (GLOBAL ? x :  PER_PROCESS_NANOPREFIX x)
+#define PREFIXNANODESC(x) (GLOBAL ? x : "per-process " x)
+#define GET_GLOBALNAME_IN_LOCALCONTEXT(x) (x+sizeof(PER_PROCESS_NANOPREFIX)-1)
+
+template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
+    if (GLOBAL) {
+        opts.add_options()
+            ("nanoscribe",
+                po::value<std::string>()->value_name("filename"),
+                "save toolpaths in *.gwl format. The slices are split to allow objects bigger than 300um to be built. A different GWL file for each region is created (or as many as processes if --nano-global is not specified). These are called 'regional' GWL files. Also, one global GWL file is created (or one for each process if --nano-global is not specified), that includes all corresponding regional GWL files. For each global GWL file, there is also a global debug GWL file, which adds delimiting squares and text to be able to identify individual regional GWL files. If this option is used, the GWL output configuration must be specified with other options, all having prefix nano-*, or pp-nano-* if specified per process.")
+            ("nano-global",
+                "If this option is specified, all nano-* options described below are accepted, and the nanoscribe configuration is global for all processes. Otherwise, each process has its own nanoscribe configuration, which can be customized with pp-nano-* options. Nanoscribe options pp-nano-tool-* must be set separately for each process even if this option is specified. If this option IS NOT specified, nano-by-tool is IMPLICITLY specified.")
+            ("nano-by-tool",
+                "If this option is specified, a different GWL file is generated for each process. This is IMPLICITLY specified if nano-global IS NOT specified. This option can be set only globally, not per process.")
+            ("nano-by-z",
+                "If this option is specified, a different GWL file is generated for each Z value. This option can be set only globally, not per process.")
+            ;
+    } else {
+        opts.add_options()
+            (PREFIXNANONAME("nano-tool-begin"),
+                po::value<std::string>()->value_name("filename"),
+                PREFIXNANODESC("GWL commands to be written in each regional GWL file if a toolchange happens. This is only relevant if (a) nano-global IS specified, AND (b) nano-by-tool IS NOT specified."))
+            (PREFIXNANONAME("nano-tool-end"),
+                po::value<std::string>()->value_name("filename"),
+                PREFIXNANODESC("GWL commands to be written in each regional GWL file if a toolchange happens. This is only relevant if (a) nano-global IS specified, AND (b) nano-by-tool IS NOT specified."))
+            ;
+    }
+    opts.add_options()
+        (PREFIXNANONAME("nano-file-begin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written at the beginning of each REGIONAL GWL file, but AFTER doing any positioning with StageGoto* commands (useful to insert findInterfaceAt commands)."))
+        (PREFIXNANONAME("nano-file-end"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written at the end of each REGIONAL GWL file"))
+        (PREFIXNANONAME("nano-global-file-begin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written at the beginning of each GLOBAL GWL file, but AFTER doing any positioning with StageGoto* commands (useful to insert findInterfaceAt commands)."))
+        (PREFIXNANONAME("nano-global-file-end"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written at the end of each GLOBAL GWL file"))
+        (PREFIXNANONAME("nano-scanmode"),
+            po::value<std::string>()->value_name("piezo|galvo"),
+            PREFIXNANODESC("nanoscribe scan mode, either 'piezo' or 'galvo'. Default value is 'galvo'"))
+        (PREFIXNANONAME("nano-galvocenter"),
+            po::value<std::string>()->value_name("always|minimize"),
+            PREFIXNANODESC("nanoscribe galvo centering mode, either 'always' or 'minimize'. Default value is 'always'."))
+        (PREFIXNANONAME("nano-angle"),
+            po::value<double>()->value_name("angle"),
+            PREFIXNANODESC("stitching angle (IN DEGREES) between blocks. Default is 90."))
+        (PREFIXNANONAME("nano-spacing"),
+            po::value<double>()->value_name("length"),
+            PREFIXNANODESC("spacing (in nanoscribe units) for each writing subdomain, in nanoscribe units. The effective size of each writing subdomain is nano-spacing+2*nano-margin. If nano-scanmode is 'galvo', this effective size should be configured according to the range of the galvo (taking into account the lens being used). If nano-angle is not 90, this effective size should be configured according to the maximum height of the slices (otherwise, suboptimal movements may occur)."))
+        (PREFIXNANONAME("nano-margin"),
+            po::value<double>()->value_name("length"),
+            PREFIXNANODESC("nanoscribe ovewrite margin, in nanoscribe units. Because the stage positioning of the nanoscribe has a repeat accuracy in the micrometer range, it is advisable to overwrite a little bit the borders of each block, to facilitate the binding between blocks."))
+        (PREFIXNANONAME("nano-maxsquarelen"),
+            po::value<double>()->value_name("length"),
+            PREFIXNANODESC("maximum extent of the addressable area (in nanoscribe units). This MUST be equal or greater than nano-spacing+2*nano-margin, but it is recommended to be strictly greater than it, to avoid errors due to rounding and snapping of coordinates."))
+        (PREFIXNANONAME("nano-origin"),
+            po::value<std::vector<double>>()->multitoken()->value_name("X Y"),
+            PREFIXNANODESC("nanoscribe block origin coordinates (in nanoscribe units). This option determines the partition of the toolpaths into blocks (because of nanoscribe's limited range in galvo/piezo modes). If this option is specified, it is the coordinates of the origin of a grid of blocks, spaced with size nano-spacing. If this option is not specified, the grid is defined to have blocks spaced with a size at most nano-spacing, such that the blocks are fitted to the bounding box of the 3D mesh."))
+        (PREFIXNANONAME("nano-gridstep"),
+            po::value<double>()->value_name("length"),
+            PREFIXNANODESC("nanoscribe grid step (in nanoscribe units). The multislicer computes the slices with a different (usually bigger) resolution than nanoscribe. As a result, it may output a large amount of points which cannot be resolved separately in nanoscribe. If this option is specified, the paths are snapped to a grid centered on the origin, and the grid step is the value of this option."))
+        ;
+}
+
 po::options_description perProcessOptionsGenerator() {
     po::options_description opts("Slicing engine options (per process)");
     opts.add_options()
@@ -106,15 +174,25 @@ po::options_description perProcessOptionsGenerator() {
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
         ;
+    nanoOptionsGenerator<false>(opts);
     return opts;
 }
+
+po::options_description nanoGlobalOptionsGenerator() {
+    po::options_description opts("Nanoscribe global options");
+    nanoOptionsGenerator<true>(opts);
+    return opts;
+}
+
 
 //it would be good practice to have these variables as state in a thread-safe singleton, to be created only if needed.
 static const po::options_description     globalOptionsStatic = globalOptionsGenerator();
 static const po::options_description perProcessOptionsStatic = perProcessOptionsGenerator();
+static const po::options_description nanoGlobalOptionsStatic = nanoGlobalOptionsGenerator();
 
 const po::options_description *     globalOptions() { return &globalOptionsStatic; }
 const po::options_description * perProcessOptions() { return &perProcessOptionsStatic; }
+const po::options_description * nanoGlobalOptions() { return &nanoGlobalOptionsStatic; }
 
 // Additional command line parser which interprets '@something' as a
 // option "config-file" with the value "something"
@@ -209,6 +287,239 @@ std::vector<po::parsed_options> sortOptions(std::vector<const po::options_descri
         }
     }
     return sortedoptions;
+}
+
+//helper method for parseNano()
+template<bool GLOBAL> void validateGlobal(ContextToParseNanoOptions *context, const char * OPTION_NAME) {
+    if (!GLOBAL && context->spec.isGlobal) throw po::error(str("Error: global option 'nano-global' was specified so option --", OPTION_NAME, " cannot be specified"));
+}
+
+//helper method for parseNano()
+template<bool GLOBAL, typename... Args> void throw_error_specific(int ntool, Args... args) {
+    if (GLOBAL) throw po::error(str(args...));
+    else        throw po::error(str(args..., " for process ", ntool));
+}
+
+//helper method for parseNano()
+template<bool GLOBAL, typename T> bool nanoOptionGetIfPresent(ContextToParseNanoOptions *context, po::variables_map &current, T& option, const char * OPTION_NAME) {
+    if (current.count(OPTION_NAME)) {
+        validateGlobal<GLOBAL>(context, OPTION_NAME);
+        option = std::move(current[OPTION_NAME].as<T>());
+        return true;
+    }
+    return false;
+}
+
+//helper method for parseNano()
+template<bool GLOBAL, typename T> bool nanoBoolOptionGetWithDefault(ContextToParseNanoOptions *context, po::variables_map &current, T& option, const char * OPTION_NAME, T Default, const char * default_name, T alternative, const char * alternative_name) {
+    bool assigned = false;
+    if (GLOBAL) {
+        option    = Default;
+        assigned  = true;
+    }
+    if (current.count(OPTION_NAME)) {
+        assigned  = true;
+        validateGlobal<GLOBAL>(context, OPTION_NAME);
+        std::string mode = std::move(current[OPTION_NAME].as<std::string>());
+        if      (mode.compare(default_name))     option = Default;
+        else if (mode.compare(alternative_name)) option = alternative;
+        else                                  throw po::error(str("Error: valid values for --", OPTION_NAME, " are either '", default_name, "' or '", alternative_name, "', but the value was: ", mode));
+    }
+    return assigned;
+}
+
+//helper method for parseNano()
+template<bool GLOBAL, typename T> bool nanoOptionMandatory(int ntool, ContextToParseNanoOptions *context, po::variables_map &current, T& option, const char * OPTION_NAME) {
+    if (current.count(OPTION_NAME)) {
+        validateGlobal<GLOBAL>(context, OPTION_NAME);
+        option = std::move(current[OPTION_NAME].as<T>());
+        return true;
+    } else {
+        bool must_be_specified;
+        if (GLOBAL) {
+            must_be_specified = context->spec.isGlobal;
+        } else {
+            bool notInGlobal  = context->nanoGlobal->count(GET_GLOBALNAME_IN_LOCALCONTEXT(OPTION_NAME)) == 0;
+            must_be_specified = notInGlobal;
+        }
+        if (must_be_specified) {
+            throw_error_specific<GLOBAL>(ntool, "Error: if --nanoscribe option is specified --", OPTION_NAME, " MUST also be specified");
+        }
+        return false;
+    }
+}
+
+//helper method for parseNano()
+void validateNoLocalNanoOptions(po::variables_map &current, const char *endErrStr) {
+    const bool GLOBAL = false;
+    const char * names[] = {
+        PREFIXNANONAME("nano-tool-begin"),
+        PREFIXNANONAME("nano-tool-end"),
+        PREFIXNANONAME("nano-file-begin"),
+        PREFIXNANONAME("nano-file-end"),
+        PREFIXNANONAME("nano-scanmode"),
+        PREFIXNANONAME("nano-galvocenter"),
+        PREFIXNANONAME("nano-angle"),
+        PREFIXNANONAME("nano-spacing"),
+        PREFIXNANONAME("nano-margin"),
+        PREFIXNANONAME("nano-maxsquarelen"),
+        PREFIXNANONAME("nano-origin"),
+        PREFIXNANONAME("nano-gridstep")
+    };
+    for (int i = 0; i < sizeof(names); ++i) {
+        if (current.count(names[i])) {
+            throw po::error(str("Error: option --", names[i], endErrStr));
+        }
+    }
+}
+
+//generic method to parse Nanoscribe options both in global mode and in per-process mode. Some considerations:
+//      -the global mode is parsed first, but when it is called, arguments ntool and numtools are invalid (we do not know numtools until later)
+//      -except for --pp-nano-tool-*, per-process options are not allowed if the global option --nano-global is used
+//      -of --nano-global is not used, global options can still be used, and they will be copied to all per-process configurations
+template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map &current, ContextToParseNanoOptions *context) {
+    int idx;
+    if (GLOBAL) {
+        context->spec.useSpec  = current.count("nanoscribe")!=0;
+        if (!context->spec.useSpec) throw po::error(str("Error: option --", current.begin()->first, " was specified, but option '--nanoscribe FILENAME' was not specified!"));
+        context->spec.filename = std::move(current["nanoscribe"].as<std::string>());
+        if (context->spec.filename.empty()) {
+            throw po::error("nanoscribe filename must not be empty!");
+        }
+        context->spec.isGlobal = current.count("nano-global") != 0;
+        idx = 0;
+        context->spec.nanos .resize(1);
+        context->spec.splits.resize(1);
+        context->spec.nanos[0]      = std::make_shared<SimpleNanoscribeConfig>();
+        context->spec.generic_ntool = current.count("nano-by-tool") == 0;
+        context->spec.generic_z     = current.count("nano-by-z")    == 0;
+    } else {
+        if (context == NULL) {
+            validateNoLocalNanoOptions(current, " is invalid!");
+            return;
+        } else if (!context->spec.useSpec) {
+            validateNoLocalNanoOptions(current, " was specified, but option '--nanoscribe FILENAME' was not specified!");
+            return;
+        }
+        context->spec.toolChanges = context->spec.nanos[0]->toolChanges = std::make_shared<ToolChanges>(numtools);
+        if (!context->spec.isGlobal) {
+            context->spec.nanos .resize(numtools);
+            context->spec.splits.resize(numtools);
+            for (int i = 1; i < numtools; ++i) {
+                context->spec.splits[i] = context->spec.splits[0];
+                context->spec.nanos[i]  = std::make_shared<SimpleNanoscribeConfig>(*context->spec.nanos[0]);
+            }
+        }
+        idx = ntool;
+    }
+
+    std::string string;
+    if (current.count(PREFIXNANONAME("nano-tool-begin"))) {
+        string = std::move(current[PREFIXNANONAME("nano-tool-begin")].as<std::string>());
+        if (!string.empty()) string += "\n";
+        (*context->spec.toolChanges)[ntool].first = std::move(string);
+    }
+    if (current.count(PREFIXNANONAME("nano-tool-end"))) {
+        string = std::move(current[PREFIXNANONAME("nano-tool-end")].as<std::string>());
+        if (!string.empty()) string += "\n";
+        (*context->spec.toolChanges)[ntool].second = std::move(string);
+    }
+
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-begin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->beginScript       = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-end"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->endScript         = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-global-file-begin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->beginGlobalScript = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-global-file-end"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->endGlobalScript   = std::move(string);
+    }
+
+    NanoscribeScanMode scanmode;
+    if (nanoBoolOptionGetWithDefault<GLOBAL, NanoscribeScanMode>(context, current, scanmode,
+        PREFIXNANONAME("nano-scanmode"), GalvoScanMode, "galvo", PiezoScanMode, "piezo")) {
+        context->spec.nanos[idx]->scanmode = scanmode;
+    }
+
+    GalvoPositionMode galvomode;
+    if (nanoBoolOptionGetWithDefault<GLOBAL, GalvoPositionMode>(context, current, galvomode,
+        PREFIXNANONAME("nano-galvocenter"), GalvoAlwaysCenter, "always", GalvoMinimizeMovements, "minimize")) {
+        context->spec.nanos[idx]->galvomode = galvomode;
+    }
+
+    if (GLOBAL) context->spec.splits[idx].wallAngle = 90.0;
+    if (current.count(PREFIXNANONAME("nano-angle"))) {
+        validateGlobal<GLOBAL>(context, PREFIXNANONAME("nano-angle"));
+        context->spec.splits[idx].wallAngle = current[PREFIXNANONAME("nano-angle")].as<double>();
+    }
+
+    bool assigned; double val;
+
+    assigned = nanoOptionMandatory<GLOBAL, double>(ntool, context, current, val, PREFIXNANONAME("nano-spacing"));
+    if (assigned) {
+        context->spec.splits[idx].displacement.X =
+        context->spec.splits[idx].displacement.Y = (clp::cInt)(val * context->factors.nanoscribe_to_internal);
+    }
+
+    assigned = nanoOptionMandatory<GLOBAL, double>(ntool, context, current, val, PREFIXNANONAME("nano-margin"));
+    if (assigned) {
+        context->spec.splits[idx].margin = (clp::cInt)(val * context->factors.nanoscribe_to_internal);
+    }
+
+    assigned = nanoOptionMandatory<GLOBAL, double>(ntool, context, current, val, PREFIXNANONAME("nano-maxsquarelen"));
+    if (assigned) {
+        context->spec.nanos[idx]->maxSquareLen = val * context->factors.nanoscribe_to_internal;
+
+        if ((GLOBAL && context->spec.isGlobal) || (!GLOBAL && !context->spec.isGlobal)) {
+            val = (double)(context->spec.splits[idx].displacement.X + 2 * context->spec.splits[idx].margin);
+            if (context->spec.nanos[idx]->maxSquareLen < val) {
+                throw_error_specific<GLOBAL>(ntool, "Error: ", PREFIXNANONAME("nano-maxsquarelen"), " MUST be greater than or equal to nano-spacing+2*nano-margin, but it was lower (", context->spec.nanos[idx]->maxSquareLen, '<', val, ')');
+            }
+        }
+    }
+
+    std::vector<double> origin;
+    if (GLOBAL) context->spec.splits[idx].useOrigin = false;
+    if (nanoOptionGetIfPresent<GLOBAL, std::vector<double>>(context, current, origin, PREFIXNANONAME("nano-origin"))) {
+        if (origin.size() != 2) {
+            throw_error_specific<GLOBAL>(ntool, "Error: ", PREFIXNANONAME("nano-origin"), " MUST have two values (X and Y), but it had ", origin.size());
+        }
+        context->spec.splits[idx].useOrigin = true;
+        context->spec.splits[idx].origin.X  = (clp::cInt)(origin[0] * context->factors.nanoscribe_to_internal);
+        context->spec.splits[idx].origin.Y  = (clp::cInt)(origin[1] * context->factors.nanoscribe_to_internal);
+    }
+
+    if (GLOBAL) context->spec.nanos[idx]->snapToGrid = false;
+    if (nanoOptionGetIfPresent<GLOBAL, double>(context, current, val, PREFIXNANONAME("nano-gridstep"))) {
+        context->spec.nanos[idx]->gridStep   = (clp::cInt)(val * context->factors.nanoscribe_to_internal);
+        context->spec.nanos[idx]->snapToGrid = context->spec.nanos[idx]->gridStep != 0;
+    }
+
+    if (GLOBAL) {
+        context->spec.splits[idx].zmin = 0.0;
+        context->spec.nanos[idx]->nanoscribeNumberFormatting = "%.4f";
+    }
+
+    if (GLOBAL) {
+        if (context->spec.isGlobal) {
+            context->spec.nanos[idx]->init(context->factors);
+        }
+    } else {
+        if (!context->spec.isGlobal) {
+            context->spec.nanos[idx]->init(context->factors);
+        }
+    }
+}
+
+void parseNanoGlobal(ContextToParseNanoOptions *nanoContext) {
+    parseNano<true>(0, 0, *nanoContext->nanoGlobal, nanoContext);
 }
 
 std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, MetricFactors &factors) {
@@ -340,7 +651,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
 }
 
 //this method CANNOT be called until GlobalSpec::parseOptions has been called
-std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors) {
+std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
     typedef std::pair<int, po::parsed_options> OptionsByTool;
@@ -469,22 +780,24 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, Met
         } else {
             spec.pp[k].infillingMode = InfillingNone;
         }
+
+        parseNano<false>(k, (int)spec.numspecs, vm, nanoContext);
     }
     return spec.populateParameters();
 }
 
-std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors) {
+std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
     std::string err = parseGlobal(spec.global, globalOptionList, factors);
     if (!err.empty()) return err;
-    return parsePerProcess(spec, perProcOptionList, factors);
+    return parsePerProcess(spec, perProcOptionList, factors, nanoContext);
 }
 
-std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, MetricFactors &factors) {
+std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
     try {
         std::vector<const po::options_description*> optss = { globalOptions(), perProcessOptions() };
         po::positional_options_description emptypos;
         auto sorted = sortOptions(optss, emptypos, 0, CommandLineOrigin, args);
-        return parseAll(spec, sorted[0], sorted[1], factors);
+        return parseAll(spec, sorted[0], sorted[1], factors, nanoContext);
     } catch (std::exception & e) {
         return std::string(e.what());
     }
