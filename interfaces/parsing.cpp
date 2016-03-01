@@ -1,59 +1,6 @@
 #include "parsing.hpp"
 #include "pathsfile.hpp"
 
-inline double    getScaled(double    val, double scale, bool doscale) { return doscale ? val*scale : val; }
-inline clp::cInt getScaled(clp::cInt val, double scale, bool doscale) { return doscale ? (clp::cInt)(val*scale) : val; }
-
-po::options_description globalOptionsGenerator() {
-    po::options_description opts("Slicing engine options (global)");
-    opts.add_options()
-        ("save-contours,j",
-            "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
-        ("correct-input",
-            "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
-        ("motion-planner,k",
-            "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
-        ("subtractive-box-mode",
-            po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"),
-            "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
-        ("slicing-uniform,u",
-            po::value<double>()->value_name("z_step"),
-            "The input mesh will be sliced uniformly at the specified slicing step. All processes will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing. The slicing step may be negative.")
-        ("slicing-scheduler,s",
-            po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"),
-            "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
-        ("slicing-manual,m",
-            po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"),
-            "Same as slicing-scheduler, but the executing order is specified manually: values are NTOOL_1, Z_1, NTOOL_2, Z_2, NTOOL_3, Z_3 ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
-        ("slicing-zbase",
-            po::value<double>()->value_name("z_base"),
-            "If --slicing-uniform is specified, and this parameter is specified, it is the Z position of the first slice, in mesh file units.")
-        ("slicing-direction",
-            po::value<std::string>()->default_value("up")->value_name("(up|down)"),
-            "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
-        ("vertical-correction",
-            "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
-        ("z-epsilon,l",
-            po::value<double>()->default_value(1e-6)->value_name("z_epsilon"),
-            "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
-        ("addsub",
-            "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa). By itself, addsub mode does not work: more options must be set. For high-res negative details, set the global option 'neg-closing'. For high-res positive details, either set the global option 'overwrite-gradual' or (if 'clearance' is not being used) set 'infill-medialaxis-radius' for process 0 to one or several very low values (0.5 to 0.01).")
-        ("neg-closing",
-            po::value<double>()->value_name("radius"),
-            "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000 (the factor can be modified in the config file), and it can be tuned to make the operation to overwrite more or less negative details.")
-        ("overwrite-gradual",
-            po::value<std::vector<double>>()->multitoken()->value_name("[rad_1 inf_1 rad_2 inf_2 ...]"),
-            "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The members of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. As more steps are used, the overwriting is more gradual, but also more expensive to compute. The fastest setting is to use just the pair 0 1; while this creates very smooth toolpaths (w.r.t. more complex pair sequences), it also generates really big overwrites everywhere. For geometries with long protusions that are narrow at the base, the first pairs should add up substantially over 1, in order to be able to overwrite these protusions (unfortunately, this may result in subtle small overwritings elsewhere). The longer the pair sequence, the less overwriting is generated. In general, this option is quite versatile, but may require a trial-and-error process to settle on a pair sequence that works correctly for some geometries. PLEASE NOTE: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius)")
-        ("feedback,b",
-            po::value<std::vector<std::string>>()->multitoken(),
-            "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
-        ("response-file",
-            po::value<std::string>(),
-            "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
-        ;
-    return opts;
-}
-
 #define PER_PROCESS_NANOPREFIX "pp-"
 #define PREFIXNANONAME(x) (GLOBAL ? x :  PER_PROCESS_NANOPREFIX x)
 #define PREFIXNANODESC(x) (GLOBAL ? x : "per-process " x)
@@ -122,7 +69,58 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
         ;
 }
 
-po::options_description perProcessOptionsGenerator() {
+po::options_description globalOptionsGenerator(bool alsoNano) {
+    po::options_description opts("Slicing engine options (global)");
+    opts.add_options()
+        ("save-contours,j",
+            "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
+        ("correct-input",
+            "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
+        ("motion-planner,k",
+            "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular contour entry points)")
+        ("subtractive-box-mode",
+            po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"),
+            "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
+        ("slicing-uniform,u",
+            po::value<double>()->value_name("z_step"),
+            "The input mesh will be sliced uniformly at the specified slicing step. All processes will be applied to every slice. Slices will be processed independently. Should not be used for true multislicing. The slicing step may be negative.")
+        ("slicing-scheduler,s",
+            po::value<std::vector<int>>()->multitoken()->zero_tokens()->value_name("[ntool_list]"),
+            "Slices for each process will be scheduled according to the Z resolution of each process. Slices of lower-resolution processes will be taken into account for slices of higher-resolution processes. If no values are provided, all specified processes are used in the multislicing process. Otherwise, the values are the indexes of the processes to be used (so that some processes can be specified but not actually used), starting from 0.")
+        ("slicing-manual,m",
+            po::value<std::vector<double>>()->multitoken()->value_name("[ntool_1 z_1 ntool2 z_2 ...]"),
+            "Same as slicing-scheduler, but the executing order is specified manually: values are NTOOL_1, Z_1, NTOOL_2, Z_2, NTOOL_3, Z_3 ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
+        ("slicing-zbase",
+            po::value<double>()->value_name("z_base"),
+            "If --slicing-uniform is specified, and this parameter is specified, it is the Z position of the first slice, in mesh file units.")
+        ("slicing-direction",
+            po::value<std::string>()->default_value("up")->value_name("(up|down)"),
+            "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
+        ("vertical-correction",
+            "If specified, the algorithm takes care to avoid toolpaths with big voxels if the object is too thin in Z (only relevant for slicing-scheduler or slicing-manual)")
+        ("z-epsilon,l",
+            po::value<double>()->default_value(1e-6)->value_name("z_epsilon"),
+            "For slicing-scheduler or slicing-manual, Z values are considered to be the same if they differ less than this, in the mesh file units")
+        ("addsub",
+            "If not specified, the engine considers all processes to be of the same type (i.e., all are either additive or subtractive). If specified, the engine operates in add/sub mode: the first process is considered additive, and all subsequent processes are subtractive (or vice versa). By itself, addsub mode does not work: more options must be set. For high-res negative details, set the global option 'neg-closing'. For high-res positive details, either set the global option 'overwrite-gradual' or (if 'clearance' is not being used) set 'infill-medialaxis-radius' for process 0 to one or several very low values (0.5 to 0.01).")
+        ("neg-closing",
+            po::value<double>()->value_name("radius"),
+            "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000 (the factor can be modified in the config file), and it can be tuned to make the operation to overwrite more or less negative details.")
+        ("overwrite-gradual",
+            po::value<std::vector<double>>()->multitoken()->value_name("[rad_1 inf_1 rad_2 inf_2 ...]"),
+            "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The members of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. As more steps are used, the overwriting is more gradual, but also more expensive to compute. The fastest setting is to use just the pair 0 1; while this creates very smooth toolpaths (w.r.t. more complex pair sequences), it also generates really big overwrites everywhere. For geometries with long protusions that are narrow at the base, the first pairs should add up substantially over 1, in order to be able to overwrite these protusions (unfortunately, this may result in subtle small overwritings elsewhere). The longer the pair sequence, the less overwriting is generated. In general, this option is quite versatile, but may require a trial-and-error process to settle on a pair sequence that works correctly for some geometries. PLEASE NOTE: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius)")
+        ("feedback,b",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
+        ("response-file",
+            po::value<std::string>(),
+            "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
+        ;
+    if (alsoNano) nanoOptionsGenerator<true>(opts);
+    return opts;
+}
+
+po::options_description perProcessOptionsGenerator(bool alsoNano) {
     po::options_description opts("Slicing engine options (per process)");
     opts.add_options()
         ("process,p",
@@ -174,7 +172,7 @@ po::options_description perProcessOptionsGenerator() {
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
         ;
-    nanoOptionsGenerator<false>(opts);
+    if (alsoNano) nanoOptionsGenerator<false>(opts);
     return opts;
 }
 
@@ -184,15 +182,12 @@ po::options_description nanoGlobalOptionsGenerator() {
     return opts;
 }
 
+po::options_description nanoPerProcessOptionsGenerator() {
+    po::options_description opts("Nanoscribe per-process options");
+    nanoOptionsGenerator<false>(opts);
+    return opts;
+}
 
-//it would be good practice to have these variables as state in a thread-safe singleton, to be created only if needed.
-static const po::options_description     globalOptionsStatic = globalOptionsGenerator();
-static const po::options_description perProcessOptionsStatic = perProcessOptionsGenerator();
-static const po::options_description nanoGlobalOptionsStatic = nanoGlobalOptionsGenerator();
-
-const po::options_description *     globalOptions() { return &globalOptionsStatic; }
-const po::options_description * perProcessOptions() { return &perProcessOptionsStatic; }
-const po::options_description * nanoGlobalOptions() { return &nanoGlobalOptionsStatic; }
 
 // Additional command line parser which interprets '@something' as a
 // option "config-file" with the value "something"
@@ -211,32 +206,29 @@ po::parsed_options parseOptions(po::options_description &opts, const po::positio
     return parser.run();
 }
 
-std::string parseAndInsertResponseFileOptions(po::options_description &opts, const po::positional_options_description &posit, std::vector<std::string> &args, const char * CommandLineOrigin, po::parsed_options &result) {
+void parseAndInsertResponseFileOptions(po::options_description &opts, const po::positional_options_description &posit, std::vector<std::string> &args, const char * CommandLineOrigin, po::parsed_options &result) {
     po::parsed_options original = parseOptions(opts, posit, args);
     result.m_options_prefix = original.m_options_prefix;
     for (auto &option : original.options) {
         if (strcmp("response-file", option.string_key.c_str()) == 0) {
-            if (option.value.empty()) return str("error ", CommandLineOrigin, ": cannot use response-file option without filename value");
+            if (option.value.empty()) throw po::error(str("error ", CommandLineOrigin, ": cannot use response-file option without filename value"));
             bool ok;
             const bool binary = false;
             std::string responsecontents = get_file_contents(option.value[0].c_str(), binary, ok);
-            if (!ok) return str("error: ", responsecontents);
+            if (!ok) throw po::error(str("error: ", responsecontents));
             auto addArgs = normalizedSplit(responsecontents);
             std::string origin = str("in file ", option.value[0]);
-            std::string res = parseAndInsertResponseFileOptions(opts, posit, addArgs, origin.c_str(), result);
-            if (!res.empty()) return res;
+            parseAndInsertResponseFileOptions(opts, posit, addArgs, origin.c_str(), result);
         } else {
             result.options.push_back(std::move(option));
         }
     }
-    return std::string();
 }
 
 po::parsed_options parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args) {
     po::parsed_options result(&opts);
     if (CommandLineOrigin == NULL) CommandLineOrigin = "while parsing parameters";
-    std::string res = parseAndInsertResponseFileOptions(opts, posit, args, CommandLineOrigin, result);
-    if (!res.empty()) throw std::runtime_error(res);
+    parseAndInsertResponseFileOptions(opts, posit, args, CommandLineOrigin, result);
     return result;
 }
 
@@ -289,6 +281,14 @@ std::vector<po::parsed_options> sortOptions(std::vector<const po::options_descri
     return sortedoptions;
 }
 
+struct ContextToParseNanoOptions {
+    Configuration &config;
+    MetricFactors &factors;
+    po::variables_map &nanoGlobal;
+    NanoscribeSpec &spec;
+    ContextToParseNanoOptions(Configuration &c, MetricFactors &f, po::variables_map &ng, NanoscribeSpec &s) : config(c), factors(f), nanoGlobal(ng), spec(s) {}
+};
+
 //helper method for parseNano()
 template<bool GLOBAL> void validateGlobal(ContextToParseNanoOptions *context, const char * OPTION_NAME) {
     if (!GLOBAL && context->spec.isGlobal) throw po::error(str("Error: global option 'nano-global' was specified so option --", OPTION_NAME, " cannot be specified"));
@@ -339,7 +339,7 @@ template<bool GLOBAL, typename T> bool nanoOptionMandatory(int ntool, ContextToP
         if (GLOBAL) {
             must_be_specified = context->spec.isGlobal;
         } else {
-            bool notInGlobal  = context->nanoGlobal->count(GET_GLOBALNAME_IN_LOCALCONTEXT(OPTION_NAME)) == 0;
+            bool notInGlobal  = context->nanoGlobal.count(GET_GLOBALNAME_IN_LOCALCONTEXT(OPTION_NAME)) == 0;
             must_be_specified = notInGlobal;
         }
         if (must_be_specified) {
@@ -381,7 +381,12 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     int idx;
     if (GLOBAL) {
         context->spec.useSpec  = current.count("nanoscribe")!=0;
-        if (!context->spec.useSpec) throw po::error(str("Error: option --", current.begin()->first, " was specified, but option '--nanoscribe FILENAME' was not specified!"));
+        if (!context->spec.useSpec) {
+            validateNoLocalNanoOptions(current, " was specified, but option '--nanoscribe FILENAME' was not specified!");
+            return;
+        }
+        context->factors.loadNanoscribeFactors(context->config);
+        if (!context->factors.err.empty()) throw po::error(context->factors.err);
         context->spec.filename = std::move(current["nanoscribe"].as<std::string>());
         if (context->spec.filename.empty()) {
             throw po::error("nanoscribe filename must not be empty!");
@@ -394,10 +399,7 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
         context->spec.generic_ntool = current.count("nano-by-tool") == 0;
         context->spec.generic_z     = current.count("nano-by-z")    == 0;
     } else {
-        if (context == NULL) {
-            validateNoLocalNanoOptions(current, " is invalid!");
-            return;
-        } else if (!context->spec.useSpec) {
+        if (!context->spec.useSpec) {
             validateNoLocalNanoOptions(current, " was specified, but option '--nanoscribe FILENAME' was not specified!");
             return;
         }
@@ -518,19 +520,12 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     }
 }
 
-void parseNanoGlobal(ContextToParseNanoOptions *nanoContext) {
-    parseNano<true>(0, 0, *nanoContext->nanoGlobal, nanoContext);
-}
+inline double    getScaled(double    val, double scale, bool doscale) { return doscale ? val*scale : val; }
+inline clp::cInt getScaled(clp::cInt val, double scale, bool doscale) { return doscale ? (clp::cInt)(val*scale) : val; }
 
-std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, MetricFactors &factors) {
+void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors) {
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
-    po::variables_map vm;
-    try {
-        po::store(optionList, vm);
-    } catch (std::exception &e) {
-        return std::string(e.what());
-    }
     spec.alsoContours              = vm.count("save-contours")       != 0;
     spec.correct                   = vm.count("correct-input")       != 0;
     spec.applyMotionPlanner        = vm.count("motion-planner")      != 0;
@@ -547,14 +542,14 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
         if (spec.addsub.fattening.useGradualFattening) {
             auto &vals = vm["overwrite-gradual"].as<std::vector<double>>();
             if ((vals.size() % 2) != 0) {
-                return str("overwrite-gradual must have an even number of values, but it has ", vals.size());
+                throw po::error(str("overwrite-gradual must have an even number of values, but it has ", vals.size()));
             }
             spec.addsub.fattening.gradual.reserve(vals.size() / 2);
             for (auto val = vals.begin(); val != vals.end(); ++val) {
                 double rad = *(val++);
                 double inf = *val;
-                if (rad < 0) return str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative radius factor: ", rad);
-                if (inf < 0) return str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative inflation factor: ", inf);
+                if (rad < 0) throw po::error(str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative radius factor: ", rad));
+                if (inf < 0) throw po::error(str("In overwrite-gradual, the ", spec.addsub.fattening.gradual.size(), "-th pair has a negative inflation factor: ", inf));
                 //maybe issue warnings if rad+inf<1? If so, how to issue them?
                 spec.addsub.fattening.gradual.push_back(FatteningSpec::GradualStep(rad, inf));
             }
@@ -565,7 +560,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
     if (vm.count("subtractive-box-mode")) {
         auto &vals = vm["subtractive-box-mode"].as<std::vector<int>>();
         if (vals.size() == 0) {
-            return std::string("subtractive-box-mode was specified without values!");
+            throw po::error("subtractive-box-mode was specified without values!");
         } else {
             spec.limitX = vals[0];
             spec.limitY = vals.size() > 1 ? vals[1] : vals[0];
@@ -580,7 +575,7 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
     bool schedSet = false;
     const char * schedRepErr = "trying to specify more than one of these options: slicing-uniform, slicing-scheduler, slicing-manual";
     if (vm.count("slicing-uniform")) {
-        if (schedSet) return std::string(schedRepErr);
+        if (schedSet) throw po::error(schedRepErr);
         spec.schedMode      = UniformScheduling;
         spec.z_uniform_step = vm["slicing-uniform"].as<double>();
         schedSet            = true;
@@ -590,29 +585,29 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
         }
     };
     if (vm.count("slicing-scheduler")) {
-        if (schedSet) return std::string(schedRepErr);
+        if (schedSet) throw po::error(schedRepErr);
         spec.schedMode = SimpleScheduler;
         spec.schedTools = std::move(vm["slicing-scheduler"].as<std::vector<int>>());
         schedSet        = true;
     };
     if (vm.count("slicing-manual")) {
-        if (schedSet) return std::string(schedRepErr);
+        if (schedSet) throw po::error(schedRepErr);
         spec.schedMode = ManualScheduling;
         auto &vals     = vm["slicing-manual"].as<std::vector<double>>();
         if ((vals.size() % 2) != 0) {
-            return str("slicing-manual must have an even number of values, but it has ", vals.size());
+            throw po::error(str("slicing-manual must have an even number of values, but it has ", vals.size()));
         }
         spec.schedSpec.reserve(vals.size() / 2);
         for (auto val = vals.begin(); val != vals.end(); ++val) {
             double ntoolv = *val;
             int ntool = (int)ntoolv;
             double z  = *(++val);
-            if (ntool != ntoolv) return str("Invalid slicing-manual value in position ", val-1-vals.begin(), ": for Z ", z, "the tool is not an integer: ", *val);
+            if (ntool != ntoolv) throw po::error(str("Invalid slicing-manual value in position ", val - 1 - vals.begin(), ": for Z ", z, "the tool is not an integer: ", *val));
             spec.schedSpec.push_back(GlobalSpec::ZNTool(z, ntool));
         }
         schedSet = true;
     };
-    if (!schedSet) return std::string("Exactly one of these options must be set: slicing-uniform, slicing-scheduler, slicing-manual");
+    if (!schedSet) throw po::error("Exactly one of these options must be set: slicing-uniform, slicing-scheduler, slicing-manual");
     spec.useScheduler = spec.schedMode != UniformScheduling;
     if (vm.count("z-epsilon")) {
         spec.z_epsilon = vm["z-epsilon"].as<double>() * factors.input_to_internal;
@@ -621,19 +616,19 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
     const std::string &direction = vm["slicing-direction"].as<std::string>();
     if      (direction.compare("up")   == 0) spec.sliceUpwards = true;
     else if (direction.compare("down") == 0) spec.sliceUpwards = false;
-    else                                     return str("value for option slicing-direction must be either 'up' or 'down', but it was '", direction, "'");
+    else                                     throw po::error(str("value for option slicing-direction must be either 'up' or 'down', but it was '", direction, "'"));
 
     spec.fb.feedback = vm.count("feedback") != 0;
     if (spec.fb.feedback) {
         const std::vector<std::string> &vals = vm["feedback"].as<std::vector<std::string>>();
         spec.fb.feedbackMesh = strcmp(vals[0].c_str(), "mesh") == 0;
         if ((!spec.fb.feedbackMesh) && (strcmp(vals[0].c_str(), "paths") != 0)) {
-            return str("Error: If feedback option is specified, the first value is the feedback mode, either 'mesh' or 'paths', but it was <", vals[0], ">\n");
+            throw po::error(str("Error: If feedback option is specified, the first value is the feedback mode, either 'mesh' or 'paths', but it was <", vals[0], ">\n"));
         }
-        if (vals.size() == 1) { return std::string("Error: If feedback is specified, the second value must be the feedback file name, but it was not present"); }
+        if (vals.size() == 1) { throw po::error("Error: If feedback is specified, the second value must be the feedback file name, but it was not present"); }
         spec.fb.feedbackFile = std::move(vals[1]);
         if (!fileExists(spec.fb.feedbackFile.c_str())) {
-            return str("Error: feedback file <", spec.fb.feedbackFile, "> does not exist!");
+            throw po::error(str("Error: feedback file <", spec.fb.feedbackFile, "> does not exist!"));
         }
         if (!spec.useScheduler) {
             const char *schedmode;
@@ -643,30 +638,108 @@ std::string parseGlobal(GlobalSpec &spec, po::parsed_options &optionList, Metric
             case ManualScheduling:  schedmode = "manual"; break;
             default:                schedmode = "unknown";
             }
-            return str("Error: feedback file was specified (", spec.fb.feedbackFile, "), but the scheduling mode '", schedmode, "' does not allow feedback!!!!");
+            throw po::error(str("Error: feedback file was specified (", spec.fb.feedbackFile, "), but the scheduling mode '", schedmode, "' does not allow feedback!!!!"));
         }
     }
-
-    return std::string();
 }
 
 //this method CANNOT be called until GlobalSpec::parseOptions has been called
-std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
+void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variables_map &vm ) {
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
-    typedef std::pair<int, po::parsed_options> OptionsByTool;
-    std::vector<OptionsByTool> optionsByTool;
-    optionsByTool.reserve(3); //reasonable number to reserve
+
+    spec.pp[k].radius             = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
+    spec.pp[k].gridstep           = (clp::cInt)getScaled(vm["gridstep"]           .as<double>(), scale, doscale);
+    spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+    if (vm.count("tolerances")) {
+        const std::vector<double> & val = vm["tolerances"].as<std::vector<double>>();
+        spec.pp[k].arctolR = (clp::cInt)getScaled(val[0], scale, doscale);
+        spec.pp[k].arctolG = val.size() == 1 ? spec.pp[k].arctolR : (clp::cInt)getScaled(val[1], scale, doscale);
+    } else {
+        spec.pp[k].arctolR = (spec.pp[k].radius / 100);
+        spec.pp[k].arctolG = (spec.pp[k].radius / 10);
+    }
+    spec.pp[k].burrLength = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.pp[k].arctolR);
+
+    if (spec.global.useScheduler) {
+        auto requireds = { "voxel-profile", "voxel-z" };
+        for (auto &required : requireds) if (vm.count(required) == 0) throw po::error(str("slicing-manual or slicing-scheduler are specified, but ", required, " is missing for process ", k));
+        const std::string &valp = vm["voxel-profile"].as<std::string>();
+        bool voxelIsEllipsoid   = valp.compare("ellipsoid") == 0;
+        bool voxelIsConstant    = valp.compare("constant")  == 0;
+        if ((!voxelIsEllipsoid) && (!voxelIsConstant)) throw po::error(str("for process ", k, ": invalid value for voxel-profile: ", valp));
+        const std::vector<double> &valz = vm["voxel-z"].as<std::vector<double>>();
+        double ZRadius     =                              getScaled(valz[0], scale, doscale);
+        double ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
+        if (voxelIsEllipsoid) {
+            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+        } else {
+            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+        }
+    }
+    spec.pp[k].applysnap            = vm.count("snap")      != 0;
+    spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
+    spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
+    spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
+    spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")     == 0;
+        
+    if (!spec.pp[k].doPreprocessing) {
+        spec.pp[k].noPreprocessingOffset = getScaled(vm["no-preprocessing"].as<double>(), scale, doscale);
+    }
+
+    if (vm.count("medialaxis-radius")) {
+        spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
+    }
+
+    bool useinfill = vm.count("infill") != 0;
+    if (useinfill) {
+        const std::string & val = vm["infill"].as<std::string>();
+        if      (val.compare("concentric")  == 0) spec.pp[k].infillingMode = InfillingConcentric;
+        else if (val.compare("linesh")      == 0) spec.pp[k].infillingMode = InfillingRectilinearH;
+        else if (val.compare("linesv")      == 0) spec.pp[k].infillingMode = InfillingRectilinearV;
+        else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
+        else                                      throw po::error(str("For process ", k, ": invalid infill mode: ", val));
+        spec.pp[k].infillingRecursive = vm.count("infill-recursive") != 0;
+        spec.pp[k].infillingWhole     = vm.count("infill-byregion")  == 0;
+        if (vm.count("infill-medialaxis-radius")) {
+            spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
+        }
+    } else {
+        spec.pp[k].infillingMode = InfillingNone;
+    }
+}
+
+void ParserLocalAndGlobal::setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin) {
+    std::vector<const po::options_description*> optss = { globalDescription.get(), localDescription.get() };
+    po::positional_options_description emptypos;
+    auto sorted = sortOptions(optss, emptypos, 0, CommandLineOrigin, args);
+    setParsedOptions(std::move(sorted[0]), std::move(sorted[1]));
+}
+
+void ParserLocalAndGlobal::setParsedOptions(po::parsed_options globals, po::parsed_options allPerProcess) {
+    po::store(globals, globalOptions);
+    separatePerProcess(allPerProcess);
+    globalCallback();
+    for (auto & optionsListByTool : perProcessOptions.optionsByTool) {
+        po::variables_map vm;
+        po::store(optionsListByTool.second, vm);
+        perProcessCallback(optionsListByTool.first, vm);
+    }
+    finishCallback();
+}
+
+void ParserLocalAndGlobal::separatePerProcess(po::parsed_options &optionList) {
+    perProcessOptions.optionsByTool.reserve(3); //reasonable number to reserve
+    perProcessOptions.maxProcess = 0;
     std::vector<int> processIds;
-    int maxProcess = 0;
     int currentProcess;
     //separate global options, and sort per-process options according to the previous --process option
     for (auto & option : optionList.options) {
         if (option.string_key.compare("process") == 0) {
-            if (option.value.empty()) return std::string("process option must have a value!");
+            if (option.value.empty()) throw po::error("process option must have a value!");
             char *endptr; int param = (int)strtol(option.value[0].c_str(), &endptr, 10);
-            if (param<0) return std::string("process option cannot have negative value: ", param);
-            if ((*endptr) != 0) return str("process option value must be a non-negative integer: ", option.value[0]);
+            if (param<0) throw po::error(str("process option cannot have negative value: ", param));
+            if ((*endptr) != 0) throw po::error(str("process option value must be a non-negative integer: ", option.value[0]));
             bool found = false;
             for (auto id = processIds.begin(); id != processIds.end();  ++id) {
                 if (*id == param) {
@@ -677,22 +750,24 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, Met
             }
             if (found) continue;
             processIds.push_back(param);
-            optionsByTool.push_back(OptionsByTool(param, po::parsed_options(perProcessOptions(), optionList.m_options_prefix)));
-            currentProcess = (int)optionsByTool.size() - 1;
-            if (maxProcess < processIds.back()) maxProcess = processIds.back();
+            perProcessOptions.optionsByTool.push_back(OptionsByTool(param, po::parsed_options(localDescription.get(), optionList.m_options_prefix)));
+            currentProcess = (int)perProcessOptions.optionsByTool.size() - 1;
+            if (perProcessOptions.maxProcess < processIds.back()) {
+                perProcessOptions.maxProcess = processIds.back();
+            }
             continue;
         }
-        if (optionsByTool.empty()) {
-            return str("option ", option.string_key, " cannot be specified before option --process");
+        if (perProcessOptions.optionsByTool.empty()) {
+            throw po::error(str("option ", option.string_key, " cannot be specified before option --process"));
         }
-        optionsByTool[currentProcess].second.options.push_back(std::move(option));
+        perProcessOptions.optionsByTool[currentProcess].second.options.push_back(std::move(option));
     }
     //some sanity checks
-    if (optionsByTool.empty()) {
-        return std::string("Cannot work without process parameters");
+    if (perProcessOptions.optionsByTool.empty()) {
+        throw po::error("Cannot work without process parameters");
     }
     {
-        std::vector<bool> visited(maxProcess + 1, false);
+        std::vector<bool> visited(perProcessOptions.maxProcess + 1, false);
         for (int k = 0; k < visited.size(); ++k) {
             int i = processIds[k];
             if (!visited[i]) visited[i] = true;
@@ -705,120 +780,38 @@ std::string parsePerProcess(MultiSpec &spec, po::parsed_options &optionList, Met
             }
         }
         if (notvisited >= 0) {
-            return str("process with id ", maxProcess, "was specified, but process with id ", notvisited, " was not specified!");
+            throw po::error(str("process with id ", perProcessOptions.maxProcess, "was specified, but process with id ", notvisited, " was not specified!"));
         }
-    }
-
-    spec.initializeVectors(maxProcess + 1);
-
-    for (auto & optionsListByTool : optionsByTool) {
-        po::variables_map vm;
-        try {
-            po::store(optionsListByTool.second, vm);
-        } catch (std::exception &e) {
-            return str("for process ", optionsListByTool.first, ": ", e.what());
-        }
-
-        int k = optionsListByTool.first;
-
-        spec.pp[k].radius             = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
-        spec.pp[k].gridstep           = (clp::cInt)getScaled(vm["gridstep"]           .as<double>(), scale, doscale);
-        spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
-        if (vm.count("tolerances")) {
-            const std::vector<double> & val = vm["tolerances"].as<std::vector<double>>();
-            spec.pp[k].arctolR = (clp::cInt)getScaled(val[0], scale, doscale);
-            spec.pp[k].arctolG = val.size() == 1 ? spec.pp[k].arctolR : (clp::cInt)getScaled(val[1], scale, doscale);
-        } else {
-            spec.pp[k].arctolR = (spec.pp[k].radius / 100);
-            spec.pp[k].arctolG = (spec.pp[k].radius / 10);
-        }
-        spec.pp[k].burrLength = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.pp[k].arctolR);
-
-        if (spec.global.useScheduler) {
-            auto requireds = { "voxel-profile", "voxel-z" };
-            for (auto &required : requireds) if (vm.count(required) == 0) return str("slicing-manual or slicing-scheduler are specified, but ", required, " is missing for process ", k);
-            const std::string &valp = vm["voxel-profile"].as<std::string>();
-            bool voxelIsEllipsoid = valp.compare("ellipsoid") == 0;
-            bool voxelIsConstant = valp.compare("constant") == 0;
-            if ((!voxelIsEllipsoid) && (!voxelIsConstant)) return str("for process ", k, ": invalid value for voxel-profile: ", valp);
-            const std::vector<double> &valz = vm["voxel-z"].as<std::vector<double>>();
-            double ZRadius = getScaled(valz[0], scale, doscale);
-            double ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
-            if (voxelIsEllipsoid) {
-                spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
-            } else {
-                spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
-            }
-        }
-        spec.pp[k].applysnap            = vm.count("snap")      != 0;
-        spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
-        spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
-        spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
-        spec.pp[k].computeToolpaths     = vm.count("no-toolpaths") == 0;
-        
-        if (!spec.pp[k].doPreprocessing) {
-            spec.pp[k].noPreprocessingOffset = getScaled(vm["no-preprocessing"].as<double>(), scale, doscale);
-        }
-
-        if (vm.count("medialaxis-radius")) {
-            spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
-        }
-
-        bool useinfill = vm.count("infill") != 0;
-        if (useinfill) {
-            const std::string & val = vm["infill"].as<std::string>();
-            if      (val.compare("concentric")  == 0) spec.pp[k].infillingMode = InfillingConcentric;
-            else if (val.compare("linesh")      == 0) spec.pp[k].infillingMode = InfillingRectilinearH;
-            else if (val.compare("linesv")      == 0) spec.pp[k].infillingMode = InfillingRectilinearV;
-            else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
-            else                                      return str("For process ", k, ": invalid infill mode: ", val);
-            spec.pp[k].infillingRecursive = vm.count("infill-recursive") != 0;
-            spec.pp[k].infillingWhole     = vm.count("infill-byregion")  == 0;
-            if (vm.count("infill-medialaxis-radius")) {
-                spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
-            }
-        } else {
-            spec.pp[k].infillingMode = InfillingNone;
-        }
-
-        parseNano<false>(k, (int)spec.numspecs, vm, nanoContext);
-    }
-    return spec.populateParameters();
-}
-
-std::string parseAll(MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
-    std::string err = parseGlobal(spec.global, globalOptionList, factors);
-    if (!err.empty()) return err;
-    return parsePerProcess(spec, perProcOptionList, factors, nanoContext);
-}
-
-std::string parseAll(MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args, MetricFactors &factors, ContextToParseNanoOptions *nanoContext) {
-    try {
-        std::vector<const po::options_description*> optss = { globalOptions(), perProcessOptions() };
-        po::positional_options_description emptypos;
-        auto sorted = sortOptions(optss, emptypos, 0, CommandLineOrigin, args);
-        return parseAll(spec, sorted[0], sorted[1], factors, nanoContext);
-    } catch (std::exception & e) {
-        return std::string(e.what());
     }
 }
 
-void composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output) {
-    if (globals || perProcess) output << "The multislicing engine is very flexible.\n  It takes parameters as if it were a command line application.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
-    if (globals)        globalOptions()->print(output);
-    if (perProcess) perProcessOptions()->print(output);
-    if (example && (globals || perProcess)) {
-        output << "\nExample:";
-        if (globals) output << " --save-contours --motion-planner --slicing-scheduler";
-        if (perProcess) output << " --process 0 --radx 75 --voxel-profile constant --voxel-z 75 67.5 --gridstep 0.1 --snap --smoothing 0.01 --tolerances 0.75 0.01 --safestep --clearance --medialaxis-radius 1.0  --process 1 --radx 10 --voxel-profile constant --voxel-z 10 9 --gridstep 0.1 --snap --smoothing 0.1 --tolerances 0.1 0.001 --safestep --clearance --medialaxis-radius 1.0";
-        output << "\n";
+ParserAllLocalAndGlobal::ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, NanoscribeSpec *n) :
+    factors(f),
+    spec(s),
+    nanoSpec(n),
+    ParserLocalAndGlobal(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(n!=NULL))),
+                         std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(n!=NULL)))) {}
+
+
+void ParserAllLocalAndGlobal::globalCallback() {
+    parseGlobal(spec.global, globalOptions, factors);
+    spec.initializeVectors(perProcessOptions.maxProcess + 1);
+    if (nanoSpec != NULL) {
+        nanoContext = std::make_shared<ContextToParseNanoOptions>(*spec.global.config, factors, globalOptions, *nanoSpec);
+        parseNano<true>(0, 0, globalOptions, nanoContext.get());
     }
 }
 
-void composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output) {
-    std::ostringstream fmt;
-    composeParameterHelp(globals, perProcess, example, fmt);
-    output = fmt.str();
+void ParserAllLocalAndGlobal::perProcessCallback(int k, po::variables_map &processOptions) {
+    parsePerProcess(spec, factors, k, processOptions);
+    if (nanoSpec != NULL) {
+        parseNano<false>(k, (int)spec.numspecs, processOptions, nanoContext.get());
+    }
+}
+
+void ParserAllLocalAndGlobal::finishCallback() {
+    std::string err = spec.populateParameters();
+    if (!err.empty()) throw po::error(std::move(err));
 }
 
 std::vector<std::string> getArgs(int argc, const char ** argv, int numskip) {

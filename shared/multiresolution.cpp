@@ -7,6 +7,7 @@
 #include "pathsfile.hpp"
 #include "parsing.hpp"
 #include "3d.hpp"
+#include <string.h>
 static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface.h so typedef coord_type resolves to the same type as typedef ClipperLib::cInt");
 
 /////////////////////////////////////////////////
@@ -105,8 +106,13 @@ StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::st
         state->err = state->factors.err;
         return state;
     }
-    std::string err = parseAll(*state->spec, NULL, args, state->factors);
-    if (!err.empty()) { state->err = err; return state; }
+    try {
+        ParserAllLocalAndGlobal parser(state->factors, *state->spec);
+        parser.setParsedOptions(args, NULL);
+    } catch (std::exception &e) {
+        state->err = e.what();
+        return state;
+    }
     if (state->spec->global.useScheduler) {
         bool removeUnused = true;
         state->sched = std::make_shared<SimpleSlicingScheduler>(removeUnused, state->spec);
@@ -148,14 +154,47 @@ LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
     return config;
 }
 
-std::string helpstr;
-LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int showExample) {
-    if (helpstr.empty()) {
-        composeParameterHelp(showGlobals != 0, showPerProcess != 0, showExample != 0, helpstr);
+void composeParameterHelp(po::options_description *globals, po::options_description* perProcess, bool example, std::ostream &output) {
+    bool g = globals != NULL;
+    bool p = perProcess != NULL;
+    bool gop = g || p;
+    if (gop) output << "The multislicing engine is very flexible.\n  It takes parameters as if it were a command line application.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
+    if (g)    globals->print(output);
+    if (p) perProcess->print(output);
+    if (example && gop) {
+        output << "\nExample:";
+        if (g) output << " --save-contours --motion-planner --slicing-scheduler";
+        if (p) output << " --process 0 --radx 75 --voxel-profile constant --voxel-z 75 67.5 --gridstep 0.1 --snap --smoothing 0.01 --tolerances 0.75 0.01 --safestep --clearance --medialaxis-radius 1.0  --process 1 --radx 10 --voxel-profile constant --voxel-z 10 9 --gridstep 0.1 --snap --smoothing 0.1 --tolerances 0.1 0.001 --safestep --clearance --medialaxis-radius 1.0";
+        output << "\n";
     }
-    return (char *)helpstr.c_str();
 }
 
+void composeParameterHelp(po::options_description *globals, po::options_description* perProcess, bool example, std::string &output) {
+    std::ostringstream fmt;
+    composeParameterHelp(globals, perProcess, example, fmt);
+    output = fmt.str();
+}
+
+LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int showExample) {
+    std::shared_ptr<po::options_description> globals;
+    std::shared_ptr<po::options_description> perProcess;
+    std::string helpstr;
+    if (showGlobals != 0) {
+        globals    = std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(false)));
+    }
+    if (showPerProcess != 0) {
+        perProcess = std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(false)));
+    }
+    composeParameterHelp(globals.get(), perProcess.get(), showExample != 0, helpstr);
+
+    char * res = new char[helpstr.size() + 2];
+    strcpy(res, helpstr.c_str());
+    return res;
+}
+
+LIBRARY_API  void  freeParameterHelp(char *helpstr) {
+    delete helpstr;
+}
 
 LIBRARY_API  void freeState(StateHandle state) {
     if (state != NULL) delete state;

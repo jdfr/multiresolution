@@ -14,15 +14,12 @@
 #endif
 
 typedef struct MainSpec {
-    po::options_description main;
-    po::positional_options_description mainPositional;
-    po::options_description dxf;
-    po::options_description nano;
-    std::vector<const po::options_description*> allopts;
-    std::vector<po::parsed_options> optsBySystem;
+    std::vector<std::shared_ptr<po::options_description>> opts_toshow;
+    std::vector<std::shared_ptr<po::options_description>> opts_toparse;
+    std::vector<const po::options_description*>           opts_toparse_naked;
+    std::vector<po::parsed_options>                       optsBySystem;
     int mainOptsIdx;
     int dxfOptsIdx;
-    int nanoOptsIdx;
     int globalOptsIdx;
     int perProcOptsIdx;
     MainSpec();
@@ -38,8 +35,15 @@ typedef struct MainSpec {
     }
 } MainSpec;
 
-MainSpec::MainSpec() : main("Main options"), dxf("DXF options"), nano("Nanoscribe options") {
-    main.add_options()
+MainSpec::MainSpec() {
+    opts_toshow       .reserve(6);
+    opts_toparse      .reserve(4);
+    opts_toparse_naked.reserve(4);
+    optsBySystem      .reserve(4);
+
+    mainOptsIdx = (int)opts_toparse.size();
+    opts_toparse.emplace_back(std::make_shared<po::options_description>("Main options"));
+    opts_toparse.back()->add_options()
         ("help,h",
             "produce help message")
         ("config,q",
@@ -60,8 +64,10 @@ MainSpec::MainSpec() : main("Main options"), dxf("DXF options"), nano("Nanoscrib
         ("dry-run,y",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
-    //mainPositional.add("load", 1).add("save", 1);
-    dxf.add_options()
+
+    dxfOptsIdx = (int)opts_toparse.size();
+    opts_toparse.emplace_back(std::make_shared<po::options_description>("DXF options"));
+    opts_toparse.back()->add_options()
         ("dxf-toolpaths",
             po::value<std::string>()->value_name("filename"),
             "Output toolpaths in a *.dxf file")
@@ -76,22 +82,34 @@ MainSpec::MainSpec() : main("Main options"), dxf("DXF options"), nano("Nanoscrib
         ("dxf-by-tool",
             "If this option is specified, a different DXF output file is generated for each process. Note: if --dxf-by-z is also specified, a different file is generated for each combination of Z and process")
         ;
-    allopts.reserve(5);
-    mainOptsIdx    = (int)allopts.size(); allopts.push_back(&main);
-    dxfOptsIdx     = (int)allopts.size(); allopts.push_back(&dxf);
-    nanoOptsIdx    = (int)allopts.size(); allopts.push_back(nanoGlobalOptions());
-    globalOptsIdx  = (int)allopts.size(); allopts.push_back(globalOptions());
-    perProcOptsIdx = (int)allopts.size(); allopts.push_back(perProcessOptions());
+
+    globalOptsIdx  = (int)opts_toparse.size();
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(true))));
+
+    perProcOptsIdx = (int)opts_toparse.size();
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(true))));
+
+    for (auto &opt : opts_toparse) {
+        opts_toparse_naked.push_back(opt.get());
+    }
+
+    opts_toshow.push_back(opts_toparse[mainOptsIdx]);
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(false))));
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(false))));
+    opts_toshow.push_back(opts_toparse[dxfOptsIdx]);
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    nanoGlobalOptionsGenerator())));
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(nanoPerProcessOptionsGenerator())));
+
 }
 
 void MainSpec::slurpAllOptions(int argc, const char ** argv) {
     auto args    = getArgs(argc, argv);
-    optsBySystem = sortOptions(allopts, mainPositional, mainOptsIdx, NULL, args);
+    optsBySystem = sortOptions(opts_toparse_naked, po::positional_options_description(), mainOptsIdx, NULL, args);
 }
 
 void MainSpec::usage() {
     std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
-    for (auto opts : allopts) {
+    for (auto opts : opts_toshow) {
         std::cout << *opts << "\n";
     }
 }
@@ -160,22 +178,11 @@ int Main(int argc, const char** argv) {
         factors.init(*config, doscale);
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
-        po::variables_map nanoGlobalOpts;
-        bool nonEmptyNanoGlobal = !dryrun && mainSpec.nonEmptyOpts(mainSpec.nanoOptsIdx);
-        if (nonEmptyNanoGlobal) {
-            nanoGlobalOpts = mainSpec.getMap(mainSpec.nanoOptsIdx);
+        {
+            ParserAllLocalAndGlobal parser(factors, *multispec, mainSpec.opts_toparse[mainSpec.globalOptsIdx], mainSpec.opts_toparse[mainSpec.perProcOptsIdx], &nanoSpec);
+            parser.setParsedOptions(mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx]);
         }
-        ContextToParseNanoOptions nanoContext(factors, &nanoGlobalOpts, nanoSpec);
-        ContextToParseNanoOptions *nanoCtxPtr = &nanoContext;
-        if (nonEmptyNanoGlobal) {
-            factors.loadNanoscribeFactors(*config);
-            if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
-            parseNanoGlobal(nanoCtxPtr);
-            saveNano = true;
-        }
-
-        std::string err = parseAll(*multispec, mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx], factors, nanoCtxPtr);
-        if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
+        saveNano = !dryrun && nanoSpec.useSpec;
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
 
@@ -251,8 +258,6 @@ int Main(int argc, const char** argv) {
             }
         }
 
-    } catch (po::too_many_positional_options_error &) {
-        fprintf(stderr, "Error parsing options: you have probably missed the value for some option!\n"); return -1;
     } catch (std::exception &e) {
         fprintf(stderr, e.what()); return -1;
     }

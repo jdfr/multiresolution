@@ -5,6 +5,11 @@
 FEATURE-RICH FUNCTIONALITY FOR READING ARGUMENTS
 *********************************************************/
 
+/*It would be really nice to replace our homegrown configuration file parser by boost:program_options's standard one.
+Unfortunately, our values can contain # characters inside them (specifically, in the python expressions),
+and boost:program_options would consider them as comment starts, even if they are within quotes, because 
+boost::program_options strips comments before any lexical analysis. Thus, we will continue to use our clunky Configuration class.*/
+
 #include "pathwriter_dxf.hpp"
 #include "pathwriter_nanoscribe.hpp"
 
@@ -31,37 +36,52 @@ typedef struct NanoscribeSpec {
     NanoscribeSpec() : useSpec(false) {}
 } NanoscribeSpec;
 
-typedef struct ContextToParseNanoOptions {
-    MetricFactors &factors;
-    po::variables_map *nanoGlobal;
-    NanoscribeSpec &spec;
-    ContextToParseNanoOptions(MetricFactors &f, po::variables_map *ng, NanoscribeSpec &s) : factors(f), nanoGlobal(ng), spec(s) {}
-} ContextToParseNanoOptions;
+typedef std::pair<int, po::parsed_options> OptionsByTool;
+typedef struct OptionsByToolSpec {
+    std::vector<OptionsByTool> optionsByTool;
+    int maxProcess;
+} OptionsByToolSpec;
 
-/*Functions to parse the command line.
+class ParserLocalAndGlobal {
+public:
+    std::shared_ptr<po::options_description> globalDescription;
+    std::shared_ptr<po::options_description>  localDescription;
+    ParserLocalAndGlobal(std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) : globalDescription(std::move(g)), localDescription(std::move(l)) {}
+    void setParsedOptions(po::parsed_options globals, po::parsed_options allPerProcess);
+    void setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin);
+    virtual void globalCallback() {};                                             //redefined in subclasses
+    virtual void perProcessCallback(int k, po::variables_map &processOptions) {}; //redefined in subclasses
+    virtual void finishCallback() {};
+protected:
+    po::variables_map globalOptions;
+    OptionsByToolSpec perProcessOptions;
+    void separatePerProcess(po::parsed_options &allPerProcess);
+};
 
-It would be really nice to replace our homegrown configuration file parser by boost:program_options's standard one.
-Unfortunately, our values can contain # characters inside them (specifically, in the python expressions),
-and boost:program_options would consider them as comment starts, even if they are within quotes, because 
-boost::program_options strips comments before any lexical analysis. Thus, we will continue to use our clunky Configuration class.*/
+struct ContextToParseNanoOptions;
+typedef struct ContextToParseNanoOptions ContextToParseNanoOptions;
 
-const po::options_description *     globalOptions();
-const po::options_description * perProcessOptions();
+class ParserAllLocalAndGlobal : public ParserLocalAndGlobal {
+public:
+    MetricFactors  &factors;
+    MultiSpec      &spec;
+    NanoscribeSpec *nanoSpec;
+    ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l, NanoscribeSpec *n = NULL) : factors(f), spec(s), nanoSpec(n), ParserLocalAndGlobal(std::move(g), std::move(l)) {}
+    ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, NanoscribeSpec *n = NULL);
+    virtual void globalCallback();
+    virtual void perProcessCallback(int k, po::variables_map &processOptions);
+    virtual void finishCallback();
+protected:
+    std::shared_ptr<ContextToParseNanoOptions> nanoContext;
+};
 
-const po::options_description * nanoGlobalOptions();
+po::options_description         globalOptionsGenerator(bool alsoNano);
+po::options_description     perProcessOptionsGenerator(bool alsoNano);
+po::options_description     nanoGlobalOptionsGenerator();
+po::options_description nanoPerProcessOptionsGenerator();
 
 std::vector<po::parsed_options> sortOptions(std::vector<const po::options_description*> &optss, const po::positional_options_description &posit, int positionalArgumentsIdx, const char *CommandLineOrigin, std::vector<std::string> &args);
-po::parsed_options parseCommandLine(po::options_description &opts, const po::positional_options_description &posit, const char *CommandLineOrigin, std::vector<std::string> &args);
 
 std::vector<std::string> getArgs(int argc, const char ** argv, int numskip=1);
-
-void        parseNanoGlobal(ContextToParseNanoOptions *nanoContext);
-std::string parseGlobal    (GlobalSpec &spec, po::parsed_options &optionList, MetricFactors &factors);
-std::string parsePerProcess( MultiSpec &spec, po::parsed_options &optionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext=NULL);
-std::string parseAll       ( MultiSpec &spec, po::parsed_options &globalOptionList, po::parsed_options &perProcOptionList, MetricFactors &factors, ContextToParseNanoOptions *nanoContext=NULL);
-std::string parseAll       ( MultiSpec &spec, const char *CommandLineOrigin, std::vector<std::string> &args,               MetricFactors &factors, ContextToParseNanoOptions *nanoContext=NULL);
-
-void composeParameterHelp(bool globals, bool perProcess, bool example, std::ostream &output);
-void composeParameterHelp(bool globals, bool perProcess, bool example, std::string &output);
 
 #endif

@@ -107,7 +107,9 @@ extern "C" {
 
     LIBRARY_API  ConfigHandle readConfiguration(char *configfilename);
 
-    LIBRARY_API  char * getParameterHelp(int showGlobals, int showPerProcess, int showExample); //ATTENTION: THIS METHOD IS NOT THREAD-SAFE!!!!
+    LIBRARY_API  char * getParameterHelp(int showGlobals, int showPerProcess, int showExample);
+
+    LIBRARY_API  void  freeParameterHelp(char *helpstr);
 
     LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv);
 
