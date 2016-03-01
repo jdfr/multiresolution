@@ -501,7 +501,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
     infillingAreas->clear();
-    clp::Paths *intermediate_medialaxis;;
+    clp::Paths *intermediate_medialaxis;
 
     clp::Paths &lowres = AUX2;
     clp::Paths *contourToProcess;
@@ -604,17 +604,19 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis);
         }
 
-        if (!spec->pp[k].medialAxisFactors.empty()) {
+    }
 
-            //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
-            clp::Paths *intermediate_paths = &AUX3;
+    if (!spec->pp[k].medialAxisFactors.empty()) {
 
-            clipperDo(clipper, *intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
-            //SHOWCONTOURS(*spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+        //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
+        clp::Paths *intermediate_paths = &AUX3;
 
-            //but now, apply the medial axis algorithm!!!!
-            applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
-        }
+        clipperDo(clipper, *intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
+        //SHOWCONTOURS(*spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+
+        //but now, apply the medial axis algorithm!!!!
+        applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
+        if (!spec->pp[k].computeToolpaths) intermediate_medialaxis->clear();
     }
 
     if (output.infillingsIndependentContours.empty() && nextProcessSameKind) {
