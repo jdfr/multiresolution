@@ -171,8 +171,11 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"),
             "If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
         ("infill-perimeter-overlap",
-            po::value<double>()->default_value(0.7)->value_name("length"),
+            po::value<double>()->default_value(0.7)->value_name("ratio"),
             "This is the ratio of overlapping between the permiter toolpath and the inner infilling toolpaths. This only has effect if 'clearance' is not specified and 'radius-removecommon is 0")
+        ("infill-lineoverlap",
+            po::value<double>()->default_value(0.001)->value_name("ratio"),
+            "This is the ratio of overlapping between lines, if --infill (lines|hlinesv) is specified")
         ("infill-byregion",
             "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
         ("infill-recursive",
@@ -691,8 +694,9 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
         else                                      throw po::error(str("For process ", k, ": invalid infill mode: ", val));
         spec.pp[k].infillingPerimeterOverlap = vm["infill-perimeter-overlap"].as<double>();
-        spec.pp[k].infillingRecursive = vm.count("infill-recursive") != 0;
-        spec.pp[k].infillingWhole     = vm.count("infill-byregion")  == 0;
+        spec.pp[k].infillingLineOverlap      = vm["infill-lineoverlap"]      .as<double>();
+        spec.pp[k].infillingRecursive        = vm.count("infill-recursive") != 0;
+        spec.pp[k].infillingWhole            = vm.count("infill-byregion")  == 0;
         if (vm.count("infill-medialaxis-radius")) {
             spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
         }
