@@ -9,15 +9,16 @@ const double NanoscribePiezoRange = 300.0; //expressed in nanoscribe units
 const char * GWLEXTENSION = ".gwl";
 
 void SimpleNanoscribeConfig::init(MetricFactors &factors) {
-    factor_internal_to_nanoscribe = factors.internal_to_nanoscribe;
+    factor_internal_to_nanoscribe     = factors.internal_to_nanoscribe;
     NanoscribePiezoRangeInternalUnits = NanoscribePiezoRange / factor_internal_to_nanoscribe;
-    factor_input_to_nanoscribe = factors.input_to_internal * factor_internal_to_nanoscribe;
+    factor_input_to_nanoscribe        = factors.input_to_internal * factor_internal_to_nanoscribe;
     if (snapToGrid) {
         snapspec.gridstepX = snapspec.gridstepY = (double)gridStep;
-        snapspec.shiftX = snapspec.shiftY = 0;
+        snapspec.shiftX    = snapspec.shiftY    = 0;
     }
+    stagegotoFormatting = str("StageGoto%c ", nanoscribeNumberFormatting, "\n");
     pointLineFormatting = str(nanoscribeNumberFormatting, ' ', nanoscribeNumberFormatting, " 0\n");
-    zoffsetFormatting = str("ZOffset ", nanoscribeNumberFormatting, "\n");
+    zoffsetFormatting   = str("ZOffset ", nanoscribeNumberFormatting, "\n");
     addzdriveFormatting = str("AddZDrivePosition ", nanoscribeNumberFormatting, " %%change z block from %d to %d\nZOffset 0\n");
 }
 
@@ -157,11 +158,11 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
                         currentWindowMax.X += (clp::cInt)(config->NanoscribePiezoRangeInternalUnits - spareLen);
                         currentWindowMax.Y += (clp::cInt)(config->NanoscribePiezoRangeInternalUnits - spareLen);
                     }
-                    if (fprintf(this->f, "StageGotoX %.20g\n", StagePosNanoscribeX) < 0) {
+                    if (fprintf(this->f, config->stagegotoFormatting.c_str(), 'X', StagePosNanoscribeX) < 0) {
                         err = str("error writing stage displacement to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
                         return false;
                     }
-                    if (fprintf(this->f, "StageGotoY %.20g\n", StagePosNanoscribeY) < 0) {
+                    if (fprintf(this->f, config->stagegotoFormatting.c_str(), 'Y', StagePosNanoscribeY) < 0) {
                         err = str("error writing stage displacement to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
                         return false;
                     }
