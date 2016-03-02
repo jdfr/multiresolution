@@ -62,6 +62,7 @@ struct ContextToParseNanoOptions;
 typedef struct ContextToParseNanoOptions ContextToParseNanoOptions;
 
 enum AddNano         { NotAddNano,         YesAddNano };
+enum AddResponseFile { NotAddResponseFile, YesAddResponseFile };
 
 class ParserAllLocalAndGlobal : public ParserLocalAndGlobal {
 public:
@@ -69,7 +70,7 @@ public:
     MultiSpec      &spec;
     NanoscribeSpec *nanoSpec;
     ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l, NanoscribeSpec *n = NULL) : factors(f), spec(s), nanoSpec(n), ParserLocalAndGlobal(std::move(g), std::move(l)) {}
-    ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, AddNano addNano);
+    ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, AddNano addNano, AddResponseFile addResponseFile);
     virtual void globalCallback();
     virtual void perProcessCallback(int k, po::variables_map &processOptions);
     virtual void finishCallback();
@@ -77,7 +78,9 @@ protected:
     std::shared_ptr<ContextToParseNanoOptions> nanoContext;
 };
 
-po::options_description         globalOptionsGenerator(AddNano useNano);
+void addResponseFileOption(po::options_description &opts);
+
+po::options_description         globalOptionsGenerator(AddNano useNano, AddResponseFile useRP);
 po::options_description     perProcessOptionsGenerator(AddNano useNano);
 po::options_description     nanoGlobalOptionsGenerator();
 po::options_description nanoPerProcessOptionsGenerator();

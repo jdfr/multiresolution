@@ -69,7 +69,15 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
         ;
 }
 
-po::options_description globalOptionsGenerator(AddNano useNano) {
+void addResponseFileOption(po::options_description &opts) {
+    opts.add_options()
+        ("response-file",
+            po::value<std::string>(),
+            "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
+        ;
+}
+
+po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile useRP) {
     po::options_description opts("Slicing engine options (global)");
     opts.add_options()
         ("save-contours,j",
@@ -112,11 +120,9 @@ po::options_description globalOptionsGenerator(AddNano useNano) {
         ("feedback,b",
             po::value<std::vector<std::string>>()->multitoken(),
             "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
-        ("response-file",
-            po::value<std::string>(),
-            "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
         ;
     if (useNano==YesAddNano)         nanoOptionsGenerator<true>(opts);
+    if (useRP  ==YesAddResponseFile)      addResponseFileOption(opts);
     return opts;
 }
 
@@ -759,12 +765,12 @@ void ParserLocalAndGlobal::separatePerProcess(po::parsed_options &optionList) {
     }
 }
 
-ParserAllLocalAndGlobal::ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, AddNano addNano) :
+ParserAllLocalAndGlobal::ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, AddNano addNano, AddResponseFile addResponseFile) :
     factors(f),
     spec(s),
     nanoSpec(NULL),
     //default configuration assumes that we do not use Nanoscribe, and include response file definition in globals
-    ParserLocalAndGlobal(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(addNano))),
+    ParserLocalAndGlobal(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(addNano, addResponseFile))),
                          std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(addNano)))) {}
 
 

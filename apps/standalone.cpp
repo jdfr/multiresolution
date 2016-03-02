@@ -64,6 +64,7 @@ MainSpec::MainSpec() {
         ("dry-run,y",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
+    addResponseFileOption(*opts_toparse.back());
 
     dxfOptsIdx = (int)opts_toparse.size();
     opts_toparse.emplace_back(std::make_shared<po::options_description>("DXF options"));
@@ -84,7 +85,7 @@ MainSpec::MainSpec() {
         ;
 
     globalOptsIdx  = (int)opts_toparse.size();
-    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(YesAddNano))));
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(YesAddNano, NotAddResponseFile))));
 
     perProcOptsIdx = (int)opts_toparse.size();
     opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(YesAddNano))));
@@ -94,7 +95,7 @@ MainSpec::MainSpec() {
     }
 
     opts_toshow.push_back(opts_toparse[mainOptsIdx]);
-    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(NotAddNano))));
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(NotAddNano, NotAddResponseFile))));
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(NotAddNano))));
     opts_toshow.push_back(opts_toparse[dxfOptsIdx]);
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    nanoGlobalOptionsGenerator())));
