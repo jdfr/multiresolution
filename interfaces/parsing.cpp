@@ -349,30 +349,6 @@ template<bool GLOBAL, typename T> bool nanoOptionMandatory(int ntool, ContextToP
     }
 }
 
-//helper method for parseNano()
-void validateNoLocalNanoOptions(po::variables_map &current, const char *endErrStr) {
-    const bool GLOBAL = false;
-    const char * names[] = {
-        PREFIXNANONAME("nano-tool-begin"),
-        PREFIXNANONAME("nano-tool-end"),
-        PREFIXNANONAME("nano-file-begin"),
-        PREFIXNANONAME("nano-file-end"),
-        PREFIXNANONAME("nano-scanmode"),
-        PREFIXNANONAME("nano-galvocenter"),
-        PREFIXNANONAME("nano-angle"),
-        PREFIXNANONAME("nano-spacing"),
-        PREFIXNANONAME("nano-margin"),
-        PREFIXNANONAME("nano-maxsquarelen"),
-        PREFIXNANONAME("nano-origin"),
-        PREFIXNANONAME("nano-gridstep")
-    };
-    for (int i = 0; i < sizeof(names); ++i) {
-        if (current.count(names[i])) {
-            throw po::error(str("Error: option --", names[i], endErrStr));
-        }
-    }
-}
-
 //generic method to parse Nanoscribe options both in global mode and in per-process mode. Some considerations:
 //      -the global mode is parsed first, but when it is called, arguments ntool and numtools are invalid (we do not know numtools until later)
 //      -except for --pp-nano-tool-*, per-process options are not allowed if the global option --nano-global is used
@@ -382,7 +358,6 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     if (GLOBAL) {
         context->spec.useSpec  = current.count("nanoscribe")!=0;
         if (!context->spec.useSpec) {
-            validateNoLocalNanoOptions(current, " was specified, but option '--nanoscribe FILENAME' was not specified!");
             return;
         }
         context->factors.loadNanoscribeFactors(context->config);
@@ -400,7 +375,6 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
         context->spec.generic_z     = current.count("nano-by-z")    == 0;
     } else {
         if (!context->spec.useSpec) {
-            validateNoLocalNanoOptions(current, " was specified, but option '--nanoscribe FILENAME' was not specified!");
             return;
         }
         context->spec.toolChanges = context->spec.nanos[0]->toolChanges = std::make_shared<ToolChanges>(numtools);
@@ -643,7 +617,7 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
     }
 }
 
-//this method CANNOT be called until GlobalSpec::parseOptions has been called
+//this method CANNOT be called until parseGlobal has been called
 void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variables_map &vm ) {
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
