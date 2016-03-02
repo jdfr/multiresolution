@@ -44,9 +44,9 @@ MainSpec::MainSpec() {
     mainOptsIdx = (int)opts_toparse.size();
     opts_toparse.emplace_back(std::make_shared<po::options_description>("Main options"));
     opts_toparse.back()->add_options()
-        ("help,h",
+        ("help",
             "produce help message")
-        ("config,q",
+        ("config",
             po::value<std::string>()->default_value("config.txt"),
             "configuration input file (if no file is provided, it is assumed to be config.txt)")
         ("load",
@@ -58,10 +58,10 @@ MainSpec::MainSpec() {
         ("save-format",
             po::value<std::string>()->default_value("integer"),
             "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
-        ("show,w",
+        ("show",
             po::value<std::vector<std::string>>()->multitoken(),
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
-        ("dry-run,y",
+        ("dry-run",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ;
     addResponseFileOption(*opts_toparse.back());
@@ -109,7 +109,7 @@ void MainSpec::slurpAllOptions(int argc, const char ** argv) {
 }
 
 void MainSpec::usage() {
-    std::cout << "Command line interface to the multislicing engine.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
+    std::cout << "Command line interface to the multislicing engine.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
     for (auto opts : opts_toshow) {
         std::cout << *opts << "\n";
     }

@@ -158,7 +158,7 @@ void composeParameterHelp(po::options_description *globals, po::options_descript
     bool g = globals != NULL;
     bool p = perProcess != NULL;
     bool gop = g || p;
-    if (gop) output << "The multislicing engine is very flexible.\n  It takes parameters as if it were a command line application.\n  Some options have long and short names.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
+    if (gop) output << "The multislicing engine is very flexible.\n  It takes parameters as if it were a command line application.\n  If there is no ambiguity, options can be specified as prefixes of their full names.\n";
     if (g)    globals->print(output);
     if (p) perProcess->print(output);
     if (example && gop) {
