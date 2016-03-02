@@ -11,7 +11,6 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
     if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
 
     SliceHeader sliceheader;
-    int index = 0;
     IOPaths iop(f);
     clp::Paths output;
     std::shared_ptr<PathWriter> writer;
