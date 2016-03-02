@@ -91,7 +91,7 @@ MainSpec::MainSpec() {
             "Z values are considered to be the same if they differ less than this, in the mesh file units")
         ("bb",
             po::value<std::vector<double>>()->multitoken(),
-            "bounding box in the XY plane, in mesh file units. If it is not provided, it will be taken from the input file. This bounding box is used to set up the are to be partitioned into several GWL scripts")
+            "bounding box in the XY plane, in mesh file units. If it is not provided, it will be computed from the input file. This bounding box is used to set up the partitioning of the toolpaths into several domains, one for each regional GWL script.")
         ;
     addResponseFileOption(*opts.back());
 
