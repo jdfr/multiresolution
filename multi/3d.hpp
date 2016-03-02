@@ -41,7 +41,7 @@ public:
     void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool);
     std::shared_ptr<MultiSpec> spec;
     Multislicer multi;
-    ToolpathManager(std::shared_ptr<MultiSpec> s) : spec(std::move(s)), slicess(spec->numspecs), multi(s) {}
+    ToolpathManager(std::shared_ptr<MultiSpec> s) : spec(std::move(s)), slicess(spec->numspecs), multi(spec) {}
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
     void removeUsedSlicesPastZ(double z);
     void removeAdditionalContoursPastZ(double z);
