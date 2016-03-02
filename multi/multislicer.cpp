@@ -574,10 +574,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
                     clipperDo(clipper, *infillingAreas, clp::ctDifference, output.contours, output.infillingsIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
                 }
             } else {
-                //TODO: change the constant 0.3 by a parameter (that is, a parameter to tune the shrink factor for the the infilling, if no clearance is needed)
-                //ALTERNATIVE TODO: make the shrink factor a non-conditional parameter, but the user should then remember to set it appropriately if clearance is required
                 //0.99: cannot be 1.0, clipping / round-off errors crop up
-                double shrinkFactor = (spec->pp[k].addInternalClearance) ? 0.99 : 0.3;
+                double shrinkFactor = (spec->pp[k].addInternalClearance) ? 0.99 : (1-spec->pp[k].infillingPerimeterOverlap);
                 offsetDo(offset, *infillingAreas, -(double)spec->pp[k].radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
             }
         }
