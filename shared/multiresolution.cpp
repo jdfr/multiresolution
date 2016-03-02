@@ -107,7 +107,7 @@ StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::st
         return state;
     }
     try {
-        ParserAllLocalAndGlobal parser(state->factors, *state->spec);
+        ParserAllLocalAndGlobal parser(state->factors, *state->spec, NotAddNano);
         parser.setParsedOptions(args, NULL);
     } catch (std::exception &e) {
         state->err = e.what();
@@ -180,10 +180,10 @@ LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int sho
     std::shared_ptr<po::options_description> perProcess;
     std::string helpstr;
     if (showGlobals != 0) {
-        globals    = std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(false)));
+        globals    = std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(NotAddNano)));
     }
     if (showPerProcess != 0) {
-        perProcess = std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(false)));
+        perProcess = std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(NotAddNano)));
     }
     composeParameterHelp(globals.get(), perProcess.get(), showExample != 0, helpstr);
 

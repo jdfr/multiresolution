@@ -69,7 +69,7 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
         ;
 }
 
-po::options_description globalOptionsGenerator(bool alsoNano) {
+po::options_description globalOptionsGenerator(AddNano useNano) {
     po::options_description opts("Slicing engine options (global)");
     opts.add_options()
         ("save-contours,j",
@@ -116,11 +116,11 @@ po::options_description globalOptionsGenerator(bool alsoNano) {
             po::value<std::string>(),
             "file with additional parameters (for any purpose, not only local/global stuff), can be specified with '@filename', too. Parameters are inserted in-line, so please pay attention to positional parameters")
         ;
-    if (alsoNano) nanoOptionsGenerator<true>(opts);
+    if (useNano==YesAddNano)         nanoOptionsGenerator<true>(opts);
     return opts;
 }
 
-po::options_description perProcessOptionsGenerator(bool alsoNano) {
+po::options_description perProcessOptionsGenerator(AddNano useNano) {
     po::options_description opts("Slicing engine options (per process)");
     opts.add_options()
         ("process,p",
@@ -172,7 +172,7 @@ po::options_description perProcessOptionsGenerator(bool alsoNano) {
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
         ;
-    if (alsoNano) nanoOptionsGenerator<false>(opts);
+    if (useNano==YesAddNano) nanoOptionsGenerator<false>(opts);
     return opts;
 }
 
@@ -759,12 +759,13 @@ void ParserLocalAndGlobal::separatePerProcess(po::parsed_options &optionList) {
     }
 }
 
-ParserAllLocalAndGlobal::ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, NanoscribeSpec *n) :
+ParserAllLocalAndGlobal::ParserAllLocalAndGlobal(MetricFactors &f, MultiSpec &s, AddNano addNano) :
     factors(f),
     spec(s),
-    nanoSpec(n),
-    ParserLocalAndGlobal(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(n!=NULL))),
-                         std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(n!=NULL)))) {}
+    nanoSpec(NULL),
+    //default configuration assumes that we do not use Nanoscribe, and include response file definition in globals
+    ParserLocalAndGlobal(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(addNano))),
+                         std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(addNano)))) {}
 
 
 void ParserAllLocalAndGlobal::globalCallback() {

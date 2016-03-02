@@ -84,18 +84,18 @@ MainSpec::MainSpec() {
         ;
 
     globalOptsIdx  = (int)opts_toparse.size();
-    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(true))));
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(YesAddNano))));
 
     perProcOptsIdx = (int)opts_toparse.size();
-    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(true))));
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(YesAddNano))));
 
     for (auto &opt : opts_toparse) {
         opts_toparse_naked.push_back(opt.get());
     }
 
     opts_toshow.push_back(opts_toparse[mainOptsIdx]);
-    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(false))));
-    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(false))));
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(NotAddNano))));
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(NotAddNano))));
     opts_toshow.push_back(opts_toparse[dxfOptsIdx]);
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    nanoGlobalOptionsGenerator())));
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(nanoPerProcessOptionsGenerator())));
