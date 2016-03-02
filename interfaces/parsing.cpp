@@ -131,7 +131,7 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
     opts.add_options()
         ("process",
             po::value<int>()->required()->value_name("ntool"),
-            "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers. See below for an example")
+            "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers.")
         ("no-preprocessing",
             po::value<double>()->implicit_value(0.0)->value_name("rad"),
             "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
@@ -190,6 +190,11 @@ po::options_description nanoGlobalOptionsGenerator() {
 
 po::options_description nanoPerProcessOptionsGenerator() {
     po::options_description opts("Nanoscribe per-process options");
+    opts.add_options()
+        ("process",
+            po::value<int>()->required()->value_name("ntool"),
+            "This is analogous to the same option in the command line multiresolution slicer: All pp-nano-* options after this one will correspond to the process specified in this option, until another --process option is given.")
+        ;
     nanoOptionsGenerator<false>(opts);
     return opts;
 }
@@ -796,6 +801,22 @@ void ParserAllLocalAndGlobal::perProcessCallback(int k, po::variables_map &proce
 void ParserAllLocalAndGlobal::finishCallback() {
     std::string err = spec.populateParameters();
     if (!err.empty()) throw po::error(std::move(err));
+}
+
+ParserNanoLocalAndGlobal::ParserNanoLocalAndGlobal(Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) :
+factors(f),
+nanoSpec(n),
+config(c),
+ParserLocalAndGlobal(std::move(g), std::move(l)) {}
+
+void ParserNanoLocalAndGlobal::globalCallback() {
+    ntools = perProcessOptions.maxProcess + 1;
+    nanoContext = std::make_shared<ContextToParseNanoOptions>(config, factors, globalOptions, nanoSpec);
+    parseNano<true>(0, 0, globalOptions, nanoContext.get());
+}
+
+void ParserNanoLocalAndGlobal::perProcessCallback(int k, po::variables_map &processOptions) {
+    parseNano<false>(k, ntools, processOptions, nanoContext.get());
 }
 
 std::vector<std::string> getArgs(int argc, const char ** argv, int numskip) {

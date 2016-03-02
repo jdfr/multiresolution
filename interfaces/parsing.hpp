@@ -78,6 +78,19 @@ protected:
     std::shared_ptr<ContextToParseNanoOptions> nanoContext;
 };
 
+class ParserNanoLocalAndGlobal : public ParserLocalAndGlobal {
+public:
+    MetricFactors  &factors;
+    NanoscribeSpec &nanoSpec;
+    Configuration  &config;
+    ParserNanoLocalAndGlobal(Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l);
+    virtual void globalCallback();
+    virtual void perProcessCallback(int k, po::variables_map &processOptions);
+    int ntools;
+protected:
+    std::shared_ptr<ContextToParseNanoOptions> nanoContext;
+};
+
 void addResponseFileOption(po::options_description &opts);
 
 po::options_description         globalOptionsGenerator(AddNano useNano, AddResponseFile useRP);
