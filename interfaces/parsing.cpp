@@ -173,6 +173,9 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("infill-perimeter-overlap",
             po::value<double>()->default_value(0.7)->value_name("ratio"),
             "This is the ratio of overlapping between the permiter toolpath and the inner infilling toolpaths. This only has effect if 'clearance' is not specified and 'radius-removecommon is 0")
+        ("infill-maxconcentric",
+            po::value<int>()->value_name("max"),
+            "If '--infill concentric' is specified, its value is the maximum number of concentric perimeters that are generated")
         ("infill-lineoverlap",
             po::value<double>()->default_value(0.001)->value_name("ratio"),
             "This is the ratio of overlapping between lines, if --infill (lines|hlinesv) is specified")
@@ -693,10 +696,14 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         else if (val.compare("linesv")      == 0) spec.pp[k].infillingMode = InfillingRectilinearV;
         else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
         else                                      throw po::error(str("For process ", k, ": invalid infill mode: ", val));
-        spec.pp[k].infillingPerimeterOverlap = vm["infill-perimeter-overlap"].as<double>();
-        spec.pp[k].infillingLineOverlap      = vm["infill-lineoverlap"]      .as<double>();
-        spec.pp[k].infillingRecursive        = vm.count("infill-recursive") != 0;
-        spec.pp[k].infillingWhole            = vm.count("infill-byregion")  == 0;
+        spec.pp[k].infillingPerimeterOverlap  = vm["infill-perimeter-overlap"].as<double>();
+        spec.pp[k].infillingLineOverlap       = vm["infill-lineoverlap"]      .as<double>();
+        spec.pp[k].infillingRecursive         = vm.count("infill-recursive") != 0;
+        spec.pp[k].infillingWhole             = vm.count("infill-byregion")  == 0;
+        spec.pp[k].useMaxConcentricRecursive  = (spec.pp[k].infillingMode == InfillingConcentric) && (vm.count("infill-maxconcentric") != 0);
+        if (spec.pp[k].useMaxConcentricRecursive) {
+            spec.pp[k].maxConcentricRecursive = vm["infill-maxconcentric"].as<int>();
+        }
         if (vm.count("infill-medialaxis-radius")) {
             spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
         }

@@ -276,7 +276,7 @@ void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAr
     double erode_value = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
     clp::cInt minLineSize = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
     clp::cInt start = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
-    clp::cInt delta = (clp::cInt)(2*infillingRadius*(1-spec->pp[k].infillingLineOverlap)); //space the lines a little bit closer than the line width
+    clp::cInt delta = (clp::cInt)(2*infillingRadius*(1-spec->pp[k].infillingLineOverlap));
     clp::cInt numlines = ((horizontal ? bb.maxy : bb.maxx) - start) / delta + 1; //add one line to be sure
     clp::cInt accum = start;
     clp::Paths lines(numlines, clp::Path(2));
@@ -357,7 +357,9 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
     AddPathsToHPs(current, subhps);
     smoothed = current = next = clp::Paths();
     for (auto subhp = subhps.begin(); subhp != subhps.end(); ++subhp) {
-        if (!processInfillingsConcentricRecursive(*subhp)) return false;
+        --numconcentric;
+        if ((numconcentric > 0) && !processInfillingsConcentricRecursive(*subhp)) return false;
+        ++numconcentric;
     }
     return true;
 }
@@ -372,6 +374,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
     case InfillingConcentric: {
         HoledPolygons hps;
         AddPathsToHPs(infillingAreas, hps);
+        numconcentric = spec->pp[k].useMaxConcentricRecursive ? spec->pp[k].maxConcentricRecursive : std::numeric_limits<int>::max();
         //use the stepping grid for this process, but switch to snapSimple
         applySnapConcentricInfilling = spec->pp[k].applysnap;
         if (applySnapConcentricInfilling) {
