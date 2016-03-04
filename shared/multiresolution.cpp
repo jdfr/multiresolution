@@ -14,15 +14,17 @@ static_assert(sizeof(coord_type) == sizeof(clp::cInt), "please correct interface
 //SHARED LIBRARY INTERFACE
 /////////////////////////////////////////////////
 
-typedef struct SharedLibraryConfig {
+typedef struct HasError {
     std::string err;
+} HasError;
+
+typedef struct SharedLibraryConfig : public HasError {
     std::shared_ptr<Configuration> config;
 
     SharedLibraryConfig(char * configfile) { config = std::make_shared<Configuration>(); config->load(configfile); }
 } SharedLibraryConfig;
 
-typedef struct SharedLibraryState {
-    std::string err;
+typedef struct SharedLibraryState : public HasError {
     std::shared_ptr<Configuration> config;
     std::shared_ptr<MultiSpec> spec;
     MetricFactors factors;
@@ -35,8 +37,7 @@ typedef struct SharedLibraryState {
 
 
 //structure to read a slice in the shared library interface
-typedef struct SharedLibrarySlice {
-    std::string err;
+typedef struct SharedLibrarySlice : public HasError {
     std::shared_ptr<clp::Paths> paths;
     std::vector<int> numpoints;
     std::vector<clp::cInt*> pathpointers;
@@ -45,8 +46,7 @@ typedef struct SharedLibrarySlice {
 } SharedLibrarySlice;
 
 //structure to hold the results of the multislicer in the shared library interface
-typedef struct SharedLibraryResult {
-    std::string err;
+typedef struct SharedLibraryResult : public HasError {
     std::vector<std::shared_ptr<ResultSingleTool>> res;
     std::vector<int> numpoints;
     std::vector<clp::cInt*> pathpointers;
@@ -61,7 +61,7 @@ SharedLibrarySlice::SharedLibrarySlice(int numpaths) : paths(std::make_shared<cl
 SharedLibrarySlice::SharedLibrarySlice(std::shared_ptr<clp::Paths> _paths) : paths(std::move(_paths)), numpoints(paths->size()), pathpointers(paths->size()) {}
 
 LIBRARY_API  char * getErrorText(void* value) {
-    std::string &err = ((SharedLibraryResult*)value)->err;
+    std::string &err = static_cast<HasError*>(value)->err;
     if (err.empty()) return NULL;
     return const_cast<char *>(err.c_str());
 }
@@ -380,8 +380,7 @@ LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
 }
 
 
-typedef struct SharedLibraryPaths {
-    std::string err;
+typedef struct SharedLibraryPaths : public HasError {
     std::string filename;
     IOPaths iop;
     FileHeader fileheader;
@@ -392,7 +391,7 @@ typedef struct SharedLibraryPaths {
     clp::Paths pathsi;
     DPaths pathsd;
     Paths3D pathsd3;
-    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), iop(f), err(), currentRecord(0) {}
+    SharedLibraryPaths(const char *_filename, FILE *f) : filename(_filename), iop(f), currentRecord(0) {}
     void clearPaths() {
         pathsi.clear();
         pathsd.clear();
