@@ -56,43 +56,14 @@ typedef struct SharedLibraryResult {
     SharedLibraryResult(std::shared_ptr<ResultSingleTool> single) : res(1, std::move(single)), ntool(res[0]->ntool), z(res[0]->z) {}
 } SharedLibraryResult;
 
-#if ( defined(_WIN32) || defined(_WIN64) )
-//taken from http://codereview.stackexchange.com/questions/419/converting-between-stdwstring-and-stdstring
-std::wstring s2ws(const std::string& s) {
-    int len;
-    int slength = (int)s.length() + 1;
-    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
-    std::wstring r(len, L'\0');
-    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
-    return r;
-}
-
-std::string ws2s(const std::wstring& s) {
-    int len;
-    int slength = (int)s.length() + 1;
-    len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0);
-    std::string r(len, '\0');
-    WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, &r[0], len, 0, 0);
-    return r;
-}
-#endif
-
 SharedLibrarySlice::SharedLibrarySlice(int numpaths) : paths(std::make_shared<clp::Paths>(numpaths)), numpoints(numpaths), pathpointers(numpaths) {}
 
 SharedLibrarySlice::SharedLibrarySlice(std::shared_ptr<clp::Paths> _paths) : paths(std::move(_paths)), numpoints(paths->size()), pathpointers(paths->size()) {}
 
-LIBRARY_API  BSTR getErrorText(void* value) {
-    //err is defined as the first memeber in all structs to be able to retrieve it from any of them with uniform code. Yes, I know, this is dirty as hell
-#if ( defined(_WIN32) || defined(_WIN64) )
-    std::wstring werr = s2ws(((SharedLibraryResult*)value)->err);
-    return SysAllocString(werr.c_str());
-#else
-    //char *noreturn = ((SharedLibraryResult*)value)->err.c_str();
-    //char *ret = (char*)malloc(strlen(noreturn) + 1);
-    //strcpy(ret, noreturn);
-    //return ret;
-    return ((SharedLibraryResult*)value)->err.c_str();
-#endif
+LIBRARY_API  char * getErrorText(void* value) {
+    std::string &err = ((SharedLibraryResult*)value)->err;
+    if (err.empty()) return NULL;
+    return const_cast<char *>(err.c_str());
 }
 
 StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::string> &args, bool doscale) {
@@ -187,6 +158,7 @@ LIBRARY_API char * getParameterHelp(int showGlobals, int showPerProcess, int sho
     }
     composeParameterHelp(globals.get(), perProcess.get(), showExample != 0, helpstr);
 
+    //we copy the string again, just to avoid having a dedicated object to free afterwards
     char * res = new char[helpstr.size() + 2];
     strcpy(res, helpstr.c_str());
     return res;

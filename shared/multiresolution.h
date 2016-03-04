@@ -33,11 +33,8 @@ typedef int OutputSliceInfo_PathType;
 #    else
 #        define LIBRARY_API __declspec(dllimport)
 #    endif
-#    include <comutil.h>
      typedef long long int coord_type;
 #elif defined(__GNUC__)
-     typedef const char * BSTR;
-     //"long long"=="long" in x64 land, but we use "long long" because GCC is horribly pedantic about types
      typedef long long int coord_type;
 #    if __GNUC__ >= 4
 #        define LIBRARY_API __attribute__ ((visibility ("default")))
@@ -101,7 +98,7 @@ extern "C" {
 #endif
 
     //getErrorText can be called for handles to arguments, results, and slices
-    LIBRARY_API  BSTR getErrorText(void* anyValue);
+    LIBRARY_API  char * getErrorText(void* anyValue);
 
     // COMMON FUNCTIONS
 
