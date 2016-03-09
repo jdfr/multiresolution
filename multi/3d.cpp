@@ -458,7 +458,8 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             //ADVANCED METHOD: OFFSET CONTOURS TO TAKE INTO ACCOUNT THE PROFILE OF THE VOXEL
             double inputz = sched.input[input_idx].z;
             int ntool = sched.input[input_idx].ntool;
-            clp::Paths *previous = NULL, *next = NULL;
+            bool firstTime = true;
+            clp::Paths *next = NULL;
             for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
                 --raw[*raw_idx].numRemainingUses;
                 double rawz = raw[*raw_idx].z;
@@ -466,7 +467,9 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                     next = &raw[*raw_idx].slice;
                 } else {
                     double width_at_raw = sched.tm.spec->pp[ntool].profile->getWidth(inputz - rawz);
-                    if (width_at_raw <= 0) {
+                    //this edge case happens from time to time due to misconfigurations, just let's handle it gracefully instead of erroring out
+                    if (width_at_raw == 0) continue;
+                    if (width_at_raw < 0) {
                         sched.has_err = true;
                         sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the voxel's width at the raw slice Z was illegal: ", width_at_raw);
                         return NULL;
@@ -481,11 +484,11 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                     offsetDo(sched.tm.multi.offset, auxaux, diffwidth, raw[*raw_idx].slice, clp::jtSquare, clp::etClosedPolygon);
                     next = &auxaux;
                 }
-                if (previous == NULL) {
-                    previous = next;
+                if (firstTime) {
+                    auxRawSlice = std::move(*next);
+                    firstTime = false;
                 } else {
-                    clipperDo(sched.tm.multi.clipper, auxRawSlice, clp::ctIntersection, *previous, *next, clp::pftNonZero, clp::pftNonZero);
-                    previous = &auxRawSlice;
+                    clipperDo(sched.tm.multi.clipper, auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
                 }
             }
             auxaux.clear();
