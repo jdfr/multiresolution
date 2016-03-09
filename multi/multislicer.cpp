@@ -276,7 +276,7 @@ void Multislicer::processInfillingsRectilinear(size_t k, clp::Paths &infillingAr
     double erode_value = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
     clp::cInt minLineSize = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
     clp::cInt start = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
-    clp::cInt delta = (clp::cInt)(2*infillingRadius*(1-spec->pp[k].infillingLineOverlap));
+    clp::cInt delta = (clp::cInt)(2 * erodedInfillingRadius);
     clp::cInt numlines = ((horizontal ? bb.maxy : bb.maxx) - start) / delta + 1; //add one line to be sure
     clp::cInt accum = start;
     clp::Paths lines(numlines, clp::Path(2));
@@ -336,11 +336,11 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
     hp.moveToPaths(current);
     if (infillingUseClearance) {
         //make the paths as non-intersecting as possible
-        offsetDo(offset, smoothed, -2 * infillingRadius, current, clp::jtRound, clp::etClosedPolygon);
-        offsetDo(offset, next,          infillingRadius, smoothed, clp::jtRound, clp::etClosedPolygon);
+        offsetDo(offset, smoothed, -2 * erodedInfillingRadius, current,  clp::jtRound, clp::etClosedPolygon);
+        offsetDo(offset, next,          erodedInfillingRadius, smoothed, clp::jtRound, clp::etClosedPolygon);
     } else {
         //freely intersecting paths, as long as they are separated by the adequate distance
-        offsetDo(offset, next, -infillingRadius, current, clp::jtRound, clp::etClosedPolygon);
+        offsetDo(offset, next, -erodedInfillingRadius, current, clp::jtRound, clp::etClosedPolygon);
     }
     if (false){//applySnapConcentricInfilling) {
         bool ok = snapClipperPathsToGrid(*spec->global.config, smoothed, next, concentricInfillingSnapSpec, *err);
@@ -349,10 +349,10 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
     }
     COPYTO(next, *accumInfillings);
     if (infillingRecursive) {
-        offsetDo(offset, smoothed, infillingRadius, next, clp::jtRound, clp::etOpenRound);
+        offsetDo(offset, smoothed, erodedInfillingRadius, next, clp::jtRound, clp::etOpenRound);
         MOVETO(smoothed, *infillingsIndependentContours);
     }
-    offsetDo(offset, current, -infillingRadius, next, clp::jtRound, clp::etClosedPolygon);
+    offsetDo(offset, current, -erodedInfillingRadius, next, clp::jtRound, clp::etClosedPolygon);
     HoledPolygons subhps;
     AddPathsToHPs(current, subhps);
     smoothed = current = next = clp::Paths();
@@ -366,6 +366,7 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
 
 bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::Paths &contoursToBeInfilled) {
     infillingRadius = (double)spec->pp[k].radius;
+    erodedInfillingRadius = infillingRadius*(1 - spec->pp[k].infillingLineOverlap);
     infillingUseClearance = spec->pp[k].addInternalClearance;
     accumInfillingsHolder.clear();
     accumInfillings = &accumInfillingsHolder;//&result.toolpaths[k]; //this gets inserted in real time

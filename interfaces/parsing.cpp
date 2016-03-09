@@ -178,7 +178,7 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             "If '--infill concentric' is specified, its value is the maximum number of concentric perimeters that are generated")
         ("infill-lineoverlap",
             po::value<double>()->default_value(0.001)->value_name("ratio"),
-            "This is the ratio of overlapping between lines, if --infill (lines|hlinesv) is specified")
+            "This is the ratio of overlapping between lines, if --infill (linesh|linesv|concentric) is specified")
         ("infill-byregion",
             "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
         ("infill-recursive",

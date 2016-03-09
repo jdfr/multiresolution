@@ -32,7 +32,7 @@ protected:
     //these variables are here to avoid recurring std::vector growing costs, but they are not intended to be used directly, but aliased as method parameters
     clp::Paths AUX1, AUX2, AUX3, AUX4;
     //state variables for infilling algorithms (necessary because of recursive implementations, to avoid passing an awful lot of context in each stack frame)
-    double infillingRadius; bool infillingUseClearance, infillingRecursive; int numconcentric;
+    double infillingRadius, erodedInfillingRadius; bool infillingUseClearance, infillingRecursive; int numconcentric;
     clp::Paths accumInfillingsHolder, *accumInfillings, accumInflatedMedialAxis, accumNonCoveredByInfillings;
     std::vector<clp::Paths> *infillingsIndependentContours;
     bool applySnapConcentricInfilling; SnapToGridSpec concentricInfillingSnapSpec; //this is state for the recursive call to processInfillingsConcentricRecursive
