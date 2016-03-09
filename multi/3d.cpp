@@ -526,7 +526,12 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
             }*/
             if (removeUnused && (tm.spec->global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
                 bool sliceUpwards = tm.spec->global.sliceUpwards;
-                double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 1.0 : -1.0);
+                /*why use factor 2.1: sometimes, a slice of ntool>0 will be scheduled *after*
+                the immediately higher slice of ntool==0. As a result, it is important to avoid
+                discarding slices up to two previous slices of ntool==0. Using 2.1 is to be on
+                the safe side regarding to round-off errors*/
+                //TODO: we have all the information needed to decided what raw/previous/additional slices are required to compute each slice, so we could write a rule engine to schedule the removal of slices exactly when we know they are not needed again!
+                double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
                 tm.removeUsedSlicesPastZ(zlimit);
                 tm.removeAdditionalContoursPastZ(zlimit);
                 rm.removeUsedRawSlices();
