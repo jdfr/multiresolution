@@ -653,8 +653,8 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         spec.pp[k].arctolR = (clp::cInt)getScaled(val[0], scale, doscale);
         spec.pp[k].arctolG = val.size() == 1 ? spec.pp[k].arctolR : (clp::cInt)getScaled(val[1], scale, doscale);
     } else {
-        spec.pp[k].arctolR = (spec.pp[k].radius / 100);
-        spec.pp[k].arctolG = (spec.pp[k].radius / 10);
+        spec.pp[k].arctolR = (spec.pp[k].radius / 10);
+        spec.pp[k].arctolG = (spec.pp[k].radius / 100);
     }
     spec.pp[k].burrLength = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.pp[k].arctolR);
 
