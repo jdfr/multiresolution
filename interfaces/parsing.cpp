@@ -147,8 +147,8 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<std::vector<double>>()->multitoken()->value_name("length extent"),
             "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
         ("gridstep",
-            po::value<double>()->required()->value_name("step"),
-            "grid step for the current process (this is the minimal amount the head can be moved in XY)")
+            po::value<double>()->value_name("step"),
+            "grid step for the current process (this is the minimal amount the head can be moved in XY). This is required if --snap is provided")
         ("snap",
             "If specified, contours are snapped to a grid centered in the origin and with the step specified in gridstep. Otherwise, no snapping is done.")
         ("safestep",
@@ -645,9 +645,13 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
 
+    if (vm.count("radx") == 0) {
+        throw po::error(str("Parameter --radx is required for all processes, but process ", k, " did not have it!"));
+    }
+
     spec.pp[k].radius             = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
-    spec.pp[k].gridstep           = (clp::cInt)getScaled(vm["gridstep"]           .as<double>(), scale, doscale);
     spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+
     if (vm.count("tolerances")) {
         const std::vector<double> & val = vm["tolerances"].as<std::vector<double>>();
         spec.pp[k].arctolR = (clp::cInt)getScaled(val[0], scale, doscale);
@@ -674,12 +678,20 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
             spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
         }
     }
+        
     spec.pp[k].applysnap            = vm.count("snap")      != 0;
     spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
     spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
     spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
     spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")     == 0;
-        
+
+    if (spec.pp[k].applysnap) {
+        if (vm.count("gridstep") == 0) {
+            throw po::error(str("Process ", k, " has --snap, so it requires --gridstep, but it was not specified!"));
+        }
+        spec.pp[k].gridstep = (clp::cInt)getScaled(vm["gridstep"].as<double>(), scale, doscale);
+    }
+
     if (!spec.pp[k].doPreprocessing) {
         spec.pp[k].noPreprocessingOffset = getScaled(vm["no-preprocessing"].as<double>(), scale, doscale);
     }

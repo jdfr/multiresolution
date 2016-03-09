@@ -14,6 +14,11 @@ bool MultiSpec::validate() {
 std::string MultiSpec::populateParameters() {
     std::string result;
     for (size_t k = 0; k<numspecs; ++k) {
+        pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
+        anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;
+
+        if (!pp[k].applysnap) continue;
+
         pp[k].substep    = pp[k].gridstep / 2.0;
         pp[k].dilatestep = pp[k].substep  * 1.05; //play it safe
         pp[k].safestep   = pp[k].gridstep * (semidiagFac*1.1);
@@ -40,8 +45,6 @@ std::string MultiSpec::populateParameters() {
         pp[k].gridstepY                = (double)pp[k].gridstep;
         pp[k].shiftX                   = 0; //for now, we assume that the grid is centered on the origin
         pp[k].shiftY                   = 0;
-        pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
-        anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;
         //pre-build the specifications for snapToGrid
         pp[k].snapspec.mode            = SnapErode;
         pp[k].snapspec.removeRedundant = true;

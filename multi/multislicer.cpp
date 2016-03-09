@@ -58,6 +58,12 @@ void Multislicer::removeHighResDetails(size_t k, clp::Paths &contours, clp::Path
     offset.ArcTolerance = (double)spec->pp[k].arctolG;
     offsetDo2(offset, opened, (double)-spec->pp[k].radius, (double)spec->pp[k].radius, contours, lowres, clp::jtRound, clp::etClosedPolygon);
 
+    if (!spec->pp[k].applysnap) {
+        //if we are not snapping to grid, operations below do not apply
+        lowres = std::move(opened); //RESULT IS RETURNED IN lowres
+        return;
+    }
+
     //add high-resolution negative space
     //aux1 <- closing(opened, substep)
     //offset.ArcTolerance = (double)spec->pp[k].arctolG;
