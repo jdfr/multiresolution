@@ -179,7 +179,6 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
 
 
 void RawSlicesManager::removeUsedRawSlices() {
-    bool sliceUpwards = sched.tm.spec->global.sliceUpwards;
     for (int k = 0; k < raw.size(); ++k) {
         if (raw[k].inUse) {
             if (raw[k].numRemainingUses < 0) {
