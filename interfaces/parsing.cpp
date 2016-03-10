@@ -475,12 +475,11 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     assigned = nanoOptionMandatory<GLOBAL, double>(ntool, context, current, val, PREFIXNANONAME("nano-maxsquarelen"));
     if (assigned) {
         context->spec.nanos[idx]->maxSquareLen = val * context->factors.nanoscribe_to_internal;
-
-        if ((GLOBAL && context->spec.isGlobal) || (!GLOBAL && !context->spec.isGlobal)) {
-            val = (double)(context->spec.splits[idx].displacement.X + 2 * context->spec.splits[idx].margin);
-            if (context->spec.nanos[idx]->maxSquareLen < val) {
-                throw_error_specific<GLOBAL>(ntool, "Error: ", PREFIXNANONAME("nano-maxsquarelen"), " MUST be greater than or equal to nano-spacing+2*nano-margin, but it was lower (", context->spec.nanos[idx]->maxSquareLen, '<', val, ')');
-            }
+    }
+    if ((GLOBAL && context->spec.isGlobal) || (!GLOBAL && !context->spec.isGlobal)) {
+        val = (double)(context->spec.splits[idx].displacement.X + 2 * context->spec.splits[idx].margin);
+        if (context->spec.nanos[idx]->maxSquareLen < val) {
+            throw_error_specific<GLOBAL>(ntool, "Error: ", PREFIXNANONAME("nano-maxsquarelen"), " MUST be greater than or equal to nano-spacing+2*nano-margin, but it was lower (", context->spec.nanos[idx]->maxSquareLen*context->factors.internal_to_nanoscribe, '<', val, ')');
         }
     }
 
