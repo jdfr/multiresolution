@@ -344,9 +344,9 @@ template<bool GLOBAL, typename T> bool nanoBoolOptionGetWithDefault(ContextToPar
         assigned  = true;
         validateGlobal<GLOBAL>(context, OPTION_NAME);
         std::string mode = std::move(current[OPTION_NAME].as<std::string>());
-        if      (mode.compare(default_name))     option = Default;
-        else if (mode.compare(alternative_name)) option = alternative;
-        else                                  throw po::error(str("Error: valid values for --", OPTION_NAME, " are either '", default_name, "' or '", alternative_name, "', but the value was: ", mode));
+        if      (mode.compare(default_name)    ==0) option = Default;
+        else if (mode.compare(alternative_name)==0) option = alternative;
+        else                                        throw po::error(str("Error: valid values for --", OPTION_NAME, " are either '", default_name, "' or '", alternative_name, "', but the value was: ", mode));
     }
     return assigned;
 }
