@@ -18,8 +18,8 @@ void SimpleNanoscribeConfig::init(MetricFactors &factors) {
     }
     stagegotoFormatting = str("StageGoto%c ", nanoscribeNumberFormatting, "\n");
     pointLineFormatting = str(nanoscribeNumberFormatting, ' ', nanoscribeNumberFormatting, " 0\n");
-    zoffsetFormatting   = str("ZOffset ", nanoscribeNumberFormatting, "\n");
-    addzdriveFormatting = str("AddZDrivePosition ", nanoscribeNumberFormatting, " %%change z block from %d to %d\nZOffset 0\n");
+    zoffsetFormatting   = str("AddZOffset ", nanoscribeNumberFormatting, "\n");
+    addzdriveFormatting = str("AddZDrivePosition ", nanoscribeNumberFormatting, " %%change z block from %d to %d\nAddZOffset ", nanoscribeNumberFormatting, "\n");
 }
 
 SimpleNanoscribePathWriter::SimpleNanoscribePathWriter(PathSplitter &_splitter, std::shared_ptr<SimpleNanoscribeConfig> _config, std::string file, double epsilon, bool generic_ntool, bool generic_z)
@@ -278,7 +278,20 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
                 return false;
             }
         }
-        //we just suppose that we are starting with ZOffset==0, at the correct Z position
+        //we suppose the script is starting at ZOffset=0
+        if (current_z_block != 0) {
+            double dz = current_z_block*NanoscribePiezoRange;
+            if (fprintf(this->f, config->addzdriveFormatting.c_str(), dz, current_z_block, z_block, -dz) < 0) {
+                err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
+                return false;
+            }
+        }
+        if (z != 0) {
+            if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - current_z_block*NanoscribePiezoRange) < 0) {
+                err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
+                return false;
+            }
+        }
     } else {
         if (ntool != lastNTool) {
             std::string &end = (*config->toolChanges)[lastNTool].second;
@@ -298,17 +311,17 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
         }
         if (differentZ) {
             if (z_block != current_z_block) {
-                if (fprintf(this->f, config->addzdriveFormatting.c_str(), (z_block - current_z_block)*NanoscribePiezoRange, current_z_block, z_block) < 0) {
+                double dz = (z_block - current_z_block)*NanoscribePiezoRange;
+                if (fprintf(this->f, config->addzdriveFormatting.c_str(), dz, current_z_block, z_block, -dz) < 0) {
                     err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
                     return false;
                 }
                 current_z_block = z_block;
-            } else {
-                double nanoscribe_last_z = lastZ * config->factor_input_to_nanoscribe;
-                if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - current_z_block*NanoscribePiezoRange) < 0) {
-                    err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
-                    return false;
-                }
+            }
+            double nanoscribe_last_z = lastZ * config->factor_input_to_nanoscribe;
+            if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - nanoscribe_last_z) < 0) {
+                err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
+                return false;
             }
         }
     }
@@ -374,19 +387,22 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
             auto includeNanoscribeSubscript = [main, debug, factor](SimpleNanoscribePathWriter* writer, clp::Path &square) {
                 bool ok = true;
                 if (!writer->firstTime) {
-                    if (writer->current_z_block != 0) {
-                        ok = fprintf(main, writer->config->addzdriveFormatting.c_str(), -writer->current_z_block*NanoscribePiezoRange, writer->current_z_block, 0) >= 0;
-                        ok = ok && (fprintf(debug, writer->config->addzdriveFormatting.c_str(), -writer->current_z_block*NanoscribePiezoRange, writer->current_z_block, 0) >= 0);
-                    } else if (writer->lastZ != 0) {
-                        ok = fprintf(main, "ZOffset 0\n") >= 0;
-                        ok = ok && fprintf(debug, "ZOffset 0\n") >= 0;
-                    }
                     clp::DoublePoint center((square[0].X + square[2].X) / 2 * factor, (square[0].Y + square[2].Y) / 2 * factor);
                     ok = ok && fprintf(debug, "StageScanMode\n") >= 0;
                     ok = ok && writeSquare(debug, square, factor);
                     ok = ok && fprintf(debug, "Write\nTextPositionX %f\nTextPositionY %f\nWriteText \"%s\"\n", center.X, center.Y, writer->filename.c_str()) >= 0;
                     ok = ok && fprintf(debug, "include %s\n", writer->filename.c_str()) >= 0;
                     ok = ok && fprintf(main, "include %s\n", writer->filename.c_str()) >= 0;
+                    if (writer->current_z_block != 0) {
+                        double dz = -writer->current_z_block*NanoscribePiezoRange;
+                        ok = fprintf(main, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0;
+                        ok = ok && (fprintf(debug, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0);
+                    }
+                    if (writer->lastZ != 0) {
+                        double dz = -writer->lastZ*writer->config->factor_input_to_nanoscribe - writer->current_z_block*NanoscribePiezoRange;
+                        ok = fprintf(main, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
+                        ok = ok && fprintf(debug, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
+                    }
                 }
                 return ok;
             };
