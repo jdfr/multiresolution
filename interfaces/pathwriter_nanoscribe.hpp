@@ -32,6 +32,7 @@ typedef struct SimpleNanoscribeConfig {
     std::string addzdriveFormatting;
     double NanoscribePiezoRangeInternalUnits;
     double factor_input_to_nanoscribe;
+    double factor_internal_to_input;
 
     void init(MetricFactors &factors);
 } SimpleNanoscribeConfig;

@@ -10,6 +10,7 @@ const char * GWLEXTENSION = ".gwl";
 
 void SimpleNanoscribeConfig::init(MetricFactors &factors) {
     factor_internal_to_nanoscribe     = factors.internal_to_nanoscribe;
+    factor_internal_to_input          = factors.internal_to_input;
     NanoscribePiezoRangeInternalUnits = NanoscribePiezoRange / factor_internal_to_nanoscribe;
     factor_input_to_nanoscribe        = factors.input_to_internal * factor_internal_to_nanoscribe;
     if (snapToGrid) {
@@ -99,8 +100,8 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
         if (!square.empty() && !paths.empty()) {
             clp::cInt lengthX = square[2].X - square[0].X;
             clp::cInt lengthY = square[2].Y - square[0].Y;
-            bool okX = lengthX < config->maxSquareLen;
-            bool okY = lengthY < config->maxSquareLen;
+            bool okX = lengthX <= config->maxSquareLen;
+            bool okY = lengthY <= config->maxSquareLen;
             if (okX && okY) {
                 clp::IntPoint     squareCenter;
                 bool galvoCenter = (config->scanmode == GalvoScanMode) && ((config->galvomode == GalvoAlwaysCenter) || overrideGalvoMode);
@@ -119,9 +120,11 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
                     double StagePosNanoscribeX;
                     double StagePosNanoscribeY;
                     double semi_maxSquareLen;
+                    clp::cInt semi_maxSquareLen_i;
                     switch (config->scanmode) {
                     case GalvoScanMode:
-                        semi_maxSquareLen = config->maxSquareLen / 2.0;
+                        semi_maxSquareLen   = config->maxSquareLen / 2.0;
+                        semi_maxSquareLen_i = (clp::cInt)std::round(semi_maxSquareLen);
                         if (galvoCenter) {
                             StagePosition = squareCenter;
                             StagePosNanoscribeX = StagePosition.X * config->factor_internal_to_nanoscribe;
@@ -129,34 +132,40 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
                         } else {
                             //double spareLenX = (config->maxSquareLen - (square[2].X - square[0].X));
                             //double spareLenY = (config->maxSquareLen - (square[2].Y - square[0].Y));
-                            StagePosition.X = square[2].X - (clp::cInt)semi_maxSquareLen;
-                            StagePosition.Y = square[2].Y - (clp::cInt)semi_maxSquareLen;
+                            StagePosition.X = square[2].X - semi_maxSquareLen_i;
+                            StagePosition.Y = square[2].Y - semi_maxSquareLen_i;
                             StagePosNanoscribeX = (square[2].X - semi_maxSquareLen) * config->factor_internal_to_nanoscribe;
                             StagePosNanoscribeY = (square[2].Y - semi_maxSquareLen) * config->factor_internal_to_nanoscribe;
                         }
                         currentWindowMin = currentWindowMax = StagePosition;
-                        currentWindowMin.X -= (clp::cInt)semi_maxSquareLen;
-                        currentWindowMin.Y -= (clp::cInt)semi_maxSquareLen;
-                        currentWindowMax.X += (clp::cInt)semi_maxSquareLen;
-                        currentWindowMax.Y += (clp::cInt)semi_maxSquareLen;
+                        currentWindowMin.X -= semi_maxSquareLen_i;
+                        currentWindowMin.Y -= semi_maxSquareLen_i;
+                        currentWindowMax.X += semi_maxSquareLen_i;
+                        currentWindowMax.Y += semi_maxSquareLen_i;
                         break;
                     case PiezoScanMode:
                     default:
                         double spareLen = (config->NanoscribePiezoRangeInternalUnits - config->maxSquareLen) / 2;
+                        if (std::abs(spareLen) < epsilon) { //this should be replaced by a proper epsilon value specific for this case, instead of reusing the z_epsilon, which is in mesh file units 
+                            spareLen = 0;
+                        }
                         if (spareLen < 0) {
                             err = str("error: maxSquareLen was ", config->maxSquareLen, "but it should not be greater than ", config->NanoscribePiezoRangeInternalUnits, " in file ", this->filename);
                             return false;
                         }
                         //align the square to the upper right corner of the piezo range, so the Piezo range remains valid for as long as possible if slanted walls are used (wallAngle!=90)
-                        StagePosition.X = square[2].X + (clp::cInt)(-config->NanoscribePiezoRangeInternalUnits + spareLen);
-                        StagePosition.Y = square[2].Y + (clp::cInt)(-config->NanoscribePiezoRangeInternalUnits + spareLen);
+                        clp::cInt desp  = (clp::cInt)std::round(-config->NanoscribePiezoRangeInternalUnits + spareLen);
+                        StagePosition.X = square[2].X + desp;
+                        StagePosition.Y = square[2].Y + desp;
                         StagePosNanoscribeX = StagePosition.X * config->factor_internal_to_nanoscribe;
                         StagePosNanoscribeY = StagePosition.Y * config->factor_internal_to_nanoscribe;
                         currentWindowMin = currentWindowMax = StagePosition;
-                        currentWindowMin.X += (clp::cInt)spareLen;
-                        currentWindowMin.Y += (clp::cInt)spareLen;
-                        currentWindowMax.X += (clp::cInt)(config->NanoscribePiezoRangeInternalUnits - spareLen);
-                        currentWindowMax.Y += (clp::cInt)(config->NanoscribePiezoRangeInternalUnits - spareLen);
+                        desp = (clp::cInt)std::round(spareLen);
+                        currentWindowMin.X += desp;
+                        currentWindowMin.Y += desp;
+                        desp = (clp::cInt)std::round(config->NanoscribePiezoRangeInternalUnits - spareLen);
+                        currentWindowMax.X += desp;
+                        currentWindowMax.Y += desp;
                     }
                     if (fprintf(this->f, config->stagegotoFormatting.c_str(), 'X', StagePosNanoscribeX) < 0) {
                         err = str("error writing stage displacement to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
@@ -333,7 +342,9 @@ NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(MultiSpec &spec, Si
     nanoconfigs = std::move(_nanoconfigs);
     double epsilon = spec.global.z_epsilon;
     SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string filename, bool generic_type, bool generic_ntool, bool generic_z) {
-        return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[nanoconfigs.size() == 1 ? 0 : idx], std::move(filename), epsilon, generic_ntool, generic_z);
+        int i = nanoconfigs.size() == 1 ? 0 : idx;
+        double eps = epsilon * nanoconfigs[i]->factor_internal_to_input;
+        return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], std::move(filename), eps, generic_ntool, generic_z);
     };
     setup(spec, callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }
