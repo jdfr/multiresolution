@@ -3,6 +3,10 @@
 #include <ctype.h>
 #include <exception>
 
+static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
+static_assert(sizeof(int) == 4, "this code requires <int> to have a size of 4 bytes.");
+
+
 bool fileExists(const char *filename) {
     FILE *test = fopen(filename, "rb");
     if (test == NULL) {
@@ -21,24 +25,36 @@ char *fullPath(const char *path) {
 }
 
 void FileHeader::buildFrom(MultiSpec &multispec, MetricFactors &factors) {
+    version  = 0;
     numtools = multispec.numspecs;
     useSched = multispec.global.useScheduler;
-    radiusX.reserve(numtools);
-    if (useSched) radiusZ.reserve(numtools);
-    for (int k = 0; k < numtools; ++k) {
-        radiusX.push_back(multispec.pp[k].radius * factors.internal_to_input);
-        if (useSched) radiusZ.push_back(multispec.pp[k].profile->getVoxelSemiHeight()*factors.internal_to_input);
+    voxels.reserve(numtools);
+    if (useSched) {
+        for (int k = 0; k < numtools; ++k) {
+            voxels.emplace_back(multispec.pp[k].radius                        * factors.internal_to_input,
+                                multispec.pp[k].profile->getVoxelSemiHeight() * factors.internal_to_input,
+                                multispec.pp[k].profile->sliceHeight          * factors.internal_to_input,
+                                multispec.pp[k].profile->applicationPoint     * factors.internal_to_input);
+        }
+    } else {
+        for (int k = 0; k < numtools; ++k) {
+            voxels.emplace_back(multispec.pp[k].radius                        * factors.internal_to_input);
+        }
     }
     numRecords = 0;
 }
 
 std::string FileHeader::writeToFile(FILE *f, bool alsoNumRecords) {
+    if (fwrite("PATH",   4, 1, f) != 1) return std::string("Could not write magic number!");
+    if (fwrite(&version, 4, 1, f) != 1) return std::string("Could not write version!");
     if (fwrite(&numtools, sizeof(numtools), 1, f) != 1) return std::string("could not write numtools to file!");
     if (fwrite(&useSched, sizeof(useSched), 1, f) != 1) return std::string("could not write useSched to file!");
     for (int k = 0; k < numtools; ++k) {
-        if (fwrite(&(radiusX[k]), sizeof(double), 1, f) != 1) return std::string("could not write radiusX to file!");
+        if (fwrite(&(voxels[k].xrad), sizeof(double), 1, f) != 1) return std::string("could not write radiusX to file!");
         if (useSched) {
-            if (fwrite(&(radiusZ[k]), sizeof(double), 1, f) != 1) return std::string("could not write radiusZ to file!");
+            if (fwrite(&(voxels[k].zrad),               sizeof(double), 1, f) != 1) return std::string("could not write radiusZ to file!");
+            if (fwrite(&(voxels[k].zheight),            sizeof(double), 1, f) != 1) return std::string("could not write Z height to file!");
+            if (fwrite(&(voxels[k].z_applicationPoint), sizeof(double), 1, f) != 1) return std::string("could not write Z application point to file!");
         }
     }
     if (alsoNumRecords) {
@@ -47,14 +63,24 @@ std::string FileHeader::writeToFile(FILE *f, bool alsoNumRecords) {
     return std::string();
 }
 
+int FileHeader::numRecordsOffset() {
+    return (int)(sizeof(double) * (3 + (numtools * (useSched ? 4 : 1))));
+}
+
 std::string FileHeader::readFromFile(FILE * f) {
+    if (fread(&version, 4, 1, f) != 1) return std::string("could not read magic number from file!");
+    if (fread(&version, 4, 1, f) != 1) return std::string("could not read version from file!");
+    if (version != 0) return std::string("File has non-supported version!!!");
     if (fread(&numtools, sizeof(numtools), 1, f) != 1) return std::string("could not read numtools from file!");
     if (fread(&useSched, sizeof(useSched), 1, f) != 1) return std::string("could not read useSched from file!");
-    radiusX.clear(); radiusX.resize(numtools);
-    radiusZ.clear(); radiusZ.resize(numtools);
+    voxels.clear(); voxels.resize(numtools);
     for (int k = 0; k < numtools; ++k) {
-                      if (fread(&(radiusX[k]), sizeof(double), 1, f) != 1) return str("Could not read radiusX for tool ", k);
-        if (useSched) if (fread(&(radiusZ[k]), sizeof(double), 1, f) != 1) return str("Could not read radiusZ for tool ", k);
+        if (fread(&(voxels[k].xrad), sizeof(double), 1, f) != 1) return str("Could not read radiusX for tool ", k);
+        if (useSched) {
+            if (fread(&(voxels[k].zrad),               sizeof(double), 1, f) != 1) return str("Could not read radiusZ for tool ", k);
+            if (fread(&(voxels[k].zheight),            sizeof(double), 1, f) != 1) return str("Could not read Z height for tool ", k);
+            if (fread(&(voxels[k].z_applicationPoint), sizeof(double), 1, f) != 1) return str("Could not read Z app point for tool ", k);
+        }
     }
     if (fread(&numRecords, sizeof(numRecords), 1, f) != 1) return std::string("could not read numRecords from file!");
     return std::string();

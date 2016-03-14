@@ -12,8 +12,6 @@
 FUNCTIONALITY TO READ/WRITE PATHSFILES
 *********************************************************/
 
-static_assert((sizeof(double) == sizeof(int64)) && (sizeof(int64) == sizeof(T64)) && (sizeof(double) == 8), "this code requires that <double>, <long long int> and their union all have a size of 8 bytes.");
-
 typedef std::vector<FILE*> FILES;
 
 bool fileExists(const char *filename);
@@ -21,15 +19,26 @@ bool fileExists(const char *filename);
 //Returns NULL if it could not resolve the path. The returned string must be freed with free()
 char *fullPath(const char *path);
 
+typedef struct VoxelFileSpec {
+    double xrad;
+    double zrad;
+    double zheight;
+    double z_applicationPoint;
+    VoxelFileSpec() {}
+    VoxelFileSpec(double x) : xrad(x) {}
+    VoxelFileSpec(double x, double z, double h, double ap) : xrad(x), zrad(z), zheight(h), z_applicationPoint(ap) {}
+} VoxelFileSpec;
+
 typedef struct FileHeader {
+    int version;
     int64 numtools;
     int64 useSched;
-    std::vector<double> radiusX;
-    std::vector<double> radiusZ;
+    std::vector<VoxelFileSpec> voxels;
     int64 numRecords;
     FileHeader() {}
     FileHeader(MultiSpec &multispec, MetricFactors &factors) { buildFrom(multispec, factors); }
     void buildFrom(MultiSpec &multispec, MetricFactors &factors);
+    int numRecordsOffset();
     std::string readFromFile(FILE *f);
     std::string writeToFile(FILE *f, bool alsoNumRecords);
 } HeaderFile;

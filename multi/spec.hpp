@@ -77,25 +77,33 @@ typedef struct GlobalSpec {
 class VerticalProfile {
 public:
     double sliceHeight; //vertical extent of a slice with this kind of voxel
-    VerticalProfile(double sh) : sliceHeight(sh) {}
-    //I would rather use an abstract method rather than one that throws an exception, but then I would not be able to use vectors of polymorphic pointers to this class
+    //number that represents the application point of the voxel:
+    //      ==0 for the lower end,
+    //      ==sliceHeight/2 for the middle point
+    //      ==sliceHeight for the upper end,
+    double applicationPoint;
+    double remainder;
+    VerticalProfile(double sh, double ap) : sliceHeight(2 * sh), applicationPoint(ap), remainder(2 * sh - ap) {}
+    //zshift is supposed to be measured from applicationPoint, so it should be computed with care  if applicationPoint!=sliceHeight/2
     virtual double getWidth(double zshift) { throw std::runtime_error("getWidth() unimplemented in base class!!!"); }
     //This is DIFFERENT from sliceHeight/2: it is the TRUE voxel extent, while sliceHeight may be adjusted for slicing purposes!!!!
     virtual double getVoxelSemiHeight() { throw std::runtime_error("getVoxelSemiHeight() unimplemented in base class!!!"); }
 };
 
+//the application point in this case is the middle of the voxel
 class ConstantProfile : public VerticalProfile {
     double radius, semiheight;
 public:
-    ConstantProfile(double r, double sh, double slh) : radius(r), semiheight(sh), VerticalProfile(slh) {}
+    ConstantProfile(double r, double sh, double slh) : radius(r), semiheight(sh), VerticalProfile(slh, slh) {}
     virtual double getWidth(double zshift) { return std::abs(zshift)<semiheight ? radius : 0.0; }
     virtual double getVoxelSemiHeight() { return semiheight; }
 };
 
+//the application point in this case is the middle of the voxel
 class EllipticalProfile : public VerticalProfile {
     double radiusX, radiusZ;
 public:
-    EllipticalProfile(double rx, double rz, double slh) : radiusX(rx), radiusZ(rz), VerticalProfile(slh) {}
+    EllipticalProfile(double rx, double rz, double slh) : radiusX(rx), radiusZ(rz), VerticalProfile(slh, slh) {}
     virtual double getWidth(double zshift) { return std::abs(zshift)<radiusZ ? radiusX*sqrt(1.0 - (zshift*zshift) / (radiusZ*radiusZ)) : 0.0; }
     virtual double getVoxelSemiHeight() { return radiusZ; }
 };

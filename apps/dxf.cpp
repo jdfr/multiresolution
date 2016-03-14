@@ -51,7 +51,7 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
             break;
         }
         bool isclosed = !toolpaths;
-        double radius = fileheader.radiusX[sliceheader.ntool];
+        double radius = fileheader.voxels[sliceheader.ntool].xrad;
         if (!writer->writePaths(output, (int)sliceheader.type, radius, (int)sliceheader.ntool, sliceheader.z, sliceheader.scaling, isclosed)) {
             err = writer->err;
             break;

@@ -115,7 +115,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
         multi.offset.ArcTolerance = (double)spec->pp[ntool_contour].arctolG;
         for (auto slice = slicess[ntool_contour].begin(); slice != slicess[ntool_contour].end(); ++slice) {
             if (!(*slice)->contours.empty()) { 
-                double currentWidth = spec->pp[ntool_contour].profile->getWidth((*slice)->z - z);
+                double currentWidth = spec->pp[ntool_contour].profile->getWidth(z - (*slice)->z);
                 if (currentWidth > 0) {
                     double diffwidth = spec->pp[ntool_contour].radius - currentWidth;
                     if ((*slice)->infillingsIndependentContours.empty()) {
@@ -214,7 +214,12 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
             for (int k = 0; k < tm.spec->numspecs; ++k) num += (int)(extent / tm.spec->pp[k].profile->sliceHeight) + 3;
             input.reserve(num);
             bool sliceUpwards = tm.spec->global.sliceUpwards;
-            std::vector<double> zbase(tm.spec->numspecs, sliceUpwards ? minz : maxz);
+            std::vector<double> zbase(tm.spec->numspecs);
+            if (sliceUpwards) {
+                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = minz + tm.spec->pp[i].profile->applicationPoint;
+            } else {
+                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = maxz - tm.spec->pp[i].profile->remainder;
+            }
             recursiveSimpleInputScheduler(0, zbase, sliceUpwards ? maxz : minz);
         }
         if (!input.empty()) {
@@ -225,9 +230,12 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
 }
 
 bool testSliceNotNearEnd(double z, double zend, int process, ToolpathManager &tm) {
-    double zspan = (tm.spec->global.sliceUpwards) ? (zend - z) : (z - zend);
-    //why 0.25: 0.5 because it is the offset when voxels are symmetric respect to their Z slice, 0.2 to give some slack and not discard slices that protude slightly
-    return zspan >= tm.spec->pp[process].profile->sliceHeight*(0.5 - 0.2);
+    double zspan = (tm.spec->global.sliceUpwards) ?
+        (zend - z - tm.spec->pp[process].profile->remainder) :
+        (z - zend - tm.spec->pp[process].profile->applicationPoint);
+    zspan -= tm.spec->pp[process].profile->remainder;
+    //-0.2 to give some slack and not discard slices that protude slightly
+    return (zspan >= 0) || (zspan >= tm.spec->pp[process].profile->sliceHeight*-0.2);
 }
 
 /*this is adequate for additive processes, as it assumes that voxels are symmetric over the Z axis.
@@ -256,7 +264,7 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
     if (!sliceUpwards) {
            sliceHeight = -sliceHeight;
     }
-    double z           = zbase[process] + sliceHeight / 2.0;
+    double z           = zbase[process];
 
     if (testSliceNotNearEnd(z, zend, process, tm)) {
         input.push_back(InputSliceData(z, process));
@@ -345,10 +353,11 @@ void SimpleSlicingScheduler::pruneInputZsAndCreateRawZs(double epsilon) {
         for (int k = 0; k < input.size(); ++k) {
             int ntool = input[k].ntool;
             double inputz = input[k].z;
-            double voxelSemiZ = tm.spec->pp[ntool].profile->getVoxelSemiHeight();
+            double minz = inputz - tm.spec->pp[ntool].profile->applicationPoint;
+            double maxz = inputz + tm.spec->pp[ntool].profile->remainder;
             for (int m = 0; m < rm.raw.size(); ++m) {
-                double val = std::fabs(rm.raw[m].z - inputz);
-                if (val <= voxelSemiZ) {
+                double z = rm.raw[m].z;
+                if ((z >= minz) && z<=maxz) {
                     //input[k].requiredRawSlices.push_back(m);
                     /*we add the m-th raw slice to the set of required raw slices of the k-th input slice IF:
                             -EITHER THE m-th RAW SLICE IS THE ONE ASSOCIATED TO input[k]
@@ -464,9 +473,10 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                 --raw[*raw_idx].numRemainingUses;
                 double rawz = raw[*raw_idx].z;
                 if (inputz == rawz) {
+                    //in this codepath, this assignment should be always executed exactly once
                     next = &raw[*raw_idx].slice;
                 } else {
-                    double width_at_raw = sched.tm.spec->pp[ntool].profile->getWidth(inputz - rawz);
+                    double width_at_raw = sched.tm.spec->pp[ntool].profile->getWidth(rawz - inputz);
                     //this edge case happens from time to time due to misconfigurations, just let's handle it gracefully instead of erroring out
                     if (width_at_raw == 0) continue;
                     if (width_at_raw < 0) {
@@ -526,10 +536,11 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
             }*/
             if (removeUnused && (tm.spec->global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
                 bool sliceUpwards = tm.spec->global.sliceUpwards;
-                /*why use factor 2.1: sometimes, a slice of ntool>0 will be scheduled *after*
+                /*why use factor 3.1: sometimes, a slice of ntool>0 will be scheduled *after*
                 the immediately higher slice of ntool==0. As a result, it is important to avoid
                 discarding slices up to two previous slices of ntool==0. Using 2.1 is to be on
-                the safe side regarding to round-off errors*/
+                the safe side regarding to round-off errors. But we use 3.1 (adding 1) because
+                weird things may happen if applicationPoint is not in the middle for some tool*/
                 //TODO: we have all the information needed to decided what raw/previous/additional slices are required to compute each slice, so we could write a rule engine to schedule the removal of slices exactly when we know they are not needed again!
                 double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
                 tm.removeUsedSlicesPastZ(zlimit);

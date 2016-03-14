@@ -672,9 +672,9 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         double ZRadius     =                              getScaled(valz[0], scale, doscale);
         double ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
         if (voxelIsEllipsoid) {
-            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
         } else {
-            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
         }
     }
         

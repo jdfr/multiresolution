@@ -29,8 +29,7 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
         if (fileheader_o.numtools < fileheaders_i[i].numtools) {
             fileheader_o.numtools = fileheaders_i[i].numtools;
             fileheader_o.useSched = fileheaders_i[i].useSched;
-            fileheader_o.radiusX  = fileheaders_i[i].radiusX;
-            fileheader_o.radiusZ  = fileheaders_i[i].radiusZ;
+            fileheader_o.voxels   = fileheaders_i[i].voxels;
         }
     }
 

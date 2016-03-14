@@ -19,8 +19,12 @@ std::string printPathInfo(const char * filename, bool verbose) {
         fprintf(stdout, "use Scheduling: %s\n", useSched ? "true" : "false");
         for (int k = 0; k < fileheader.numtools; ++k) {
             const char * padding = "\n   ";
-            fprintf(stdout, "for tool %d:%sradius in X: %f", k, useSched ? padding : " ", fileheader.radiusX[k]);
-            if (useSched) fprintf(stdout, "%sradius in Z: %f", padding, fileheader.radiusZ[k]);
+            fprintf(stdout, "for tool %d:%sradius in X: %f", k, useSched ? padding : " ", fileheader.voxels[k].xrad);
+            if (useSched) {
+                fprintf(stdout, "%s           radius in Z: %f", padding, fileheader.voxels[k].zrad);
+                fprintf(stdout, "%s  complete height in Z: %f", padding, fileheader.voxels[k].zheight);
+                fprintf(stdout, "%sapplication point in Z: %f", padding, fileheader.voxels[k].z_applicationPoint);
+            }
             fprintf(stdout, "\n");
         }
         fprintf(stdout, "Number of Records: %d\n", fileheader.numRecords);
