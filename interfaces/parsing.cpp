@@ -804,12 +804,20 @@ void ParserLocalAndGlobal::setParsedOptions(std::vector<std::string> &args, cons
 }
 
 void ParserLocalAndGlobal::setParsedOptions(po::parsed_options globals, po::parsed_options allPerProcess) {
-    po::store(globals, globalOptions);
+    try {
+        po::store(globals, globalOptions);
+    } catch (std::exception &e) {
+        throw po::error(str("Error reading global options: ", e.what()));
+    }
     separatePerProcess(allPerProcess);
     globalCallback();
     for (auto & optionsListByTool : perProcessOptions.optionsByTool) {
         po::variables_map vm;
-        po::store(optionsListByTool.second, vm);
+        try {
+            po::store(optionsListByTool.second, vm);
+        } catch (std::exception &e) {
+            throw po::error(str("Error reading options for process ", optionsListByTool.first, ": ", e.what()));
+        }
         perProcessCallback(optionsListByTool.first, vm);
     }
     finishCallback();
