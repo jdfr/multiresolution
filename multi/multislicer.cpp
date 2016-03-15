@@ -549,6 +549,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     if (!spec->pp[k].computeToolpaths) {
         output.contours = *contourToProcess; //TODO: do not use deep copy if possible
+        AUX4.clear();
+        intermediate_medialaxis = &AUX4; //this may be needed to avoid errors when computing the medial axis
     } else {
         clp::Paths &unprocessedToolPaths = AUX3;
         if (!generateToolPath(k, nextProcessSameKind, *contourToProcess, output.toolpaths, unprocessedToolPaths, AUX4)) {

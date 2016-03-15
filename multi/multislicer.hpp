@@ -41,7 +41,7 @@ public:
     clp::Clipper clipper;
     clp::Clipper clipper2; //we need this in order to conduct more than one clipping in parallel, if necessary
     Multislicer(std::shared_ptr<MultiSpec> _spec) : spec(std::move(_spec)) {}
-    void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); accumInfillingsHolder.clear();  accumInflatedMedialAxis.clear(); accumNonCoveredByInfillings.clear();  infillingsIndependentContours = NULL; }
+    void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear();  accumInflatedMedialAxis.clear(); accumNonCoveredByInfillings.clear();  infillingsIndependentContours = NULL; }
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the 
     //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm
     bool applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);
