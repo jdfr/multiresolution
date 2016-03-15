@@ -137,15 +137,24 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("no-toolpaths",
             "If specified, the toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
-        ("radx",
-            po::value<double>()->required()->value_name("length"),
-            "radius of the voxel for the current process in the XY plane")
         ("voxel-profile",
             po::value<std::string>()->value_name("(constant|ellipsoid)"),
-            "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant' or 'ellipsoid'")
+            "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant', 'ellipsoid', 'interpolated'")
+        ("voxel-spec",
+            po::value<std::vector<double>>()->multitoken()->value_name("Z0 X0 Z1 X1 ..."),
+            "required if voxel-profile is 'interpolated'. In that case, this is a list of coordinates defining a linear approximation to a voxel profile.")
+        ("radx",
+            po::value<double>()->value_name("length"),
+            "radius of the voxel for the current process in the XY plane. Required if voxel-profile is 'constant' or 'ellipsoid'. If voxel-profile is 'interpolated', this value can be omitted (it will be computed as the largest X radius from the profile), but it can be specified to override the implicit value (only recommended if you know what you are doing, because the application logic ASSUMES that the radius IS the radius at the application point).")
         ("voxel-z",
             po::value<std::vector<double>>()->multitoken()->value_name("length extent"),
-            "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value.")
+            "required if slicing-scheduler or slicing-manual are specified: the first value is the voxel radius in Z. The second value is the semiheight in Z (used to the define the slicing step for slicing-scheduler). If the second value is not present, it is implied to be the same as the first value. This is required if voxel-profile is 'constant' or 'ellipsoid'. If voxel-profile is 'interpolated', this can be omitted (the values will be computed as the difference between max and min Z values from the profile), but they can be specified to override the implicit value (this is not recommended unless you know exactly what you are doing), but in that case only the second value (the semiHeight) will have an effect on the computation.")
+        ("voxel-zlimits",
+            po::value<std::vector<double>>()->multitoken()->value_name("length extent"),
+            "This is relevent only if voxel-profile is 'interpolated'. If specified, it sets the min and max Z values, regardless of the extent of the profile defined in voxel-spec. This option is mutually exclusive with voxel-z: if it is specified, voxel-z MUST NOT be specified, and vice versa (it is also valid if neither of them is specified, though). This option is useful to define several 'tools' from a common 'voxel-spec' profile: if a profile is defined for a ball nose cutter, several tools may be defined with the same profile but different min-max values, which may be useful in 'slicing-manual' mode.")
+        ("voxel-application-point",
+            po::value<double>()->value_name("length"),
+            "This is relevent only if voxel-profile is 'interpolated'. Implicitly, the application point of the voxel is the Z value with maximal X radius from the profile. This can be overrident if this value is specified. If voxel-profile is 'constant' or 'ellipsoid', the application point is always the middle of the voxel, regardless of the value specified with this option.")
         ("gridstep",
             po::value<double>()->value_name("step"),
             "grid step for the current process (this is the minimal amount the head can be moved in XY). This is required if --snap is provided")
@@ -644,12 +653,93 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     bool doscale = factors.doparamscale;
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
 
-    if (vm.count("radx") == 0) {
-        throw po::error(str("Parameter --radx is required for all processes, but process ", k, " did not have it!"));
+    spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+
+    bool radxpresent = vm.count("radx") != 0;
+    if (radxpresent) {
+        spec.pp[k].radius = (clp::cInt)getScaled(vm["radx"].as<double>(), scale, doscale);
     }
 
-    spec.pp[k].radius             = (clp::cInt)getScaled(vm["radx"]               .as<double>(), scale, doscale);
-    spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+    if (spec.global.useScheduler) {
+        if (vm.count("voxel-profile") == 0) throw po::error(str("slicing-manual or slicing-scheduler are specified, but 'voxel-profile' is missing for process ", k));
+        const std::string &valp = vm["voxel-profile"].as<std::string>();
+        bool voxelIsEllipsoid   = tolower(valp[0])=='e'; //"ellipsoid"
+        bool voxelIsConstant    = tolower(valp[0])=='c'; //"constant"
+        bool voxelIsInterp      = tolower(valp[0])=='i'; //"interpolated"
+        if ((!voxelIsEllipsoid) && (!voxelIsConstant) && (!voxelIsInterp)) {
+            throw po::error(str("for process ", k, ": invalid value for voxel-profile: ", valp, ". The value must start with either 'e' (ellipsoid), 'c' (constant) or 'i' (interpolated)"));
+        }
+
+        bool voxelzpresent    = vm.count("voxel-z")                 != 0;
+        bool voxelzlimpresent = vm.count("voxel-zlimits")           != 0;
+        bool appppresent      = vm.count("voxel-application-point") != 0;
+        bool voxelspecpresent = vm.count("voxel-spec")              != 0;
+        double ZRadius(0.0), ZSemiHeight(0.0);
+
+        if (voxelIsConstant || voxelIsEllipsoid) {
+            if (voxelzlimpresent) throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --voxel-zlimits MUST NOT be specified for that process"));
+            if (voxelspecpresent) throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --voxel-spec MUST NOT be specified for that process"));
+            if (!radxpresent)     throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --radx is inconditionally required for that process, but it was not specified!"));
+            if (!voxelzpresent)   throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --voxel-z is inconditionally required for that process, but it was not specified!"));
+        } else {
+            //voxelIsInterp==true
+            if (!voxelspecpresent) {
+                throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --voxel-spec MUST be specified for that process"));
+            }
+            if (voxelzpresent && voxelzlimpresent) {
+                throw po::error(str("'voxel-profile' is '", valp, "' for process ", k, ", so --voxel-z and voxel-zlimits cannot be specified simultaneously for that process!"));
+            }
+        }
+        if (voxelzpresent) {
+            const std::vector<double> &valz = vm["voxel-z"].as<std::vector<double>>();
+            if (valz.empty()) throw po::error(str("voxel-z has not values for process ", k));
+            ZRadius     =                              getScaled(valz[0], scale, doscale);
+            ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
+        }
+        if (voxelIsEllipsoid) {
+            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+        } else if (voxelIsConstant) {
+            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+        } else /*voxelIsInterp*/ {
+            VerticalProfileRecomputeSpec r;
+            VerticalProfileSpec s;
+            s.epsilon = spec.global.z_epsilon;
+            s.radius  = (double)spec.pp[k].radius;
+            s.zradius = ZRadius;
+            r.recomputeRadius                           = !radxpresent;
+            r.recomputeZRadius = r.recomputeSliceHeight = !voxelzpresent;
+            r.recomputeMinZ    = r.recomputeMaxZ        = !voxelzlimpresent;
+            r.recomputeApplicationPoint                 = !appppresent;
+            double applicationPoint;
+            if (appppresent) {
+                applicationPoint = getScaled(vm["voxel-application-point"].as<double>(), scale, doscale);
+            }
+            if (voxelzlimpresent) {
+                const std::vector<double> &valz = vm["voxel-zlimits"].as<std::vector<double>>();
+                if (valz.size() < 2) throw po::error(str("voxel-zlimits must have two values (minZ and maxZ), but for process ", k, " it has ", valz.size()));
+                s.minZ = getScaled(valz[0], scale, doscale);
+                s.maxZ = getScaled(valz[1], scale, doscale);
+            }
+            const std::vector<double> &valz = vm["voxel-spec"].as<std::vector<double>>();
+            int numcoords = (int)valz.size() / 2;
+            if (valz.empty())           throw po::error(str("voxel-spec has not values for process ", k));
+            if ((valz.size() % 2) != 0) throw po::error(str("voxel-spec does not have an even number of values for process ", k, ". This is invalid because it specifies a series of coordinates to define a voxel profile!"));
+            if (numcoords < 2)          throw po::error(str("voxel-spec must define at least two coordinates in all processes, but for process ", k, " it doesn't!"));
+            s.profile.reserve(numcoords);
+            for (auto val = valz.begin(); val != valz.end(); ++val) {
+                double z = getScaled(*val, scale, doscale);
+                ++val;
+                double x = getScaled(*val, scale, doscale);
+                s.profile.emplace_back(z, x);
+            }
+            auto profile = std::make_shared<LinearlyApproximatedProfile>(std::move(s), 2 * ZSemiHeight, applicationPoint, std::move(r));
+            if (!profile->err.empty()) throw po::error(str("Error while parsing the interpolated profile for process ", k, ": ", profile->err));
+            spec.pp[k].radius  = (clp::cInt)profile->spec.radius;
+            spec.pp[k].profile = std::move(profile);
+        }
+    } else {
+        if (!radxpresent) throw po::error(str("Neither slicing-manual nor slicing-scheduler are specified, so --radx is inconditionally required for all processes, but process ", k, " did not have it!"));
+    }
 
     if (vm.count("tolerances")) {
         const std::vector<double> & val = vm["tolerances"].as<std::vector<double>>();
@@ -661,23 +751,6 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     }
     spec.pp[k].burrLength = (clp::cInt) (vm.count("smoothing") ? getScaled(vm["smoothing"].as<double>(), scale, doscale) : spec.pp[k].arctolR);
 
-    if (spec.global.useScheduler) {
-        auto requireds = { "voxel-profile", "voxel-z" };
-        for (auto &required : requireds) if (vm.count(required) == 0) throw po::error(str("slicing-manual or slicing-scheduler are specified, but ", required, " is missing for process ", k));
-        const std::string &valp = vm["voxel-profile"].as<std::string>();
-        bool voxelIsEllipsoid   = valp.compare("ellipsoid") == 0;
-        bool voxelIsConstant    = valp.compare("constant")  == 0;
-        if ((!voxelIsEllipsoid) && (!voxelIsConstant)) throw po::error(str("for process ", k, ": invalid value for voxel-profile: ", valp));
-        const std::vector<double> &valz = vm["voxel-z"].as<std::vector<double>>();
-        double ZRadius     =                              getScaled(valz[0], scale, doscale);
-        double ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
-        if (voxelIsEllipsoid) {
-            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
-        } else {
-            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
-        }
-    }
-        
     spec.pp[k].applysnap            = vm.count("snap")      != 0;
     spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
     spec.pp[k].addInternalClearance = vm.count("clearance") != 0;

@@ -1,6 +1,7 @@
 #include "spec.hpp"
 #include "snapToGrid.hpp"
-
+#include <algorithm>
+#include <limits>
 
 bool MultiSpec::validate() {
     //do not validate anything for now
@@ -67,5 +68,72 @@ std::string MultiSpec::populateParameters() {
         global.outerLimitY = global.limitY - (pp[0].radius * 3);
     }
     return result;
+}
+
+bool DoublePointComparator(const clp::DoublePoint &a, const clp::DoublePoint &b) {
+    return a.X < b.X;
+}
+
+LinearlyApproximatedProfile::LinearlyApproximatedProfile(VerticalProfileSpec s, double slh, double ap, VerticalProfileRecomputeSpec r) {
+    spec = std::move(s);
+    std::sort(spec.profile.begin(), spec.profile.end(), DoublePointComparator);
+    if (r.recomputeMinZ) spec.minZ =  std::numeric_limits<double>::infinity();
+    if (r.recomputeMaxZ) spec.maxZ = -std::numeric_limits<double>::infinity();
+    double radius                  = -std::numeric_limits<double>::infinity();
+    bool recomputeRadiusOrApplicationPoint = r.recomputeRadius | r.recomputeApplicationPoint;
+    for (auto &point : spec.profile) {
+        double z = point.X;
+        double x = std::abs(point.Y);
+        if (r.recomputeMinZ && (spec.minZ > z)) spec.minZ = z;
+        if (r.recomputeMaxZ && (spec.maxZ < z)) spec.maxZ = z;
+        if (recomputeRadiusOrApplicationPoint && (radius < x)) {
+            bool validZ = (r.recomputeMinZ || (spec.minZ <= z)) &&
+                          (r.recomputeMaxZ || (spec.maxZ >= z));
+            if (validZ) {
+                radius = x;
+                if (r.recomputeApplicationPoint) applicationPoint = z;
+            }
+        }
+    }
+    if (!r.recomputeApplicationPoint) applicationPoint = ap;
+    //the 3d logic implicitly assumes that the profile coordinates start at minZ=0, so we translate the profile
+    if (std::abs(spec.minZ) > spec.epsilon) {
+        spec.maxZ        -= spec.minZ;
+        applicationPoint -= spec.minZ;
+        for (auto &point : spec.profile) {
+            point.X      -= spec.minZ;
+        }
+        spec.minZ         = 0;
+    }
+    sliceHeight = (r.recomputeSliceHeight) ? spec.maxZ : slh;
+    if (r.recomputeZRadius) spec.zradius = sliceHeight / 2;
+    setup(sliceHeight, applicationPoint);
+    if (r.recomputeRadius)  {
+        spec.radius = r.recomputeApplicationPoint ? radius : getWidth(0);
+    }
+}
+
+double LinearlyApproximatedProfile::getWidth(double zshift) {
+    //zshift has its origin in applicationPoint, so we convert it to be based in the same coordinate system as the other spec values
+    clp::DoublePoint pos(zshift + applicationPoint, 0);
+    if (pos.X < spec.minZ) return 0;
+    if (pos.X > spec.maxZ) return 0;
+    //now, let's find it in the ordered profile
+    auto element = std::lower_bound(spec.profile.begin(), spec.profile.end(), pos, DoublePointComparator);
+    if (element == spec.profile.end()) {
+        auto element1 = element - 1;
+        if (std::abs(element1->X - pos.X) < spec.epsilon) return element1->Y;
+        return 0;
+    }
+    if (std::abs(element->X  - pos.X) < spec.epsilon)     return element->Y;
+    if ((element == spec.profile.begin()))                return 0;
+    auto element1 = element - 1;
+    if (std::abs(element1->X - pos.X) < spec.epsilon)     return element1->Y;
+    double dStepZ = element->X - element1->X;
+    double dz     =      pos.X - element1->X;
+    double ratio  = dz / dStepZ;
+    double dStepX = element->Y - element1->Y;
+    pos.Y         = element1->Y + dStepX * ratio;
+    return pos.Y;
 }
 

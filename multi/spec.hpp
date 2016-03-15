@@ -83,7 +83,9 @@ public:
     //      ==sliceHeight for the upper end,
     double applicationPoint;
     double remainder;
-    VerticalProfile(double sh, double ap) : sliceHeight(2 * sh), applicationPoint(ap), remainder(2 * sh - ap) {}
+    VerticalProfile() {}
+    VerticalProfile(double sh, double ap) { setup(sh, ap); }
+    void setup(double sh, double ap) { sliceHeight = sh; applicationPoint = ap; remainder = sh - ap; }
     //zshift is supposed to be measured from applicationPoint, so it should be computed with care  if applicationPoint!=sliceHeight/2
     virtual double getWidth(double zshift) { throw std::runtime_error("getWidth() unimplemented in base class!!!"); }
     //This is DIFFERENT from sliceHeight/2: it is the TRUE voxel extent, while sliceHeight may be adjusted for slicing purposes!!!!
@@ -106,6 +108,29 @@ public:
     EllipticalProfile(double rx, double rz, double slh) : radiusX(rx), radiusZ(rz), VerticalProfile(slh, slh) {}
     virtual double getWidth(double zshift) { return std::abs(zshift)<radiusZ ? radiusX*sqrt(1.0 - (zshift*zshift) / (radiusZ*radiusZ)) : 0.0; }
     virtual double getVoxelSemiHeight() { return radiusZ; }
+};
+
+typedef struct VerticalProfileSpec {
+    std::vector<clp::DoublePoint> profile;
+    double epsilon, minZ, maxZ, radius, zradius;
+} VerticalProfileSpec;
+
+typedef struct VerticalProfileRecomputeSpec {
+    bool recomputeMinZ;
+    bool recomputeMaxZ;
+    bool recomputeRadius;
+    bool recomputeZRadius;
+    bool recomputeSliceHeight;
+    bool recomputeApplicationPoint;
+} VerticalProfileRecomputeSpec;
+
+class LinearlyApproximatedProfile : public VerticalProfile {
+public:
+    std::string err;
+    VerticalProfileSpec spec;
+    LinearlyApproximatedProfile(VerticalProfileSpec spec, double slh, double ap, VerticalProfileRecomputeSpec recompute);
+    virtual double getWidth(double zshift);
+    virtual double getVoxelSemiHeight() { return spec.zradius; }
 };
 
 /********************************************************
