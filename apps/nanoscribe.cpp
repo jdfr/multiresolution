@@ -51,6 +51,7 @@ template<typename Function> std::string processToolpaths(std::string &pathsfilen
 }
 
 typedef struct MainSpec {
+    std::vector<const char *>                             opts_names;
     std::vector<std::shared_ptr<po::options_description>> opts;
     std::vector<const po::options_description*>           opts_naked;
     std::vector<po::parsed_options>                       optsBySystem;
@@ -62,7 +63,11 @@ typedef struct MainSpec {
     void usage();
     inline po::variables_map getMap(int idx) {
         po::variables_map map;
-        po::store(optsBySystem[idx], map);
+        try {
+            po::store(optsBySystem[idx], map);
+        } catch (std::exception &e) {
+            throw po::error(str("Error reading ", opts_names[idx], ": ", e.what()));
+        }
         return map;
     }
     inline bool nonEmptyOpts(int idx) {
@@ -72,11 +77,13 @@ typedef struct MainSpec {
 
 MainSpec::MainSpec() {
     opts.reserve(3);
+    opts_names.reserve(3);
     opts_naked.reserve(3);
     optsBySystem.reserve(3);
 
     mainOptsIdx = (int)opts.size();
-    opts.emplace_back(std::make_shared<po::options_description>("Main options"));
+    opts_names.push_back("Main options");
+    opts.emplace_back(std::make_shared<po::options_description>(opts_names.back()));
     opts.back()->add_options()
         ("help",
             "produce help message")
@@ -96,9 +103,11 @@ MainSpec::MainSpec() {
     addResponseFileOption(*opts.back());
 
     globalOptsIdx = (int)opts.size();
-    opts.emplace_back(std::make_shared<po::options_description>(std::move(    nanoGlobalOptionsGenerator())));
+    opts_names.push_back("Global options");
+    opts.emplace_back(std::make_shared<po::options_description>(std::move(nanoGlobalOptionsGenerator())));
 
     perProcOptsIdx = (int)opts.size();
+    opts_names.push_back("Per-process options");
     opts.emplace_back(std::make_shared<po::options_description>(std::move(nanoPerProcessOptionsGenerator())));
 
     for (auto &opt : opts) {
