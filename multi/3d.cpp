@@ -209,16 +209,22 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
                 input.push_back(InputSliceData(pair->z, pair->ntool));
             }
         } else {
+            bool sliceUpwards = tm.spec->global.sliceUpwards;
             double extent = maxz - minz;
+            double base;
+            if (tm.spec->global.use_z_base) {
+                base = tm.spec->global.z_base;
+            } else {
+                base = sliceUpwards ? minz : maxz;
+            }
             int num = 0;
             for (int k = 0; k < tm.spec->numspecs; ++k) num += (int)(extent / tm.spec->pp[k].profile->sliceHeight) + 3;
             input.reserve(num);
-            bool sliceUpwards = tm.spec->global.sliceUpwards;
             std::vector<double> zbase(tm.spec->numspecs);
             if (sliceUpwards) {
-                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = minz + tm.spec->pp[i].profile->applicationPoint;
+                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = base + tm.spec->pp[i].profile->applicationPoint;
             } else {
-                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = maxz - tm.spec->pp[i].profile->remainder;
+                for (int i = 0; i < tm.spec->numspecs; ++i) zbase[i] = base - tm.spec->pp[i].profile->remainder;
             }
             recursiveSimpleInputScheduler(0, zbase, sliceUpwards ? maxz : minz);
         }

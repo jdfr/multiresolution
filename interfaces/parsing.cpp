@@ -100,7 +100,7 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
             "Same as slicing-scheduler, but the executing order is specified manually: values are NTOOL_1, Z_1, NTOOL_2, Z_2, NTOOL_3, Z_3 ..., such that for each the i-th scheduled slice is at height Z_i, and is computed with process NTOOL_i.")
         ("slicing-zbase",
             po::value<double>()->value_name("z_base"),
-            "If --slicing-uniform is specified, and this parameter is specified, it is the Z position of the first slice, in mesh file units.")
+            "This parameter is the Z position of the first slice, in mesh file units. If it is not specified, the first Z value is either the min or the max Z position of the 3D mesh, depending on the value of slicing-direction. In mode --slicing-scheduler or --slicing-manual, this will be either the bottom or the top (depending on --slicing-direction) of the first slice.")
         ("slicing-direction",
             po::value<std::string>()->default_value("up")->value_name("(up|down)"),
             "If --slicing-scheduler is specified, this specifies if the slicing is done from the bottom-up ('up'), or vice versa (for --slicing-uniform, the direction is implicit in the sign of the z step). It also determines the order of the output slices, even if using --slicing-manual")
@@ -568,6 +568,10 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
     } else {
         spec.limitX = spec.limitY = -1;
     }
+    spec.use_z_base = vm.count("slicing-zbase") != 0;
+    if (spec.use_z_base) {
+        spec.z_base = vm["slicing-zbase"].as<double>();
+    }
     bool schedSet = false;
     const char * schedRepErr = "trying to specify more than one of these options: slicing-uniform, slicing-scheduler, slicing-manual";
     if (vm.count("slicing-uniform")) {
@@ -575,10 +579,6 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
         spec.schedMode      = UniformScheduling;
         spec.z_uniform_step = vm["slicing-uniform"].as<double>();
         schedSet            = true;
-        spec.use_z_base = vm.count("slicing-zbase") != 0;
-        if (spec.use_z_base) {
-            spec.z_base = vm["slicing-zbase"].as<double>();
-        }
     };
     if (vm.count("slicing-scheduler")) {
         if (schedSet) throw po::error(schedRepErr);
