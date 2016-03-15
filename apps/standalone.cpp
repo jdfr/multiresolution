@@ -14,6 +14,7 @@
 #endif
 
 typedef struct MainSpec {
+    std::vector<const char *>                             opts_toparse_names;
     std::vector<std::shared_ptr<po::options_description>> opts_toshow;
     std::vector<std::shared_ptr<po::options_description>> opts_toparse;
     std::vector<const po::options_description*>           opts_toparse_naked;
@@ -27,7 +28,11 @@ typedef struct MainSpec {
     void usage();
     inline po::variables_map getMap(int idx) {
         po::variables_map map;
-        po::store(optsBySystem[idx], map);
+        try {
+            po::store(optsBySystem[idx], map);
+        } catch (std::exception &e) {
+            throw po::error(str("Error reading ", opts_toparse_names[idx], ": ", e.what()));
+        }
         return map;
     }
     inline bool nonEmptyOpts(int idx) {
@@ -38,11 +43,13 @@ typedef struct MainSpec {
 MainSpec::MainSpec() {
     opts_toshow       .reserve(6);
     opts_toparse      .reserve(4);
+    opts_toparse_names.reserve(4);
     opts_toparse_naked.reserve(4);
     optsBySystem      .reserve(4);
 
     mainOptsIdx = (int)opts_toparse.size();
-    opts_toparse.emplace_back(std::make_shared<po::options_description>("Main options"));
+    opts_toparse_names.push_back("Main options");
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(opts_toparse_names.back()));
     opts_toparse.back()->add_options()
         ("help",
             "produce help message")
@@ -67,7 +74,8 @@ MainSpec::MainSpec() {
     addResponseFileOption(*opts_toparse.back());
 
     dxfOptsIdx = (int)opts_toparse.size();
-    opts_toparse.emplace_back(std::make_shared<po::options_description>("DXF options"));
+    opts_toparse_names.push_back("DXF options");
+    opts_toparse.emplace_back(std::make_shared<po::options_description>(opts_toparse_names.back()));
     opts_toparse.back()->add_options()
         ("dxf-toolpaths",
             po::value<std::string>()->value_name("filename"),
@@ -85,9 +93,11 @@ MainSpec::MainSpec() {
         ;
 
     globalOptsIdx  = (int)opts_toparse.size();
+    opts_toparse_names.push_back("Global options");
     opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(YesAddNano, NotAddResponseFile))));
 
     perProcOptsIdx = (int)opts_toparse.size();
+    opts_toparse_names.push_back("Per-process options");
     opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(YesAddNano))));
 
     for (auto &opt : opts_toparse) {
