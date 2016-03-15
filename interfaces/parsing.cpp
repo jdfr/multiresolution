@@ -697,9 +697,9 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
             ZSemiHeight = valz.size() == 1 ? ZRadius : getScaled(valz[1], scale, doscale);
         }
         if (voxelIsEllipsoid) {
-            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+            spec.pp[k].profile = std::make_shared<EllipticalProfile>((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
         } else if (voxelIsConstant) {
-            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, 2 * ZSemiHeight);
+            spec.pp[k].profile = std::make_shared<ConstantProfile>  ((double)spec.pp[k].radius, ZRadius, ZSemiHeight);
         } else /*voxelIsInterp*/ {
             VerticalProfileRecomputeSpec r;
             VerticalProfileSpec s;
@@ -732,7 +732,7 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
                 double x = getScaled(*val, scale, doscale);
                 s.profile.emplace_back(z, x);
             }
-            auto profile = std::make_shared<LinearlyApproximatedProfile>(std::move(s), 2 * ZSemiHeight, applicationPoint, std::move(r));
+            auto profile = std::make_shared<LinearlyApproximatedProfile>(std::move(s), ZSemiHeight, applicationPoint, std::move(r));
             if (!profile->err.empty()) throw po::error(str("Error while parsing the interpolated profile for process ", k, ": ", profile->err));
             spec.pp[k].radius  = (clp::cInt)profile->spec.radius;
             spec.pp[k].profile = std::move(profile);

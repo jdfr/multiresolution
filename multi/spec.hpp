@@ -85,7 +85,7 @@ public:
     double remainder;
     VerticalProfile() {}
     VerticalProfile(double sh, double ap) { setup(sh, ap); }
-    void setup(double sh, double ap) { sliceHeight = sh; applicationPoint = ap; remainder = sh - ap; }
+    void setup(double sh, double ap) { sliceHeight = 2 * sh; applicationPoint = ap; remainder = 2 * sh - ap; }
     //zshift is supposed to be measured from applicationPoint, so it should be computed with care  if applicationPoint!=sliceHeight/2
     virtual double getWidth(double zshift) { throw std::runtime_error("getWidth() unimplemented in base class!!!"); }
     //This is DIFFERENT from sliceHeight/2: it is the TRUE voxel extent, while sliceHeight may be adjusted for slicing purposes!!!!
