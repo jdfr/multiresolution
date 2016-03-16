@@ -1,5 +1,6 @@
 #include "pathwriter_nanoscribe.hpp"
 #include "parsing.hpp"
+#include <iostream>
 #include <iomanip>
 #include <limits>
 
