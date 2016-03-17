@@ -17,6 +17,7 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
     std::vector<FILE *> is(numinputs, NULL);
     std::vector<FileHeader> fileheaders_i(numinputs);
     FileHeader fileheader_o;
+    fileheader_o.version  = 0; //if we ever have more than one version, we will need to handle this meaningfully instead of just hard-coding it
     fileheader_o.numtools = 0;
     fileheader_o.useSched = false;
     fileheader_o.numRecords = 0;
