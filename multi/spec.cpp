@@ -105,7 +105,7 @@ LinearlyApproximatedProfile::LinearlyApproximatedProfile(VerticalProfileSpec s, 
         }
         spec.minZ         = 0;
     }
-    sliceHeight = (r.recomputeSliceHeight) ? spec.maxZ : slh;
+    sliceHeight = (r.recomputeSliceHeight) ? spec.maxZ : 2 * slh;
     if (r.recomputeZRadius) spec.zradius = sliceHeight / 2;
     setup(sliceHeight, applicationPoint);
     if (r.recomputeRadius)  {
