@@ -20,14 +20,28 @@ typedef struct HasError {
 
 typedef struct SharedLibraryConfig : public HasError {
     std::shared_ptr<Configuration> config;
+    std::shared_ptr<MetricFactors> factors;
 
-    SharedLibraryConfig(char * configfile) { config = std::make_shared<Configuration>(); config->load(configfile); }
+    SharedLibraryConfig(char * configfile) {
+        config = std::make_shared<Configuration>();
+        config->load(configfile);
+        if (config->has_err) {
+            err = config->err;
+            return;
+        }
+        bool doscale = true;
+        factors = std::make_shared<MetricFactors>(*config, doscale);
+        if (!factors->err.empty()) {
+            err = factors->err;
+        }
+
+    }
 } SharedLibraryConfig;
 
 typedef struct SharedLibraryState : public HasError {
     std::shared_ptr<Configuration> config;
+    std::shared_ptr<MetricFactors> factors;
     std::shared_ptr<MultiSpec> spec;
-    MetricFactors factors;
     std::vector<clp::cInt> processRadiuses;
     std::shared_ptr<SimpleSlicingScheduler> sched;
     std::shared_ptr<Multislicer> multi;
@@ -66,19 +80,15 @@ LIBRARY_API  char * getErrorText(void* value) {
     return const_cast<char *>(err.c_str());
 }
 
-StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::string> &args, bool doscale) {
+StateHandle initState(std::shared_ptr<Configuration> config, std::shared_ptr<MetricFactors> factors, std::vector<std::string> &args) {
     SharedLibraryState *state = new SharedLibraryState(config);
     if (state->spec->global.config->has_err) {
         state->err = state->spec->global.config->err;
         return state;
     }
-    state->factors.init(*config, doscale);
-    if (!state->factors.err.empty()) {
-        state->err = state->factors.err;
-        return state;
-    }
+    state->factors = factors;
     try {
-        ParserAllLocalAndGlobal parser(state->factors, *state->spec, NotAddNano, YesAddResponseFile);
+        ParserAllLocalAndGlobal parser(*state->factors, *state->spec, NotAddNano, YesAddResponseFile);
         parser.setParsedOptions(args, NULL);
     } catch (std::exception &e) {
         state->err = e.what();
@@ -94,15 +104,15 @@ StateHandle initState(std::shared_ptr<Configuration> config, std::vector<std::st
     return state;
 }
 
-LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* arguments) {
+LIBRARY_API  StateHandle parseArguments(ConfigHandle config, char* arguments) {
     std::string argl(arguments);
     auto args = normalizedSplit(argl);
-    return initState(config->config, args, doscale != 0);
+    return initState(config->config, config->factors, args);
 }
 
-LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv) {
+LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int argc, const char** argv) {
     auto args = getArgs(argc, argv);
-    return initState(config->config, args, doscale != 0);
+    return initState(config->config, config->factors, args);
 }
 
 LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
@@ -116,6 +126,15 @@ LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
     ret.processRadiuses = &(state->processRadiuses.front());
     return ret;
 }
+
+LIBRARY_API ConfigExtractInfo getConfigExtract(ConfigHandle config) {
+    ConfigExtractInfo ret;
+    ret.factor_input_to_internal = config->factors->input_to_internal;
+    ret.factor_internal_to_input = config->factors->internal_to_input;
+    ret.factor_slicer_to_internal = config->factors->slicer_to_internal;
+    return ret;
+}
+
 
 LIBRARY_API  ConfigHandle readConfiguration(char *configfilename) {
     SharedLibraryConfig *config = new SharedLibraryConfig(configfilename);
@@ -301,7 +320,7 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
         return ret;
     }
     if (state->spec->global.fb.feedback) {
-        double internal_to_input = state->factors.internal_to_input;
+        double internal_to_input = state->factors->internal_to_input;
 
         //un-scale the z values for raw slices, since they are needed by applyFeedback()
         std::vector<double> rawZs = state->sched->rm.rawZs;
@@ -309,7 +328,7 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
             *z *= internal_to_input;
         }
 
-        std::string err = applyFeedback(*state->spec->global.config, state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
+        std::string err = applyFeedback(*state->spec->global.config, *state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
         if (!err.empty()) {
             state->err = err;
             voidSlices3DSpecInfo(ret);

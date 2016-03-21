@@ -89,9 +89,15 @@ typedef struct LoadPathFileInfo {
 } LoadPathFileInfo;
 
 typedef struct ParamsExtractInfo {
-    int numProcesses;
     coord_type * processRadiuses;
+    int numProcesses;
 } ParamsExtractInfo;
+
+typedef struct ConfigExtractInfo {
+    double factor_input_to_internal;
+    double factor_internal_to_input;
+    double factor_slicer_to_internal;
+} ConfigExtractInfo;
 
 #ifdef __cplusplus
 extern "C" {
@@ -108,11 +114,13 @@ extern "C" {
 
     LIBRARY_API  void  freeParameterHelp(char *helpstr);
 
-    LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int doscale, int argc, const char** argv);
+    LIBRARY_API  StateHandle parseArgumentsMainStyle(ConfigHandle config, int argc, const char** argv);
 
-    LIBRARY_API  StateHandle parseArguments(ConfigHandle config, int doscale, char* arguments);
+    LIBRARY_API  StateHandle parseArguments(ConfigHandle config, char* arguments);
 
     LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state);
+
+    LIBRARY_API ConfigExtractInfo getConfigExtract(ConfigHandle config);
 
     LIBRARY_API  void freeState(StateHandle arguments);
 
