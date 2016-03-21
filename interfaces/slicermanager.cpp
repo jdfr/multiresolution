@@ -54,7 +54,7 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.args.push_back(debugfile);
 #endif
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
-    subp.args.push_back(std::string(incremental ? "incremental " : "noincremental "));
+    subp.args.push_back(std::string(incremental ? "incremental" : "noincremental"));
     subp.args.push_back(stlfilename);
 
     err = subp.start();
