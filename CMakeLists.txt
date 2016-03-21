@@ -124,6 +124,10 @@ if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
+if (ENABLE_SLICER_LOGGING)
+    ADD_DEFINITIONS(-DSLICER_USE_DEBUG_FILE) #this is used by several subprojects
+endif()
+
 set (INCLUDE_DIRS
   ${clipper_include_dir}
   ${iopaths_include_dir}
@@ -218,9 +222,6 @@ if (NOT LINKING_OPTIMIZATION)
   ADD_LIBRARY(miniboostlib STATIC ${BOOSTSOURCES})
   if(USE_PYTHON_DEBUG)
     set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
-  endif()
-  if (ENABLE_SLICER_LOGGING)
-      set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "SLICER_USE_DEBUG_FILE")
   endif()
   if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
     target_compile_options(corelib      PUBLIC "-fPIC")
