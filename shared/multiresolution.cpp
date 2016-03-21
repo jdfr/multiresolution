@@ -21,6 +21,7 @@ typedef struct HasError {
 typedef struct SharedLibraryConfig : public HasError {
     std::shared_ptr<Configuration> config;
     std::shared_ptr<MetricFactors> factors;
+    std::string slicerWorkDir, slicerExePath, slicerDebugFile;
 
     SharedLibraryConfig(char * configfile) {
         config = std::make_shared<Configuration>();
@@ -131,9 +132,22 @@ LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
 
 LIBRARY_API ConfigExtractInfo getConfigExtract(ConfigHandle config) {
     ConfigExtractInfo ret;
-    ret.factor_input_to_internal = config->factors->input_to_internal;
-    ret.factor_internal_to_input = config->factors->internal_to_input;
+    ret.factor_input_to_internal  = config->factors->input_to_internal;
+    ret.factor_internal_to_input  = config->factors->internal_to_input;
     ret.factor_slicer_to_internal = config->factors->slicer_to_internal;
+    //Here we rely on the fact that, during the return ConfigExtractInfo lifetime, config->config->update() will not be called!!!!!
+    config->slicerWorkDir   = config->config->getValue("SLICER_PATH");
+    config->slicerExePath   = config->config->getValue("SLICER_EXEC");
+    ret.slicerWorkdir       = const_cast<char*>(config->slicerWorkDir.c_str());
+    ret.slicerExePath       = const_cast<char*>(config->slicerExePath.c_str());
+#ifdef SLICER_USE_DEBUG_FILE
+    ret.useSlicerDebugFile  = 1;
+    config->slicerDebugFile = config->config->getValue("SLICER_DEBUGFILE");
+    ret.slicerDebugFile     = const_cast<char*>(config->slicerDebugFile.c_str());
+#else
+    ret.useSlicerDebugFile = 0;
+    ret.slicerDebugFile    = NULL;
+#endif
     return ret;
 }
 

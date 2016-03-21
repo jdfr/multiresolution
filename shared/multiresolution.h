@@ -99,6 +99,10 @@ typedef struct ConfigExtractInfo {
     double factor_input_to_internal;
     double factor_internal_to_input;
     double factor_slicer_to_internal;
+    char *slicerWorkdir;
+    char *slicerExePath;
+    char *slicerDebugFile;
+    int useSlicerDebugFile;
 } ConfigExtractInfo;
 
 #ifdef __cplusplus
