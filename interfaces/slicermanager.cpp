@@ -23,9 +23,9 @@ class ExternalSlicerManager : public SlicerManager {
 public:
     ExternalSlicerManager(
 #ifdef SLICER_USE_DEBUG_FILE
-        std::string &&_debugfile,
+        std::string _debugfile,
 #endif
-    std::string &&_execpath, std::string &&_workdir, bool _repair, bool _incremental, double _scaled) :
+    std::string _execpath, std::string _workdir, bool _repair, bool _incremental, double _scaled) :
 #ifdef SLICER_USE_DEBUG_FILE
     debugfile(std::move(_debugfile)),
 #endif
