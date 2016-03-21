@@ -239,7 +239,6 @@ bool testSliceNotNearEnd(double z, double zend, int process, ToolpathManager &tm
     double zspan = (tm.spec->global.sliceUpwards) ?
         (zend - z - tm.spec->pp[process].profile->remainder) :
         (z - zend - tm.spec->pp[process].profile->applicationPoint);
-    zspan -= tm.spec->pp[process].profile->remainder;
     //-0.2 to give some slack and not discard slices that protude slightly
     return (zspan >= 0) || (zspan >= tm.spec->pp[process].profile->sliceHeight*-0.2);
 }
