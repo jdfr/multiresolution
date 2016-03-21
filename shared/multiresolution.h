@@ -91,6 +91,8 @@ typedef struct LoadPathFileInfo {
 typedef struct ParamsExtractInfo {
     coord_type * processRadiuses;
     int numProcesses;
+    int alsoContours;
+    int usingScheduler;
 } ParamsExtractInfo;
 
 typedef struct ConfigExtractInfo {

@@ -124,6 +124,8 @@ LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
         state->processRadiuses.push_back(pp.radius);
     }
     ret.processRadiuses = &(state->processRadiuses.front());
+    ret.alsoContours    = state->spec->global.alsoContours;
+    ret.usingScheduler  = state->spec->global.useScheduler;
     return ret;
 }
 
