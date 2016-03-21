@@ -15,10 +15,10 @@ typedef int LoadPathInfo_PathFormat;
 #define PATHFORMAT_DOUBLE    1
 #define PATHFORMAT_DOUBLE_3D 2
 
-//this is used by getDesiredPaths()
+//this is used by getOutputSliceInfo()
 typedef int OutputSliceInfo_PathType;
 #define PathToolPath 0
-#define PathProcessed 1
+#define PathInfillingAreas 1
 #define PathContour 2
 
 //do not declare the shared library definitions if we only want the above definitions

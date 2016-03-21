@@ -255,7 +255,7 @@ LIBRARY_API  int alsoComplementary(SharedLibraryResult* result, int ntool) {
 inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, OutputSliceInfo_PathType pathtype) {
     clp::Paths * paths;
     switch (pathtype) {
-    case PathProcessed:
+    case PathInfillingAreas:
         paths = &result->res[ntool]->infillingAreas; break;
     case PathContour:
         paths = &result->res[ntool]->contoursToShow; break;
