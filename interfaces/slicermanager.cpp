@@ -17,6 +17,7 @@ class ExternalSlicerManager : public SlicerManager {
     std::string err;
     bool repair, incremental;
     double scaled;
+    double scalingFactor;
     long scale;
     bool useIntegerScale;
     int numSlice;
@@ -29,13 +30,14 @@ public:
 #ifdef SLICER_USE_DEBUG_FILE
     debugfile(std::move(_debugfile)),
 #endif
-    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scaled(_scaled), scale((long)_scaled), useIntegerScale(((double)scale)==scaled) {}
+    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scaled(_scaled), scale((long)_scaled), useIntegerScale(((double)scale)==scaled), scalingFactor(0.0) {}
     virtual ~ExternalSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
     virtual bool terminate();
     virtual bool finalize();
     virtual std::string getErrorMessage() { return err; }
     virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz);
+    virtual double getScalingFactor();
     virtual void sendZs(double *values, int numvalues);
     virtual int  askForNextSlice();
     virtual void readNextSlice(clp::Paths &nextSlice);
@@ -87,8 +89,8 @@ void ExternalSlicerManager::getLimits(double *minx, double *maxx, double *miny, 
             return;
         }
     }
-    double limits[6];
-    if (!iopOUT.readDoubleP(limits, 6)) {
+    double limits[7];
+    if (!iopOUT.readDoubleP(limits, 7)) {
         err = "could not read min/max values from the slicer!!!";
         return;
     }
@@ -98,6 +100,11 @@ void ExternalSlicerManager::getLimits(double *minx, double *maxx, double *miny, 
     *maxy = limits[3];
     *minz = limits[4];
     *maxz = limits[5];
+    scalingFactor = limits[6];
+}
+
+double ExternalSlicerManager::getScalingFactor() {
+    return scalingFactor;
 }
 
 void ExternalSlicerManager::sendZs(double *values, int numvalues) {

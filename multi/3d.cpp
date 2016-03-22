@@ -609,6 +609,12 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         double a, b, c, d, e, f;
         feedbackSlicer->getLimits(&a, &b, &c, &d, &e, &f);
 
+        double slicer_to_input = 1 / factors.input_to_slicer;
+        if (std::fabs(feedbackSlicer->getScalingFactor() - slicer_to_input) > (slicer_to_input*1e-3)) {
+            feedbackSlicer->terminate();
+            return str("Error: the scalingFactor from the slicer is ", feedbackSlicer->getScalingFactor(), " while the factor from the configuration is different: ", slicer_to_input, "!!!\n");
+        }
+
         feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
 
         clp::Paths rawslice;
@@ -619,6 +625,7 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
             feedbackSlicer->readNextSlice(rawslice); {
                 std::string err = feedbackSlicer->getErrorMessage();
                 if (!err.empty()) {
+                    feedbackSlicer->terminate();
                     return str("Error while trying to read the ", k, "-th slice from the slicer manager: ", err, "!!!\n");
                 }
             }

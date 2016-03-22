@@ -304,6 +304,13 @@ int Main(int argc, const char** argv) {
 
     double minx, maxx, miny, maxy, minz, maxz;
     slicer->getLimits(&minx, &maxx, &miny, &maxy, &minz, &maxz);
+
+    double slicer_to_input = 1 / factors.input_to_slicer;
+    if (std::fabs(slicer->getScalingFactor() - slicer_to_input) > (slicer_to_input*1e-3)) {
+        fprintf(stderr, "Error while trying to start the slicer manager: the scalingFactor from the slicer is %f while the factor from the configuration is different: %f!!!\n", slicer->getScalingFactor(), slicer_to_input);
+        return -1;
+    }
+
     if (nanoSpec.useSpec) {
         //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
         clp::IntPoint mn((clp::cInt)(minx * factors.input_to_internal),
