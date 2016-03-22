@@ -93,6 +93,9 @@ typedef struct ParamsExtractInfo {
     int numProcesses;
     int alsoContours;
     int usingScheduler;
+    int use_z_base;
+    double z_uniform_step;
+    double z_base;
 } ParamsExtractInfo;
 
 typedef struct ConfigExtractInfo {

@@ -127,6 +127,13 @@ LIBRARY_API ParamsExtractInfo getParamsExtract(StateHandle state) {
     ret.processRadiuses = &(state->processRadiuses.front());
     ret.alsoContours    = state->spec->global.alsoContours;
     ret.usingScheduler  = state->spec->global.useScheduler;
+    ret.use_z_base      = state->spec->global.use_z_base;
+    if (!state->spec->global.useScheduler) {
+        ret.z_uniform_step = state->spec->global.z_uniform_step;
+    }
+    if (state->spec->global.use_z_base) {
+        ret.z_base         = state->spec->global.z_base;
+    }
     return ret;
 }
 
