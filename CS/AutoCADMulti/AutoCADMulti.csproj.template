@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{556AA3FF-02C1-4D79-ADD1-5B4B6BFCD62D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <OutputPath>AutoCADMulti.dir\Debug\</OutputPath>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>AutoCADMulti</RootNamespace>
+    <AssemblyName>AutoCADMulti</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>AutoCADMulti.dir\Debug.AnyCPU\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutDir>${CS_OUTPUT_DIR}</OutDir>
+    <IntDir>AutoCADMulti.dir\Release\</IntDir>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!--This is to supress the annoying warning MSB3270 about accoremgd.dll et al being amd64 while the C# DLLs are AnyCPU-->
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+    </PropertyGroup>
+  <ItemGroup>
+${AUTOCAD_DLL_REFERENCES}
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}main.cs" />
+    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}maindialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}maindialog.Designer.cs">
+      <DependentUpon>${AutoCADMulti_SOURCE_DIR_PREFIX}maindialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="${AutoCADMulti_SOURCE_DIR_PREFIX}maindialog.resx">
+      <DependentUpon>${AutoCADMulti_SOURCE_DIR_PREFIX}maindialog.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="${MULTIRES_LIBRARY_PROJECT_FILE}">
+      <Project>${multiresolution_library_GUID_CMAKE}</Project>
+      <Name>multiresolution_library</Name>
+    </ProjectReference>
+    <ProjectReference Include="${MultiSlicerInterface_PROJECT_FILE}">
+      <Project>{cb80c200-ca82-40a9-b7b7-f3b57578cef2}</Project>
+      <Name>MultiSlicerInterface</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
