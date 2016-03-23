@@ -446,6 +446,7 @@ namespace AutoCADMulti {
                 if ((rawslice.Length > 0) && (alsoContours)) {
                     showExternalSlice(rawslice, external.scalingFactor, zs[i], tr, btr);
                 }
+                //here, it may be the moment to use dll.receiveAdditionalAdditiveContours() if we were using online feedback...
                 void* slice = handler.feedRawSliceIntoDll(rawslice);
                 rawslice    = null;
                 handler.feedSliceToScheduler(slice); //the slice is freed in feedSliceToScheduler()
