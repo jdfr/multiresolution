@@ -397,7 +397,7 @@ LIBRARY_API void computeOutputSlices(StateHandle state) {
 }
 
 /*may return NULL to mean that no output is ready yet. Because of that,
-error strings can be queried from the ArgumentsHandle argument*/
+error strings can be queried from the StateHandle argument*/
 LIBRARY_API ResultsHandle giveOutputIfAvailable(StateHandle state) {
     if (state->sched->output_idx >= state->sched->output.size()) {
         return NULL;
