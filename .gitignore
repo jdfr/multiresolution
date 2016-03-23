@@ -1,4 +1,5 @@
 *.vcxproj
+*.csproj
 *.user
 *.filters
 *.paths

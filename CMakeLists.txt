@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.9)
 
 option(ENABLE_SLICER_LOGGING "enable slicer debug output to file" ON) #this option has to be coordinated with the one used in the slicer!!!!
 option(USE_PYTHON_DEBUG      "add support for viewing contours in python for debugging" ON)
@@ -6,6 +6,7 @@ option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
 option(GENERATE_LIBRARY      "generate shared library"  ON)
 option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
 option(SET_CONFIGURE_FILE    "generate example configuration files (the variables PYPATH and INITIAL_MESH_FILE must be set!!!)" ON)
+option(GENERATE_CS_INTERFACE "generate the C# client of the DLL shared library (only in Visual Studio)" ON)
 option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
 option(GENERATE_DXFCONVERTER "generate dxf converter executable"  ON)
 option(GENERATE_NANOCONVERTER "generate nanoscribe converter executable"  ON)
@@ -19,6 +20,16 @@ option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process sign
 option(LINKING_OPTIMIZATION  "optimizations that may make the build process significantly slower" OFF)
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if (CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE)
+  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE})
+elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG)
+  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
+else()
+  set(OUTPUTDIR ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
 #if present, include code from this file. Useful for setting some configuration values such as PYPATH
 include(${SRC}/cmake.configvars.txt OPTIONAL)
@@ -253,6 +264,23 @@ if(GENERATE_LIBRARY)
     target_link_libraries(multiresolution_library corelib miniboostlib)
   endif()
 endif()
+
+if(MSVC)
+  if(GENERATE_LIBRARY)
+    if(GENERATE_CS_INTERFACE)
+      set(CS_OUTPUT_DIR "${OUTPUTDIR}")
+      set(MultiSlicerInterface_SOURCE_DIR_PREFIX "${SRC}\\CS\\MultiSlicerInterface\\")
+      set(multiresolution_library_GUID_CMAKE "b3b551ad-5df5-4538-a482-0025ed6d4e2f" CACHE INTERNAL "")
+      set(MULTIRES_LIBRARY_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/multiresolution_library.vcxproj")
+      set(MultiSlicerInterface_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/MultiSlicerInterface.csproj")
+      configure_file(${MultiSlicerInterface_SOURCE_DIR_PREFIX}MultiSlicerInterface.csproj.template ${MultiSlicerInterface_PROJECT_FILE})
+      include_external_msproject(MultiSlicerInterface ${MultiSlicerInterface_PROJECT_FILE}
+                                 GUID CB80C200-CA82-40A9-B7B7-F3B57578CEF2
+                                 #TYPE
+                                 PLATFORM AnyCPU)
+    endif()
+  endif()
+endif()
   
 if(GENERATE_EXECUTABLE)
   set(EXECSOURCES
@@ -315,16 +343,6 @@ SINGLESOURCE_EXECUTABLE(GENERATE_FILEUNION     multiresolution_fileunion    apps
 SINGLESOURCE_EXECUTABLE(GENERATE_FILETOUCH     multiresolution_filetouch    apps/touch.cpp      touchp)
 SINGLESOURCE_EXECUTABLE(GENERATE_TRANSFORMER   multiresolution_transform    apps/transform.cpp  transformp)
 SINGLESOURCE_EXECUTABLE(GENERATE_XYZHANDLER    multiresolution_xyz          apps/xyz.cpp        xyz)
-
-if (CMAKE_RUNTIME_OUTPUT_DIRECTORY)
-  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE)
-  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE})
-elseif (CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG)
-  set(OUTPUTDIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG})
-else()
-  set(OUTPUTDIR ${CMAKE_CURRENT_BINARY_DIR})
-endif()
 
 if(${MINGW})
   if (NOT MINGW_DLLS_COPIED)
