@@ -8,6 +8,14 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.ApplicationServices;
 
+/*HOW TO USE THIS PLUGIN:
+ *    a) compile the project (the dependencies should also be compiled and, if necessary, put in the same output folder)
+ *    b) open AutoCAD
+ *    c) in AutoCAD, tcreate or open a document
+ *    d) in AutoCAD, execute the command NETLOAD in AutoCAD, navigate to the directory containing the DLL for this project, and select the DLL for this plugin (AutoCADMulti.dll)
+ *    e) in AutoCAD, execute the command MULTISLICER
+ */
+
 [assembly: CommandClass(typeof(AutoCADMulti.main))]
 
 namespace AutoCADMulti {
