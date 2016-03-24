@@ -18,7 +18,6 @@ option(GENERATE_FILEINFO     "generate info dumper for paths files"  ON)
 option(GENERATE_FILEUNION    "generate tool to merge several paths files into one"  ON)
 option(GENERATE_FILETOUCH    "generate slice header setter for paths files"  ON)
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
-option(LINKING_OPTIMIZATION  "optimizations that may make the build process significantly slower" OFF)
 
 set(SRC "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -75,11 +74,21 @@ else()
   set(CLIPPER_BASE_DIR "" CACHE PATH "path to clipper library")
 endif()
 
-if(EXISTS ${SRC}/../boost/include/boost)
-  set(BOOST_INCLUDE_DIR ${SRC}/../boost/include)
-else()
-  #as far as I understand, this will enable users of cmake-gui to set this directory
-  set(BOOST_INCLUDE_DIR "" CACHE PATH "path to boost library")
+#as far as I understand, this will enable users of cmake-gui to set this directory
+set(Boost_INCLUDE_DIR "" CACHE PATH "path to boost library")
+
+if("${Boost_INCLUDE_DIR}" STREQUAL "")
+  #try to find boost! first, let's see if we have it in the parent directory
+  if(EXISTS ${SRC}/../boost/boost)
+    set(Boost_INCLUDE_DIR ${SRC}/../boost)
+  else()
+    #try to find it with find_package
+    find_package(Boost 1.59.0 QUIET COMPONENTS program_options)
+    if (NOT Boost_FOUND)
+      message(FATAL_ERROR "Error: please set the variable Boost_INCLUDE_DIR to the path to the Boost include directory (Boost 1.59.0 or higher required).")
+    endif()
+    set(BOOST_FINDPACKAGE_EXECUTED ON)
+  endif()
 endif()
 
 set(clipper_include_dir ${CLIPPER_BASE_DIR}/clipper)
@@ -118,11 +127,6 @@ if (MSVC)
     if(COMPILE_OPTIMIZATIONS)
       set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} " /fp:fast /Ox /GF Gy /GS- ")
     endif()
-    if(LINKING_OPTIMIZATION)
-      set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} /GL)
-      set(CMAKE_EXE_LINKER_FLAGS    ${CMAKE_EXE_LINKER_FLAGS}    " /GL ")
-      set(CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS} " /GL ")
-    endif()
   endif()
 endif()
 
@@ -139,11 +143,6 @@ if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
   if(COMPILE_OPTIMIZATIONS)
     ADD_DEFINITIONS(-Ofast -ffast-math -march=native)
   endif()
-  if(LINKING_OPTIMIZATION)
-    ADD_DEFINITIONS(-fwhole-program -flto)
-    set(CMAKE_EXE_LINKER_FLAGS    ${CMAKE_EXE_LINKER_FLAGS}    -flto)
-    set(CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS} -flto)
-  endif()
 endif()
 
 if (ENABLE_SLICER_LOGGING)
@@ -153,7 +152,7 @@ endif()
 set (INCLUDE_DIRS
   ${clipper_include_dir}
   ${iopaths_include_dir}
-  ${BOOST_INCLUDE_DIR}
+  ${Boost_INCLUDE_DIR}
   ${SRC}/multi
   ${SRC}/interfaces
   ${SRC}/python
@@ -216,39 +215,55 @@ if (USE_PYTHON_DEBUG)
     )
 endif()
 
-if(EXISTS ${SRC}/../boost/program_options/src)
-  set(BOOST_PROGRAMOPTIONS_DIR ${SRC}/../boost/program_options/src)
-else()
-  #as far as I understand, this will enable users of cmake-gui to set this directory
-  set(BOOST_PROGRAMOPTIONS_DIR "" CACHE PATH "path to boost::program_options source files")
+#as far as I understand, this will enable users of cmake-gui to set this directory
+set(BOOST_PROGRAMOPTIONS_DIR "" CACHE PATH "path to boost::program_options source files")
+if(NOT BOOST_FINDPACKAGE_EXECUTED)
+  set(Boost_LIBRARIES "" CACHE PATH "If BOOST_PROGRAMOPTIONS_DIR is empty, this must include the absolute path to the static library program_options")
 endif()
 
-set(BOOSTSOURCES
-    ${BOOST_PROGRAMOPTIONS_DIR}/cmdline.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/options_description.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/parsers.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/variables_map.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/value_semantic.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/positional_options.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/utf8_codecvt_facet.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/convert.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/winmain.cpp
-    ${BOOST_PROGRAMOPTIONS_DIR}/split.cpp
-    )
-
-set(CORESOURCES ${CORESOURCES})
-
-if (NOT LINKING_OPTIMIZATION)
-  ADD_LIBRARY(corelib      STATIC ${CORESOURCES})
-  ADD_LIBRARY(miniboostlib STATIC ${BOOSTSOURCES})
-  if(USE_PYTHON_DEBUG)
-    set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
+if("${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
+  #try to find program_options's source code in a known locations
+  if(EXISTS ${Boost_INCLUDE_DIR}/libs/program_options/src)
+    set(BOOST_PROGRAMOPTIONS_DIR ${Boost_INCLUDE_DIR}/libs/program_options/src)
+  elseif(EXISTS ${SRC}/../boost/libs/program_options/src)
+    set(BOOST_PROGRAMOPTIONS_DIR ${SRC}/../boost/libs/program_options/src)
+  elseif(BOOST_FINDPACKAGE_EXECUTED)
+    if (NOT Boost_PROGRAM_OPTIONS_FOUND)
+      message(FATAL_ERROR "Error: could not find neither the sources of boost::program_options nor the compiled binaries!")
+    endif()
+  else()
+    if("${Boost_LIBRARIES}" STREQUAL "")
+      message(FATAL_ERROR "Error: we require boost::program_options in any of these forms: either the sources in BOOST_PROGRAMOPTIONS_DIR or the compiled static library in Boost_LIBRARIES")
+    endif()
   endif()
+endif()
+
+if(NOT "${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
+  ADD_LIBRARY(miniboostlib STATIC
+      ${BOOST_PROGRAMOPTIONS_DIR}/cmdline.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/options_description.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/parsers.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/variables_map.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/value_semantic.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/positional_options.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/utf8_codecvt_facet.cpp
+      ${BOOST_PROGRAMOPTIONS_DIR}/convert.cpp
+      #${BOOST_PROGRAMOPTIONS_DIR}/winmain.cpp
+      #${BOOST_PROGRAMOPTIONS_DIR}/split.cpp
+      )
   if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
-    target_compile_options(corelib      PUBLIC "-fPIC")
     target_compile_options(miniboostlib PUBLIC "-fPIC" "-Wno-deprecated-declarations")
   endif()
+  set(Boost_LIBRARIES miniboostlib)
+endif()
+
+ADD_LIBRARY(corelib STATIC ${CORESOURCES})
+if(USE_PYTHON_DEBUG)
+  set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
+endif()
+if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
+  target_compile_options(corelib PUBLIC "-fPIC")
 endif()
   
 if(GENERATE_LIBRARY)
@@ -256,24 +271,10 @@ if(GENERATE_LIBRARY)
     shared/multiresolution.h
     shared/multiresolution.cpp
     )
-  if(LINKING_OPTIMIZATION)
-    set(LIBRARY_SOURCES
-      ${LIBRARY_SOURCES}
-      ${CORESOURCES}
-      ${BOOSTSOURCES}
-      )
-  endif()
   ADD_LIBRARY(multiresolution_library SHARED ${LIBRARY_SOURCES})
   set_target_properties(multiresolution_library PROPERTIES COMPILE_DEFINITIONS "LIBRARY_EXPORTS")
   set_target_properties(multiresolution_library PROPERTIES OUTPUT_NAME multires)
-  if(LINKING_OPTIMIZATION)
-    target_compile_options(multiresolution_library PUBLIC "-Wno-deprecated-declarations")
-    if(USE_PYTHON_DEBUG)
-      set_property(TARGET multiresolution_library APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
-    endif()
-  else()
-    target_link_libraries(multiresolution_library corelib miniboostlib)
-  endif()
+  target_link_libraries(multiresolution_library corelib ${Boost_LIBRARIES})
 endif()
 
 if(MSVC)
@@ -318,9 +319,7 @@ if(MSVC)
 endif()
   
 if(GENERATE_EXECUTABLE)
-  set(EXECSOURCES
-    apps/standalone.cpp
-    )
+  set(EXECSOURCES apps/standalone.cpp)
   if(USE_PYTHON_VIEWER)
     set(EXECSOURCES
       ${EXECSOURCES}
@@ -328,44 +327,20 @@ if(GENERATE_EXECUTABLE)
       python/sliceviewer.cpp
       )
   endif()
-  if(LINKING_OPTIMIZATION)
-    set(EXECSOURCES
-      ${EXECSOURCES}
-      ${CORESOURCES}
-      ${BOOSTSOURCES}
-      )
-  endif()
   ADD_EXECUTABLE(multiresolution_executable ${EXECSOURCES})
   set_target_properties(multiresolution_executable PROPERTIES OUTPUT_NAME multires)
   if (USE_PYTHON)
     set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "STANDALONE_USEPYTHON")
   endif()
-  if(LINKING_OPTIMIZATION)
-    target_compile_options(multiresolution_executable PUBLIC "-Wno-deprecated-declarations")
-    if(USE_PYTHON_DEBUG)
-      set_property(TARGET multiresolution_executable APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
-    endif()
-  else()
-    target_link_libraries(multiresolution_executable corelib miniboostlib)
-  endif()
+  target_link_libraries(multiresolution_executable corelib ${Boost_LIBRARIES})
 endif()
 
 function(SINGLESOURCE_EXECUTABLE GENERATE_OPTION TARGETNAME SOURCEFILE EXENAME)
   if(GENERATE_OPTION)
     set(SINGLESOURCE ${SOURCEFILE})
-    if(LINKING_OPTIMIZATION)
-      set(SINGLESOURCE ${SINGLESOURCE} ${CORESOURCES} ${BOOSTSOURCES})
-    endif()
     ADD_EXECUTABLE(${TARGETNAME} ${SINGLESOURCE})
     set_target_properties(${TARGETNAME} PROPERTIES OUTPUT_NAME ${EXENAME})
-    if(LINKING_OPTIMIZATION)
-      target_compile_options(${TARGETNAME} PUBLIC "-Wno-deprecated-declarations")
-      if(USE_PYTHON_DEBUG)
-        set_property(TARGET ${TARGETNAME} APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
-      endif()
-    else()
-      target_link_libraries(${TARGETNAME} corelib miniboostlib)
-    endif()
+    target_link_libraries(${TARGETNAME} corelib ${Boost_LIBRARIES})
   endif()
 endfunction(SINGLESOURCE_EXECUTABLE)
 
