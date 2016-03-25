@@ -36,7 +36,7 @@ INPUT_TO_PARAMETER_FACTOR     :    1000 ;
 
 # config values for using python
 FILESEP                      : ${FILESEP} ;
-PYPATH                       : ${PYPATH} ;
+PYPATH                       : ${PYTHON_EXECUTABLE} ;
 
 # config values for the showcontours debugging facilities (requires python)
 SHOWCONTOURS_SCRIPTPATH      : ${SHOWCONTOURS_SCRIPTPATH} ;
