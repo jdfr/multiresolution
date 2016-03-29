@@ -82,16 +82,17 @@ if (USE_PYTHON OR GENERATE_EXECUTABLE)
   message("PLEASE MAKE SURE TO USE A CONFIGURATION FILE WITH CORRECT DEFINITIONS ${MSG}")
 endif()
 
-if(EXISTS ${SRC}/../clipper)
-  set(CLIPPER_BASE_DIR ${SRC}/../clipper)
-else()
-  #as far as I understand, this will enable users of cmake-gui to set this directory
-  set(CLIPPER_BASE_DIR "" CACHE PATH "path to clipper library")
+set(CLIPPER_BASE_DIR "" CACHE PATH "tweaked clipper/iopaths base dir")
+if("${CLIPPER_BASE_DIR}" STREQUAL "")
+  if (EXISTS ${SRC}/../clipper)
+    set(CLIPPER_BASE_DIR ${SRC}/../clipper)
+  else()
+    message(FATAL_ERROR "Please set the variable CLIPPER_BASE_DIR to the base path to the clipper/iopaths directory")
+  endif()
 endif()
 
 #as far as I understand, this will enable users of cmake-gui to set this directory
 set(Boost_INCLUDE_DIR "" CACHE PATH "path to boost library")
-
 if("${Boost_INCLUDE_DIR}" STREQUAL "")
   #try to find boost! first, let's see if we have it in the parent directory
   if(EXISTS ${SRC}/../boost/boost)
