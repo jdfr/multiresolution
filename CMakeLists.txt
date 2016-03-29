@@ -256,7 +256,7 @@ endif()
 if(NOT "${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
   ADD_LIBRARY(miniboostlib STATIC
       ${BOOST_PROGRAMOPTIONS_DIR}/cmdline.cpp
-      ${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
+      #${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
       ${BOOST_PROGRAMOPTIONS_DIR}/options_description.cpp
       ${BOOST_PROGRAMOPTIONS_DIR}/parsers.cpp
       ${BOOST_PROGRAMOPTIONS_DIR}/variables_map.cpp
