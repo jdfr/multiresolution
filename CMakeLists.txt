@@ -1,13 +1,13 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.9)
 
 option(ENABLE_SLICER_LOGGING "enable slicer debug output to file" ON) #this option has to be coordinated with the one used in the slicer!!!!
+
 option(USE_PYTHON_DEBUG      "add support for viewing contours in python for debugging" ON)
 option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
 option(GENERATE_LIBRARY      "generate shared library"  ON)
 option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
-option(SET_CONFIGURE_FILE    "generate example configuration files (the variables PYTHON_EXECUTABLE and INITIAL_MESH_FILE must be set!!!)" ON)
-option(GENERATE_CS_INTERFACE "generate the C# client of the DLL shared library (only in Visual Studio)" ON)
-option(GENERATE_CS_AUTOCAD   "generate a .NET AutoCAD plugin that uses the C# client (only in Visual Studio, requires the AutoCAD SDK to be installed, and the paths to AutoCAD to be defined)" ON)
+option(GENERATE_CS_INTERFACE "generate the C# client of the DLL shared library (only in Visual Studio)" ${GENERATE_LIBRARY})
+option(GENERATE_CS_AUTOCAD   "generate a .NET AutoCAD plugin that uses the C# client (only in Visual Studio, requires the AutoCAD SDK to be installed, and the paths to AutoCAD to be defined)" ${GENERATE_CS_INTERFACE})
 option(GENERATE_SVGCONVERTER "generate svg converter executable"  ON)
 option(GENERATE_DXFCONVERTER "generate dxf converter executable"  ON)
 option(GENERATE_NANOCONVERTER "generate nanoscribe converter executable"  ON)
@@ -17,7 +17,14 @@ option(GENERATE_FILEFILTER   "generate filter for paths files"  ON)
 option(GENERATE_FILEINFO     "generate info dumper for paths files"  ON)
 option(GENERATE_FILEUNION    "generate tool to merge several paths files into one"  ON)
 option(GENERATE_FILETOUCH    "generate slice header setter for paths files"  ON)
+
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
+if(GENERATE_LIBRARY OR GENERATE_EXECUTABLE)
+  set(GENERATE_LIBRARY_OR_EXECUTABLE ON)
+else()
+  set(GENERATE_LIBRARY_OR_EXECUTABLE OFF)
+endif()
+option(SET_CONFIGURE_FILE    "generate example configuration files (the variables PYTHON_EXECUTABLE and INITIAL_MESH_FILE must be set!!!)" ${GENERATE_LIBRARY_OR_EXECUTABLE})
 
 set(SRC "${CMAKE_CURRENT_SOURCE_DIR}")
 

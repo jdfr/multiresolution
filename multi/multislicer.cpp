@@ -243,7 +243,7 @@ bool Multislicer::generateToolPath(size_t k, bool nextProcessSameKind, clp::Path
     }
 
     //SHOWCONTOURS(*spec->global.config, "contour, toolpath before and after snap", &contour, &beforesnap, &temp_toolpath);
-    //add to the end the initial point of each contour in the toolpath (this is unconditionally necessary to make the interface with the company's c# app to work seamlessly for open and closed paths, but it is also necessary to correctly operate with the toolpath as a set of open paths in clipperlib)
+    //add to the end the initial point of each contour in the toolpath (this is necessary to correctly operate with the toolpaths as a set of open paths in clipperlib, but also for proper toolpath output)
     applyToPaths<copyOpenToClosedPath, ReserveCapacity>(temp_toolpath, toolpaths);
     return true;
 }
@@ -692,9 +692,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
             /*the order IS important (start_near is a side-effected configuration value),
             and should be the same as the output order in the gcode pipeline (alternatively,
-            if the gcode pipeline can reorder arbitrarily both kinds of objects
-            (currently the company's AutoCAD app does not), this should be completely redesigned
-            (and probably deferred until actual gcode creation)*/
+            if the gcode pipeline can reorder arbitrarily both kinds of objects,
+            (some back-ends may not) this should be completely redesigned (and probably deferred until actual gcode creation)*/
             if (!LUMP_CONTOURS_AND_INFILLINGS_TOGETHER) {
                 if (use_infillings) {
                     //INVARIANT: add_medialaxis_now is false
