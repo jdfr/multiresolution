@@ -380,6 +380,7 @@ SINGLESOURCE_EXECUTABLE(GENERATE_SVGCONVERTER  multiresolution_svgconverter apps
 SINGLESOURCE_EXECUTABLE(GENERATE_DXFCONVERTER  multiresolution_dxfconverter apps/dxf.cpp        dxfconv)
 SINGLESOURCE_EXECUTABLE(GENERATE_NANOCONVERTER multiresolution_nanoscribe   apps/nanoscribe.cpp nanoconv)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEFILTER    multiresolution_filefilter   apps/filter.cpp     filterp)
+SINGLESOURCE_EXECUTABLE(GENERATE_FILESPLITTER  multiresolution_filesplitter apps/splitter.cpp   splitterp)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEINFO      multiresolution_fileinfo     apps/info.cpp       infop)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILEUNION     multiresolution_fileunion    apps/union.cpp      unionp)
 SINGLESOURCE_EXECUTABLE(GENERATE_FILETOUCH     multiresolution_filetouch    apps/touch.cpp      touchp)
