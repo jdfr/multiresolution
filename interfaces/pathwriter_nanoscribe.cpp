@@ -346,7 +346,7 @@ NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(MultiSpec &spec, Si
         double eps = epsilon * nanoconfigs[i]->factor_internal_to_input;
         return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], std::move(filename), eps, generic_ntool, generic_z);
     };
-    setup(spec, callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
+    setup((int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }
 
 bool writeSquare(FILE *f, clp::Path square, double factor) {

@@ -1,7 +1,8 @@
 #ifndef PATHSPLITTER_HEADER
 #define PATHSPLITTER_HEADER
 
-#include "spec.hpp"
+#include "common.hpp"
+#include "config.hpp"
 
 /*to write an object in a machine that works in chunks (i.e. nanoscribe),
 we must divide it in small blocks. The blocks are cuboids, placed in a
@@ -43,11 +44,11 @@ public:
     int numx, numy; //matrix sizes
     bool angle90;
     PathSplitterConfig config;
-    PathSplitter(PathSplitterConfig _config, MultiSpec *_spec = NULL) : config(std::move(_config)), setup_done(false), spec(_spec) {}
+    PathSplitter(PathSplitterConfig _config, Configuration *_cfg = NULL) : config(std::move(_config)), setup_done(false), cfg(_cfg) {}
     bool setup();
     bool processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling);
 protected:
-    MultiSpec *spec;
+    Configuration *cfg;
     clp::Clipper clipper;
     double sinangle;
     bool setup_done;

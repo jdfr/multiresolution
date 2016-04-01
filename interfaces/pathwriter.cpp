@@ -100,9 +100,9 @@ bool PathsFileWriter::close() {
     return ok;
 }
 
-bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+bool SplittingPathWriter::setup(int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
     filename = std::move(file);
-    numtools = (int)_spec.numspecs;
+    numtools = ntools;
     isopen   = false;
     //make sanity checks
     if (splitterconfs.empty()) {
@@ -131,7 +131,7 @@ bool SplittingPathWriter::setup(MultiSpec &_spec, SplittingSubPathWriterCreator 
             prefix = filename; //assign each iteration because the state takes ownership of the string
         }
 
-        states.emplace_back(prefix, std::move(*conf));// , &_spec);
+        states.emplace_back(prefix, std::move(*conf));// , _cfg);
         auto &splitter   = states.back().splitter;
         auto &subwriters = states.back().subwriters;
 

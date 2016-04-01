@@ -42,7 +42,7 @@ typedef struct SplittingPathWriterState {
     PathSplitter splitter;
     std::string filename_prefix;
     Matrix<std::shared_ptr<PathWriter>> subwriters;
-    SplittingPathWriterState(std::string prefix, PathSplitterConfig config, MultiSpec *spec = NULL) : splitter(std::move(config), spec), filename_prefix(std::move(prefix)) {}
+    SplittingPathWriterState(std::string prefix, PathSplitterConfig config, Configuration *cfg = NULL) : splitter(std::move(config), cfg), filename_prefix(std::move(prefix)) {}
 } SplittingPathWriterState;
 
 //this class splits the Paths it receives in a checkerboard pattern, then passes the pieces to a matrix of PathWriters,
@@ -50,7 +50,8 @@ typedef struct SplittingPathWriterState {
 class SplittingPathWriter : public PathWriter {
 public:
     //either a single PathSplitterConfig, or one for each tool
-    SplittingPathWriter(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(_spec, callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
+    SplittingPathWriter(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup((int)_spec.numspecs, _spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
+    SplittingPathWriter(int numtools,     SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(numtools,            NULL,                      callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
     virtual ~SplittingPathWriter() { close(); }
     virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
@@ -58,7 +59,7 @@ public:
     virtual bool finishAfterClose() { return true; } //this method will get called after closing all subwritters, if everything is OK up to that point
 protected:
     SplittingPathWriter() {} //this constructor is to be used by subclasses
-    bool setup(MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
+    bool setup(int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
     std::vector<SplittingPathWriterState> states; //one state for each PathSplitterConfig
     int numtools;
     bool justone;

@@ -64,13 +64,13 @@ bool PathSplitter::setup() {
             }
         }
     }
-    if (spec != NULL) {
+    if (cfg != NULL) {
         clp::Paths squares;
         for (auto &encl : buffer.data) {
             squares.push_back(encl.originalSquare);
             squares.back().push_back(squares.back().front());
         }
-        SHOWCONTOURS(*spec->global.config, "PathSplitter squares", &squares);
+        SHOWCONTOURS(*cfg, "PathSplitter squares", &squares);
     }
     singlex    = numx == 1;
     singley    = numy == 1;
