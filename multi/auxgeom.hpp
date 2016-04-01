@@ -213,6 +213,12 @@ typedef struct BBox {
     clp::cInt miny;
     clp::cInt maxy;
     BBox(clp::cInt _minx = 0, clp::cInt _maxx = 0, clp::cInt _miny = 0, clp::cInt _maxy = 0) : minx(_minx), maxx(_maxx), miny(_miny), maxy(_maxy) {}
+    void merge(BBox &second) {
+        minx = std::min(minx, second.minx);
+        miny = std::min(miny, second.miny);
+        maxx = std::max(maxx, second.maxx);
+        maxy = std::max(maxy, second.maxy);
+    }
     Transformation fitToInt32();
 } BBox;
 BBox getBB(clp::Path &path);
