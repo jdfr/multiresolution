@@ -57,6 +57,7 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
 
 template<typename T> bool PathWriterMultiFile<T>::start() {
     if (!this->isopen) {
+        addExtension(filename, extension);
         if (!static_cast<T*>(this)->startWriter()) return false;
     }
     return true;
