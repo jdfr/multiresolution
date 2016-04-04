@@ -36,7 +36,7 @@ protected:
     bool isOpen, f_already_open, numRecordsSet;
 };
 
-typedef std::function<std::shared_ptr<PathWriter>(int, PathSplitter&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
+typedef std::function<std::shared_ptr<PathWriter>(int, PathSplitter&, std::string&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
 
 typedef struct SplittingPathWriterState {
     PathSplitter splitter;

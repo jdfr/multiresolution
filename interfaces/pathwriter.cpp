@@ -149,8 +149,8 @@ bool SplittingPathWriter::setup(int ntools, Configuration *_cfg, SplittingSubPat
         int num0y = (int)std::ceil(std::log10(numy-1));
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
-                std::string newfile = str(states.back().filename_prefix, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), y);
-                subwriters.at(x, y) = callback(n, splitter, std::move(newfile), generic_type, generic_ntool, generic_z);
+                std::string suffix = str(".N", n, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), y);
+                subwriters.at(x, y) = callback(n, splitter, filename, std::move(suffix), generic_type, generic_ntool, generic_z);
             }
         }
     }

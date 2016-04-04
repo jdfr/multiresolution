@@ -341,10 +341,10 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
 NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
     nanoconfigs = std::move(_nanoconfigs);
     double epsilon = spec.global.z_epsilon;
-    SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string filename, bool generic_type, bool generic_ntool, bool generic_z) {
+    SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string &filename, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
         int i = nanoconfigs.size() == 1 ? 0 : idx;
         double eps = epsilon * nanoconfigs[i]->factor_internal_to_input;
-        return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], std::move(filename), eps, generic_ntool, generic_z);
+        return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z);
     };
     setup((int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }

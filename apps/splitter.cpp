@@ -160,9 +160,10 @@ int main(int argc, const char** argv) {
     const bool generic_type  = true;
     const bool generic_ntool = true;
     const bool generic_z     = true;
-    SplittingPathWriter writer(numtools, (SplittingSubPathWriterCreator)[header](int idx, PathSplitter& splitter, std::string fname, bool generic_type, bool generic_ntool, bool generic_z) {
-                return std::make_shared<PathsFileWriter>(std::move(fname), (FILE*)NULL, header, PATHFORMAT_INT64);
-            }, std::move(conf), outputPattern, generic_type, generic_ntool, generic_z);
+    SplittingSubPathWriterCreator callback = [header](int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+        return std::make_shared<PathsFileWriter>(fname+suffix, (FILE*)NULL, header, PATHFORMAT_INT64);
+    };
+    SplittingPathWriter writer(numtools, callback, std::move(conf), outputPattern, generic_type, generic_ntool, generic_z);
 
     err = processFile(pathsfilename, writer);
     if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
