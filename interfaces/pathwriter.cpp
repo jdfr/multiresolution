@@ -32,6 +32,60 @@ bool PathWriter::close() {
     throw std::runtime_error("Base method PathWriter::close() should never be called!");
 }
 
+bool PathWriterDelegator::start() {
+    if (!isopen) {
+        for (auto &sub : subs) {
+            if (!sub.second->start()) {
+                err = str("Error starting subwriter ", sub.second->filename, ": ", sub.second->err);
+                return false;
+            }
+        }
+        isopen = true;
+    }
+    return true;
+}
+
+bool PathWriterDelegator::close() {
+    bool ok = true;
+    for (auto &sub : subs) {
+        if (!sub.second->close()) {
+            err = str("Error closing subwriter ", sub.second->filename, ": ", sub.second->err);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+bool PathWriterDelegator::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+    if (!isopen) {
+        if (!start()) return false;
+    }
+    for (auto &sub : subs) {
+        if (sub.first(type, ntool, z)) {
+            if (!sub.second->writePaths(paths, type, radius, ntool, z, scaling, isClosed)) {
+                err = str("Error writing paths to ", sub.second->filename, ": ", sub.second->err);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool PathWriterDelegator::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+    if (!isopen) {
+        if (!start()) return false;
+    }
+    for (auto &sub : subs) {
+        if (sub.first(type, ntool, z)) {
+            if (!sub.second->writeEnclosedPaths(encl, type, radius, ntool, z, scaling, isClosed)) {
+                err = str("Error writing paths to ", sub.second->filename, ": ", sub.second->err);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool PathsFileWriter::start() {
     if (!isOpen) {
         if (numRecordsSet && (numRecords < 0)) {

@@ -19,6 +19,25 @@ public:
     virtual bool close();
 };
 
+typedef std::function<bool(int, int, double)> PathFilter;
+
+class PathWriterDelegator : public PathWriter {
+public:
+    PathWriterDelegator(std::string fname) : isopen(false) { filename = std::move(fname); }
+    virtual ~PathWriterDelegator() { close(); }
+    virtual bool start(); //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
+    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    //this method has to be implemented only for subclasses that are used by SplittingPathWriter. It should really be on a separate EnclosedPathWriter subclass,
+    //but then, we would like some objects to inherit both from EnclosedPathWriter and from the subclass PathWriterMultiFile, creating the need for virtual inheritance
+    //(and that does not make much sense when we are using CRTP in PathWriterMultiFile, after all).
+    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool close();
+    void addWriter(std::shared_ptr<PathWriter> writer, PathFilter filter) { subs.emplace_back(std::move(filter), std::move(writer)); };
+protected:
+    std::vector<std::pair<PathFilter, std::shared_ptr<PathWriter>>> subs;
+    bool isopen;
+};
+
 //this class implements a PathWriter using the file format specified by FileHeader and SliceHeader
 class PathsFileWriter : public PathWriter {
 public:
