@@ -46,6 +46,8 @@ class ParserLocalAndGlobal {
 public:
     std::shared_ptr<po::options_description> globalDescription;
     std::shared_ptr<po::options_description>  localDescription;
+    po::variables_map globalOptions;
+    OptionsByToolSpec perProcessOptions;
     ParserLocalAndGlobal(std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) : globalDescription(std::move(g)), localDescription(std::move(l)) {}
     void setParsedOptions(po::parsed_options globals, po::parsed_options allPerProcess);
     void setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin);
@@ -53,8 +55,6 @@ public:
     virtual void perProcessCallback(int k, po::variables_map &processOptions) {}; //redefined in subclasses
     virtual void finishCallback() {};
 protected:
-    po::variables_map globalOptions;
-    OptionsByToolSpec perProcessOptions;
     void separatePerProcess(po::parsed_options &allPerProcess);
 };
 

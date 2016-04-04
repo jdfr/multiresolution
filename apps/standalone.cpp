@@ -13,6 +13,99 @@
 #    include "sliceviewer.hpp"
 #endif
 
+//this class handles the *save-in-grid options, which must be coordinated acroos global and per-process options
+class ParserStandaloneLocalAndGlobal : public ParserAllLocalAndGlobal {
+public:
+    PathSplitterConfigs saveInGridConf;
+    ParserStandaloneLocalAndGlobal(MetricFactors &f, MultiSpec &s, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l, NanoscribeSpec *n = NULL) : ParserAllLocalAndGlobal(f, s, std::move(g), std::move(l), n) {}
+    virtual void globalCallback();
+    virtual void perProcessCallback(int k, po::variables_map &processOptions);
+    virtual void finishCallback();
+    template<bool GLOBAL> static void addOptions(po::options_description &opts);
+protected:
+    void parseSaveInGridOption(po::variables_map &vm, const char *opt_name, int idx, PathSplitterConfig &config);
+    bool saveGlobal;
+    std::vector<bool> saveLocals;
+};
+
+template<bool GLOBAL> void ParserStandaloneLocalAndGlobal::addOptions(po::options_description &opts) {
+    if (GLOBAL) {
+        opts.add_options()
+            ("save-in-grid",
+            po::value<std::vector<double>>()->multitoken(),
+            "If this option is specified, --save, --dxf-toopaths and --dxf-contours will generate additional output: the output toolpaths and contours will also be partitioned according to a grid, generating an additonal file for each partition in the grid. The naming convention for these files is to append to the file name the suffix .X.Y, where X and Y are the grid coordinates of each partition element. Essentially, this is a tool to use a similar partitioning scheme as the one used for Nanoscribe output. This is useful to solve the surface alignment problem: often, the surface of the material or the base is not perfectly parallel to the XY plane of movement, so large shapes at very high resolution will fail to be properly printed or machined. An easy workaround for this problem is to partition the shape, so that the surface can be approximately aligned for each element of the partition (Nanoscribe machines take this approach). This option takes a list of parameters: DISPLACEMENT MARGIN [ORIGIN_X ORIGIN_Y]. The shape will be divided in a grid of squares of size DISPLACEMENT+MARGIN, overlapping by MARGIN on each side. If ORIGIN_X and ORIGIN_Y are provided, they represent the origin of coordinates of the grid. Otherwise, the grid will be generated to fit the input mesh file, with rectangular partition elements of size possibly smaler than DISPLACEMENT+MARGIN. All parameters are in mesh file units (usually millimeters). This option will use the same grid for all processes. If you want to use different grid parameters for each process, please see the help of the per-process option --pp--save-in-grid.")
+            ;
+    } else {
+        opts.add_options()
+            ("pp-save-in-grid",
+            po::value<std::vector<double>>()->multitoken(),
+            "This is a per-process version of the option --save-in-grid (please see the help for --save-in-grid for details on why use this option, and a description of the parameters it takes). If --save-in-grid is used, all processes will be partitioned with the same grid. If --pp--save-in-grid is used, one --pp--save-in-grid must be specified for each process, so that each process will have a different grid. Usage of --save-in-grid and pp-save-in-grid are mutually exclusive.")
+            ;
+
+    }
+}
+
+void ParserStandaloneLocalAndGlobal::globalCallback() {
+    ParserAllLocalAndGlobal::globalCallback();
+    saveInGridConf.clear();
+    saveLocals.clear();
+    saveLocals.resize(spec.numspecs, false);
+    saveGlobal = globalOptions.count("save-in-grid") != 0;
+    if (saveGlobal) {
+        saveInGridConf.resize(1);
+        parseSaveInGridOption(globalOptions, "save-in-grid", -1, saveInGridConf[0]);
+    }
+}
+
+void ParserStandaloneLocalAndGlobal::perProcessCallback(int k, po::variables_map &processOptions) {
+    ParserAllLocalAndGlobal::perProcessCallback(k, processOptions);
+    saveLocals[k] = processOptions.count("pp-save-in-grid") != 0;
+    if (saveLocals[k]) {
+        if (saveGlobal) throw po::error(str("error: if option --save-in-grid is used, --pp--save-in-grid cannot be used for any process, but it was specified for process ", k, "!"));
+        if (saveInGridConf.empty()) {
+            saveInGridConf.resize(spec.numspecs);
+        }
+        parseSaveInGridOption(processOptions, "pp-save-in-grid", k, saveInGridConf[k]);
+    }
+}
+
+void ParserStandaloneLocalAndGlobal::finishCallback() {
+    ParserAllLocalAndGlobal::finishCallback();
+    if (!saveGlobal) {
+        bool first = saveLocals[0];
+        for (auto local = saveLocals.begin() + 1; local != saveLocals.end(); ++local) {
+            if (*local != first) {
+                int n = (int)(local - saveLocals.begin());
+                throw po::error(str("If --pp--save-in-grid is specified for one process, it must be specified FOR ALL processes! It was specifed for process ", first ? 0 : n, " but not for process ", first ? n : 0, "!"));
+            }
+        }
+    }
+}
+
+void ParserStandaloneLocalAndGlobal::parseSaveInGridOption(po::variables_map &vm, const char *opt_name, int idx, PathSplitterConfig &conf) {
+    const std::vector<double> &vals = vm[opt_name].as<std::vector<double>>();
+    int s = (int)vals.size();
+    if (!((s == 2) || (s == 4)))  {
+        std::string opt = std::string(opt_name);
+        if (idx >= 0) {
+            opt += str(" (for process ", idx, ")");
+        }
+        throw po::error(str("option --", opt, " requires either 2 or 4 arguments, but it has ", s));
+    }
+    double displacement = vals[0];
+    double margin       = vals[1];
+    conf.wallAngle      = 90; //no need to set conf[0].zmin
+    conf.displacement.X =
+    conf.displacement.Y = (clp::cInt)(vals[0] * factors.input_to_internal);
+    conf.margin         = (clp::cInt)(vals[1] * factors.input_to_internal);
+    conf.useOrigin      = s==4;
+    if (conf.useOrigin) {
+        conf.origin.X   = (clp::cInt)(vals[2] * factors.input_to_internal);
+        conf.origin.Y   = (clp::cInt)(vals[3] * factors.input_to_internal);
+    }
+}
+
+
 typedef struct MainSpec {
     std::vector<const char *>                             opts_toparse_names;
     std::vector<std::shared_ptr<po::options_description>> opts_toshow;
@@ -95,22 +188,25 @@ MainSpec::MainSpec() {
     globalOptsIdx  = (int)opts_toparse.size();
     opts_toparse_names.push_back("Global options");
     opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(    globalOptionsGenerator(YesAddNano, NotAddResponseFile))));
+    ParserStandaloneLocalAndGlobal::addOptions<true >(*opts_toparse.back());
 
     perProcOptsIdx = (int)opts_toparse.size();
     opts_toparse_names.push_back("Per-process options");
     opts_toparse.emplace_back(std::make_shared<po::options_description>(std::move(perProcessOptionsGenerator(YesAddNano))));
+    ParserStandaloneLocalAndGlobal::addOptions<false>(*opts_toparse.back());
 
     for (auto &opt : opts_toparse) {
         opts_toparse_naked.push_back(opt.get());
     }
 
     opts_toshow.push_back(opts_toparse[mainOptsIdx]);
-    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(NotAddNano, NotAddResponseFile))));
-    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(NotAddNano))));
     opts_toshow.push_back(opts_toparse[dxfOptsIdx]);
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(        globalOptionsGenerator(NotAddNano, NotAddResponseFile))));
+    ParserStandaloneLocalAndGlobal::addOptions<true >(*opts_toshow.back());
+    opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    perProcessOptionsGenerator(NotAddNano))));
+    ParserStandaloneLocalAndGlobal::addOptions<false>(*opts_toshow.back());
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(    nanoGlobalOptionsGenerator())));
     opts_toshow.emplace_back(std::make_shared<po::options_description>(std::move(nanoPerProcessOptionsGenerator())));
-
 }
 
 void MainSpec::slurpAllOptions(int argc, const char ** argv) {
@@ -135,6 +231,14 @@ int Main(int argc, const char** argv) {
     bool saveDXF  = false;
     bool saveNano = false;
     int64 saveFormat;
+
+    DXFWMode dxfmode;
+    bool dxf_generic_by_ntool, dxf_generic_by_z;
+    std::string dxf_filename_toolpaths, dxf_filename_contours;
+
+    double epsilon_meshunits;
+
+    PathSplitterConfigs saveInGridConf;
 
     std::string singleoutputfilename;
 
@@ -190,10 +294,13 @@ int Main(int argc, const char** argv) {
         if (!factors.err.empty()) { fprintf(stderr, factors.err.c_str()); return -1; }
 
         {
-            ParserAllLocalAndGlobal parser(factors, *multispec, mainSpec.opts_toparse[mainSpec.globalOptsIdx], mainSpec.opts_toparse[mainSpec.perProcOptsIdx], &nanoSpec);
+            ParserStandaloneLocalAndGlobal parser(factors, *multispec, mainSpec.opts_toparse[mainSpec.globalOptsIdx], mainSpec.opts_toparse[mainSpec.perProcOptsIdx], &nanoSpec);
             parser.setParsedOptions(mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx]);
+            saveInGridConf = std::move(parser.saveInGridConf);
         }
         saveNano = !dryrun && nanoSpec.useSpec;
+
+        epsilon_meshunits = multispec->global.z_epsilon*factors.internal_to_input;
 
         if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
 
@@ -244,28 +351,35 @@ int Main(int argc, const char** argv) {
                 fprintf(stderr, "DXF format parameter must start by either 'b' (binary) or 'a' (ascii): <%s>\n", dxfm.c_str());
                 return -1;
             }
-            bool generic_by_ntool = dxfOpts.count("dxf-by-tool") == 0;
-            bool generic_by_z = dxfOpts.count("dxf-by-z") == 0;
-            auto dxf_modes = { "dxf-toolpaths", "dxf-contours" };
-            std::vector<std::shared_ptr<PathWriter>>* specific_pathwriter_vector[] = { &pathwriters_toolpath, &pathwriters_contour };
+            dxf_generic_by_ntool = dxfOpts.count("dxf-by-tool") == 0;
+            dxf_generic_by_z     = dxfOpts.count("dxf-by-z")    == 0;
+            if (dxfOpts.count("dxf-toolpaths")) dxf_filename_toolpaths = std::move(dxfOpts["dxf-toolpaths"].as<std::string>());
+            if (dxfOpts.count("dxf-contours"))  dxf_filename_contours  = std::move(dxfOpts["dxf-contours" ].as<std::string>());
 
-            int k = 0;
-            for (auto &dxf_mode : dxf_modes) {
-                if (dxfOpts.count(dxf_mode) != 0) {
-                    std::shared_ptr<PathWriter> w;
-                    std::string fn = std::move(dxfOpts[dxf_mode].as<std::string>());
-                    const bool generic_type = true;
-                    double epsilon = multispec->global.z_epsilon*factors.internal_to_input;
-                    if (dxfmode == DXFAscii) {
-                        w = std::make_shared<DXFAsciiPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
-                    } else {
-                        w = std::make_shared<DXFBinaryPathWriter>(std::move(fn), epsilon, generic_type, generic_by_ntool, generic_by_z);
-                    }
-                    pathwriters_arefiles.push_back(w);
-                    specific_pathwriter_vector[k]->push_back(w);
-                    saveDXF = true;
+            const bool generic_type = true;
+
+            auto createDXFWriter = [dxfmode, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z](std::string &fname) {
+                std::shared_ptr<PathWriter> w;
+                if (dxfmode == DXFAscii) {
+                    w = std::make_shared<DXFAsciiPathWriter >(fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
+                } else {
+                    w = std::make_shared<DXFBinaryPathWriter>(fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
                 }
-                ++k;
+                return w;
+            };
+
+            if (!dxf_filename_toolpaths.empty()) {
+                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_toolpaths);
+                pathwriters_arefiles.push_back(w);
+                pathwriters_toolpath.push_back(w);
+                saveDXF = true;
+            }
+
+            if (!dxf_filename_contours.empty()) {
+                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_contours);
+                pathwriters_arefiles.push_back(w);
+                pathwriters_contour .push_back(w);
+                saveDXF = true;
             }
         }
 
@@ -311,15 +425,17 @@ int Main(int argc, const char** argv) {
         return -1;
     }
 
+    clp::IntPoint bbmn, bbmx;
+    bbmn.X = (clp::cInt) (minx * factors.input_to_internal);
+    bbmn.Y = (clp::cInt) (miny * factors.input_to_internal);
+    bbmx.X = (clp::cInt) (maxx * factors.input_to_internal);
+    bbmx.Y = (clp::cInt) (maxx * factors.input_to_internal);
+
     if (nanoSpec.useSpec) {
         //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
-        clp::IntPoint mn((clp::cInt)(minx * factors.input_to_internal),
-                         (clp::cInt)(miny * factors.input_to_internal)),
-                      mx((clp::cInt)(maxx * factors.input_to_internal),
-                         (clp::cInt)(maxy * factors.input_to_internal));
         for (auto & split : nanoSpec.splits) {
-            split.min = mn;
-            split.max = mx;
+            split.min = bbmn;
+            split.max = bbmx;
         }
         std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(*multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
         pathwriters_arefiles.push_back(pathsplitter);
@@ -330,8 +446,9 @@ int Main(int argc, const char** argv) {
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
     int numtools = (int)multispec->numspecs;
-    if (save || show) {
-        std::shared_ptr<FileHeader> header = std::make_shared<FileHeader>(*multispec, factors);
+    {
+        std::shared_ptr<FileHeader> header;
+        if (save || show) header = std::make_shared<FileHeader>(*multispec, factors);
 #ifdef STANDALONE_USEPYTHON
         if (show) {
             pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
@@ -348,6 +465,51 @@ int Main(int argc, const char** argv) {
             if (alsoContours) {
                 pathwriters_raw    .push_back(pathwriters_arefiles.back());
                 pathwriters_contour.push_back(pathwriters_arefiles.back());
+            }
+        }
+
+        if (!saveInGridConf.empty() && (save || saveDXF)) {
+            for (auto &conf : saveInGridConf) {
+                conf.min = bbmn;
+                conf.max = bbmx;
+            }
+            SplittingSubPathWriterCreator callback = [save, saveFormat, saveDXF, dxfmode, &dxf_filename_toolpaths, &dxf_filename_contours, epsilon_meshunits, &singleoutputfilename, &header](int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+                std::shared_ptr<PathWriter> d = std::make_shared<PathWriterDelegator>(fname+suffix);
+                PathWriterDelegator *delegator = static_cast<PathWriterDelegator*>(d.get());
+                if (save) {
+                    delegator->addWriter(std::make_shared<PathsFileWriter>(singleoutputfilename+suffix, (FILE*)NULL, header, saveFormat), [](int type, int ntool, double z) {return true; });
+                }
+                if (saveDXF) {
+                    auto dxfCreator = [dxfmode, epsilon_meshunits, generic_type, generic_ntool, generic_z](std::string fn) {
+                        std::shared_ptr<PathWriter> w;
+                        if (dxfmode == DXFAscii) {
+                            w = std::make_shared<DXFAsciiPathWriter >(fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
+                        } else {
+                            w = std::make_shared<DXFBinaryPathWriter>(fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
+                        }
+                        return w;
+                    };
+                    if (!dxf_filename_toolpaths.empty()) {
+                        delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix), [](int type, int ntool, double z) { return type == PATHTYPE_TOOLPATH; });
+                    }
+                    if (!dxf_filename_contours.empty()) {
+                        delegator->addWriter(dxfCreator(dxf_filename_contours + suffix), [](int type, int ntool, double z) { return type == PATHTYPE_PROCESSED_CONTOUR; });
+                    }
+                }
+                return d;
+            };
+            bool saveInGridConf_justone = saveInGridConf.size() == 1;
+            std::shared_ptr<PathWriter> w = std::make_shared<SplittingPathWriter>(*multispec, callback, saveInGridConf, "SPLITTING_DELEGATOR");
+            pathwriters_arefiles.push_back(w);
+            if (save || (!dxf_filename_toolpaths.empty())) {
+                pathwriters_toolpath.push_back(w);
+            }
+            if (save && alsoContours && saveInGridConf_justone) {
+                //if we do not include !saveInGridConf_justone in the condition, errors will happen down the writer pipeline. It is just easier not writing raw contours in this case...
+                pathwriters_raw.push_back(w);
+            }
+            if ((save && alsoContours) || (!dxf_filename_contours.empty())) {
+                pathwriters_contour.push_back(w);
             }
         }
     }
