@@ -42,6 +42,18 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
         (PREFIXNANONAME("nano-global-file-end"),
             po::value<std::string>()->value_name("script"),
             PREFIXNANODESC("GWL commands to be written at the end of each GLOBAL GWL file"))
+        (PREFIXNANONAME("nano-perimeters-begin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when starting a section writing perimeter toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters and infillings."))
+        (PREFIXNANONAME("nano-perimeters-end"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when finishing a section writing perimeter toolpaths."))
+        (PREFIXNANONAME("nano-infillings-begin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when starting a section writing perimeter toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters and infillings."))
+        (PREFIXNANONAME("nano-infillings-end"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when finishing a section writing perimeter toolpaths."))
         (PREFIXNANONAME("nano-scanmode"),
             po::value<std::string>()->value_name("piezo|galvo"),
             PREFIXNANODESC("nanoscribe scan mode, either 'piezo' or 'galvo'. Default value is 'galvo'"))
@@ -450,6 +462,22 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-global-file-end"))) {
         if (!string.empty()) string += "\n";
         context->spec.nanos[idx]->endGlobalScript   = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-perimeters-begin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->beginPerimeters = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-perimeters-end"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->endPerimeters   = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-infillings-begin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->beginInfillings = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-infillings-end"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->endInfillings   = std::move(string);
     }
 
     NanoscribeScanMode scanmode;

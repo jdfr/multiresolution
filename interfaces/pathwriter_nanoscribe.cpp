@@ -51,6 +51,13 @@ bool SimpleNanoscribePathWriter::startWriter() {
 bool SimpleNanoscribePathWriter::endWriter() {
     if (this->isopen && this->err.empty()) {
         if (!firstTime) {
+            std::string *endtype = lastType == PATHTYPE_TOOLPATH_PERIMETER ? &config->endPerimeters : &config->endInfillings;
+            if (!endtype->empty()) {
+                if (fputs(endtype->c_str(), this->f) < 0) {
+                    err = str("error: cannot write ", lastType == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
+                    return false;
+                }
+            }
             std::string &end = (*config->toolChanges)[lastNTool].second;
             if (!end.empty()) {
                 if (fputs(end.c_str(), this->f) < 0) {
@@ -176,20 +183,9 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
                         return false;
                     }
                     if (firstTime) {
-                        if (!config->beginScript.empty()) {
-                            if (fputs(config->beginScript.c_str(), this->f) < 0) {
-                                err = str("error: cannot write script beggining for file ", this->filename);
-                                return false;
-                            }
-                        }
-                        const char *scanmode = config->scanmode == GalvoScanMode ? "GalvoScanMode\n" : "PiezoScanMode\n";
-                        if (fprintf(this->f, scanmode) < 0) {
-                            err = str("error: cannot write scan mode for file ", this->filename);
-                            return false;
-                        }
                     }
                 }
-                if (!setupNToolAndZ(firstTime, ntool, z)) return false;
+                if (!setupStateForToolpaths(firstTime, type, ntool, z)) return false;
                 //offset paths by stage position
                 for (auto &path : paths) {
                     for (auto &point : path) {
@@ -257,14 +253,15 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
             }
         }
         firstTime = false;
-        lastZ = z;
+        lastZ     = z;
         lastNTool = ntool;
+        lastType  = type;
         square.clear();
     }
     return true;
 }
 
-bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, double z) {
+bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type, int ntool, double z) {
     double nanoscribe_z = 0.0;
     int z_block = 0;
     bool differentZ = z != lastZ;
@@ -280,6 +277,17 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
         }
     }
     if (firstTime) {
+        if (!config->beginScript.empty()) {
+            if (fputs(config->beginScript.c_str(), this->f) < 0) {
+                err = str("error: cannot write script beggining for file ", this->filename);
+                return false;
+            }
+        }
+        const char *scanmode = config->scanmode == GalvoScanMode ? "GalvoScanMode\n" : "PiezoScanMode\n";
+        if (fprintf(this->f, scanmode) < 0) {
+            err = str("error: cannot write scan mode for file ", this->filename);
+            return false;
+        }
         std::string &begin = (*config->toolChanges)[ntool].first;
         if (!begin.empty()) {
             if (fputs(begin.c_str(), this->f) < 0) {
@@ -298,6 +306,13 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
         if (z != 0) {
             if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - current_z_block*NanoscribePiezoRange) < 0) {
                 err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
+                return false;
+            }
+        }
+        std::string *begintype = type == PATHTYPE_TOOLPATH_PERIMETER ? &config->beginPerimeters : &config->beginInfillings;
+        if (!begintype->empty()) {
+            if (fputs(begintype->c_str(), this->f) < 0) {
+                err = str("error: cannot write ", type == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
                 return false;
             }
         }
@@ -331,6 +346,28 @@ bool SimpleNanoscribePathWriter::setupNToolAndZ(bool firstTime, int ntool, doubl
             if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - nanoscribe_last_z) < 0) {
                 err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
                 return false;
+            }
+        }
+        if (type != lastType) {
+            std::string *begin, *end;
+            if (type == PATHTYPE_TOOLPATH_PERIMETER) {
+                begin = &config->beginPerimeters;
+                end   = &config->endInfillings;
+            } else { //type == PATHTYPE_TOOLPATH_INFILLING
+                begin = &config->beginInfillings;
+                end   = &config->endPerimeters;
+            }
+            if (!end->empty()) {
+                if (fputs(end->c_str(), this->f) < 0) {
+                    err = str("error: cannot write ", lastType == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " ending for tool ", lastNTool, " in file ", this->filename);
+                    return false;
+                }
+            }
+            if (!begin->empty()) {
+                if (fputs(begin->c_str(), this->f) < 0) {
+                    err = str("error: cannot write ",     type == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
+                    return false;
+                }
             }
         }
     }
