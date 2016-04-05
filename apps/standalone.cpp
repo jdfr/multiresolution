@@ -172,10 +172,12 @@ MainSpec::MainSpec() {
     opts_toparse.back()->add_options()
         ("dxf-toolpaths",
             po::value<std::string>()->value_name("filename"),
-            "Output toolpaths in a *.dxf file")
+            "Output perimeter and infilling toolpaths in a *.dxf file")
         ("dxf-contours",
             po::value<std::string>()->value_name("filename"),
             "Output contours in a *.dxf file (if both this and --dxf-toolpaths are specified, the file names MUST be different)")
+        ("dxf-separate-infillings",
+            "If this option is specified, and --dxf-toolpaths is also specified, toolpaths are written to two different files: one for perimeter toolpaths, other for infilling toolpaths. The files will have a common file name and different suffixes.")
         ("dxf-format",
             po::value<std::string>()->default_value("binary"),
             "Format of the output DXF files: either 'binary' or 'ascii'. The default is 'binary'")
@@ -233,7 +235,7 @@ int Main(int argc, const char** argv) {
     int64 saveFormat;
 
     DXFWMode dxfmode;
-    bool dxf_generic_by_ntool, dxf_generic_by_z;
+    bool dxf_generic_by_typeT, dxf_generic_by_ntool, dxf_generic_by_z;
     std::string dxf_filename_toolpaths, dxf_filename_contours;
 
     double epsilon_meshunits;
@@ -351,14 +353,13 @@ int Main(int argc, const char** argv) {
                 fprintf(stderr, "DXF format parameter must start by either 'b' (binary) or 'a' (ascii): <%s>\n", dxfm.c_str());
                 return -1;
             }
-            dxf_generic_by_ntool = dxfOpts.count("dxf-by-tool") == 0;
-            dxf_generic_by_z     = dxfOpts.count("dxf-by-z")    == 0;
+            dxf_generic_by_ntool = dxfOpts.count("dxf-by-tool")             == 0;
+            dxf_generic_by_z     = dxfOpts.count("dxf-by-z")                == 0;
+            dxf_generic_by_typeT = dxfOpts.count("dxf-separate-infillings") == 0;
             if (dxfOpts.count("dxf-toolpaths")) dxf_filename_toolpaths = std::move(dxfOpts["dxf-toolpaths"].as<std::string>());
             if (dxfOpts.count("dxf-contours"))  dxf_filename_contours  = std::move(dxfOpts["dxf-contours" ].as<std::string>());
 
-            const bool generic_type = true;
-
-            auto createDXFWriter = [dxfmode, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z](std::string &fname) {
+            auto createDXFWriter = [dxfmode, epsilon_meshunits, dxf_generic_by_ntool, dxf_generic_by_z](std::string &fname, bool generic_type) {
                 std::shared_ptr<PathWriter> w;
                 if (dxfmode == DXFAscii) {
                     w = std::make_shared<DXFAsciiPathWriter >(fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
@@ -369,14 +370,14 @@ int Main(int argc, const char** argv) {
             };
 
             if (!dxf_filename_toolpaths.empty()) {
-                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_toolpaths);
+                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_toolpaths, dxf_generic_by_typeT);
                 pathwriters_arefiles.push_back(w);
                 pathwriters_toolpath.push_back(w);
                 saveDXF = true;
             }
 
             if (!dxf_filename_contours.empty()) {
-                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_contours);
+                std::shared_ptr<PathWriter> w = createDXFWriter(dxf_filename_contours, true);
                 pathwriters_arefiles.push_back(w);
                 pathwriters_contour .push_back(w);
                 saveDXF = true;
@@ -473,14 +474,18 @@ int Main(int argc, const char** argv) {
                 conf.min = bbmn;
                 conf.max = bbmx;
             }
-            SplittingSubPathWriterCreator callback = [save, saveFormat, saveDXF, dxfmode, &dxf_filename_toolpaths, &dxf_filename_contours, epsilon_meshunits, &singleoutputfilename, &header](int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+            SplittingSubPathWriterCreator callback =
+                [save, saveFormat, saveDXF, dxfmode, dxf_generic_by_typeT, &dxf_filename_toolpaths, &dxf_filename_contours, epsilon_meshunits, &singleoutputfilename, &header]
+
+                (int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+
                 std::shared_ptr<PathWriter> d = std::make_shared<PathWriterDelegator>(fname+suffix);
                 PathWriterDelegator *delegator = static_cast<PathWriterDelegator*>(d.get());
                 if (save) {
                     delegator->addWriter(std::make_shared<PathsFileWriter>(singleoutputfilename+suffix, (FILE*)NULL, header, saveFormat), [](int type, int ntool, double z) {return true; });
                 }
                 if (saveDXF) {
-                    auto dxfCreator = [dxfmode, epsilon_meshunits, generic_type, generic_ntool, generic_z](std::string fn) {
+                    auto dxfCreator = [dxfmode, epsilon_meshunits, generic_ntool, generic_z](std::string fn, bool generic_type) {
                         std::shared_ptr<PathWriter> w;
                         if (dxfmode == DXFAscii) {
                             w = std::make_shared<DXFAsciiPathWriter >(fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
@@ -490,11 +495,11 @@ int Main(int argc, const char** argv) {
                         return w;
                     };
                     if (!dxf_filename_toolpaths.empty()) {
-                        delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix),
+                        delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix, dxf_generic_by_typeT),
                             [](int type, int ntool, double z) { return (type == PATHTYPE_TOOLPATH_PERIMETER) || (type == PATHTYPE_TOOLPATH_INFILLING); });
                     }
                     if (!dxf_filename_contours.empty()) {
-                        delegator->addWriter(dxfCreator(dxf_filename_contours + suffix),
+                        delegator->addWriter(dxfCreator(dxf_filename_contours + suffix, true),
                             [](int type, int ntool, double z) { return type == PATHTYPE_PROCESSED_CONTOUR; });
                     }
                 }
