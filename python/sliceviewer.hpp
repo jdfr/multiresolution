@@ -13,7 +13,7 @@ public:
         //scriptPath = workdir + filesep + config.getValue("SLICEVIEWER_SCRIPTNAME");
         scriptPath = config.getValue("SLICEVIEWER_SCRIPTNAME");
         execpath = config.getValue("PYPATH");
-        if (viewparams != NULL) {
+        if ((viewparams != NULL) && (strlen(viewparams)!=0)) {
             use_custom_formatting = true;
             custom_formatting = viewparams;
         } else {
