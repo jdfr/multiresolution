@@ -24,7 +24,7 @@ typedef struct VoxelFileSpec {
     double zrad;
     double zheight;
     double z_applicationPoint;
-    VoxelFileSpec() {}
+    VoxelFileSpec() = default;
     VoxelFileSpec(double x) : xrad(x) {}
     VoxelFileSpec(double x, double z, double h, double ap) : xrad(x), zrad(z), zheight(h), z_applicationPoint(ap) {}
 } VoxelFileSpec;
@@ -35,7 +35,7 @@ typedef struct FileHeader {
     int64 useSched;
     std::vector<VoxelFileSpec> voxels;
     int64 numRecords;
-    FileHeader() {}
+    FileHeader() = default;
     FileHeader(MultiSpec &multispec, MetricFactors &factors) { buildFrom(multispec, factors); }
     void buildFrom(MultiSpec &multispec, MetricFactors &factors);
     int numRecordsOffset();
@@ -53,7 +53,7 @@ typedef struct SliceHeader {
     double scaling;
     static const int numFields = 7;
     std::vector<T64> alldata;
-    SliceHeader() {}
+    SliceHeader() = default;
     SliceHeader(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling) { setTo(paths, mode, _type, _ntool, _z, _saveFormat, _scaling); }
     void setTo(clp::Paths &paths, PathCloseMode mode, int64 _type, int64 _ntool, double _z, int64 _saveFormat, double _scaling);
     void setBuffer();

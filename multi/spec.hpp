@@ -25,7 +25,7 @@ typedef struct FeedbackSpec {
 //    -by a gradual fattening, setting flag useGradualFattening to true
 //    -for high-res features rich in narrow negative details (such as gratings), setting the flag erasegHighResNegDetails may be useful. This can be used on its own, or combined with any of the two previous methods.
 typedef struct FatteningSpec {
-    typedef struct GradualStep { double radiusFactor; double inflateFactor; GradualStep() {}; GradualStep(double rad, double inf) : radiusFactor(rad), inflateFactor(inf) {} } GradualStep;
+    typedef struct GradualStep { double radiusFactor; double inflateFactor; GradualStep() = default; GradualStep(double rad, double inf) : radiusFactor(rad), inflateFactor(inf) {} } GradualStep;
     bool eraseHighResNegDetails;
     bool useGradualFattening;
     clp::cInt eraseHighResNegDetails_radius;
@@ -44,7 +44,7 @@ typedef struct AddSubSpec {
 } AddSubSpec;
 
 typedef struct GlobalSpec {
-    typedef struct ZNTool { double z; unsigned int ntool; ZNTool() {}; ZNTool(double _z, unsigned int _ntool) : z(_z), ntool(_ntool) {} } ZNTool;
+    typedef struct ZNTool { double z; unsigned int ntool; ZNTool() = default; ZNTool(double _z, unsigned int _ntool) : z(_z), ntool(_ntool) {} } ZNTool;
     //currently, having a reference to the Configuration here is useful only for debugging with showContours
     std::shared_ptr<Configuration> config;
     SchedulerMode schedMode;
@@ -83,7 +83,7 @@ public:
     //      ==sliceHeight for the upper end,
     double applicationPoint;
     double remainder;
-    VerticalProfile() {}
+    VerticalProfile() = default;
     VerticalProfile(double sh, double ap) { setup(sh, ap); }
     void setup(double sh, double ap) { sliceHeight = sh; applicationPoint = ap; remainder = sh - ap; }
     //zshift is supposed to be measured from applicationPoint, so it should be computed with care  if applicationPoint!=sliceHeight/2

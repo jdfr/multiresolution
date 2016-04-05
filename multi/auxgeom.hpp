@@ -159,7 +159,7 @@ template<DoTransform fun> void transformAllPaths(Transformation &t, HoledPolygon
 
 typedef struct Point3D {
     double x, y, z;
-    Point3D() {}
+    Point3D() = default;
     Point3D(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
 } Point3D;
 
