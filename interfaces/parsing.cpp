@@ -195,6 +195,8 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("infill-medialaxis-radius",
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
+        ("lump-all-toolpaths-together",
+            "Perimeters and infillings are toolpaths, but each one is output separately, to enable possible optimizations in the printing of the infillings (which do not need to be as accurate as perimeters). However, if this option is specified, all infillings will be lumped together with the perimeters for this tool, and all will be output as perimeters (even if they are infillings). This happens *before* motion planning is applied, so in that case motion planning is applied to all toolpaths together.")
         ;
     if (useNano==YesAddNano) nanoOptionsGenerator<false>(opts);
     return opts;
@@ -654,6 +656,8 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     double scale = factors.doparamscale ? factors.param_to_internal : 0.0;
 
     spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
+
+    spec.pp[k].lumpToolpathsTogether = vm.count("lump-all-toolpaths-together") != 0;
 
     bool radxpresent = vm.count("radx") != 0;
     if (radxpresent) {

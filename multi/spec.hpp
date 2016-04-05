@@ -151,6 +151,7 @@ typedef struct PerProcessSpec {
     bool      applysnap;             // flag to snap to grid
     bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
     bool      addInternalClearance;  // make sure that the toolpath is smooth enough to not write over itself
+    bool      lumpToolpathsTogether; //instad of outputting perimeters and infillings separately, lump all them as perimeters
     std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
     std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
     InfillingMode infillingMode;     //how to deal with infillings

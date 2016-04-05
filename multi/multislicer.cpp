@@ -667,13 +667,26 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             intermediate_medialaxis_perimeter->clear();
         }
 
+        bool dolump = spec->pp[k].lumpToolpathsTogether;
+
         if (!accumInfillingsHolder.empty()) {
-            MOVETO(accumInfillingsHolder, output.itoolpaths);
+            if (dolump) {
+                MOVETO(accumInfillingsHolder, output.ptoolpaths);
+            } else {
+                MOVETO(accumInfillingsHolder, output.itoolpaths);
+            }
             accumInfillingsHolder.clear();
         }
         if (!intermediate_medialaxis_infilling->empty()) {
-            MOVETO(*intermediate_medialaxis_infilling, output.itoolpaths);
+            if (dolump) {
+                MOVETO(*intermediate_medialaxis_infilling, output.ptoolpaths);
+            } else {
+                MOVETO(*intermediate_medialaxis_infilling, output.itoolpaths);
+            }
             intermediate_medialaxis_infilling->clear();
+        }
+        if (dolump) {
+            output.itoolpaths.clear();
         }
 
         if (spec->global.applyMotionPlanner) {
