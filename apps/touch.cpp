@@ -34,9 +34,10 @@ std::string touchFile(const char * filename, const char *outputname, std::vector
 
         for (auto &spec : specs) {
             if (spec.filterspec.matchesHeader(sliceheader)) {
-                if (spec.setspec.usentool) sliceheader.ntool = spec.setspec.ntool;
-                if (spec.setspec.usetype)  sliceheader.type  = spec.setspec.type;
-                if (spec.setspec.usez)     sliceheader.z     = spec.setspec.z;
+                if (spec.setspec.usentool)    sliceheader.ntool = spec.setspec.ntool;
+                if (spec.setspec.usetoolpath) sliceheader.type  = PATHTYPE_TOOLPATH_PERIMETER;
+                if (spec.setspec.usetype)     sliceheader.type  = spec.setspec.type;
+                if (spec.setspec.usez)        sliceheader.z     = spec.setspec.z;
                 sliceheader.setBuffer();
                 if (!spec.adds.empty()) {
                     auto num = spec.adds.size()*sizeof(double);
@@ -94,13 +95,13 @@ const char *ERR =
 "    -PATHSFILENAME_INPUT and PATHSFILENAME_OUTPUT are required (input/output paths file names).\n\n"
 "    -a sequence of specifications 'set SPEC_MATCH to SPEC_SET [add SPEC_ADD]', where SPEC_MATCH and SPEC_SET are lists of pairs 'SPECTYPE VALUE'.\n\n"
 "        -SPECTYPE can be either 'type', 'ntool', or 'z'.\n\n"
-"            -If SPECTYPE is 'type', VALUE can be either r[aw], c[ontour] or t[oolpath].\n\n"
+"            -If SPECTYPE is 'type', VALUE can be either r[aw], c[ontour], p[erimeter] (perimeter toolpath type), i[nfilling] (infilling toolpath type), or t[oolpath] (any toolpath type).\n\n"
 "            -If SPECTYPE is 'ntool', VALUE is an integer.\n\n"
 "            -If SPECTYPE is 'z', VALUE is a floating point number.\n\n"
 "        -If 'add SPEC_ADD' is specified (it is optional), a list of values are appended to the header of the matching headers. these values are specified by a list of pairs 'ADDTYPE VALUE'.\n\n"
 "            -If ADDTYPE is 'double', VALUE is a floating point number.\n\n"
 "            -If ADDTYPE is 'integer', VALUE is a 64-bit signed integer.\n\n"
-"This tool modifies the headers of records: if they match a SPEC_MATCH set of specifications, their values are set according to the cooresponding SPEC_SET and SPEC_ADD.\n\n";
+"This tool modifies the headers of records: if they match a SPEC_MATCH set of specifications, their values are set according to the corresponding SPEC_SET and SPEC_ADD. If the corresponding SPEC_SET specifies 'type t[oolpath]', it will be implicitly translated to 'type perimeter'.\n\n";
 
 void printError(ParamReader &rd) {
     rd.fmt << ERR;

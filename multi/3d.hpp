@@ -12,7 +12,6 @@ typedef struct ResultSingleTool : public virtual SingleProcessOutput {
     bool has_err;
     bool used;
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
-    ResultSingleTool(clp::Paths &&_contours, clp::Paths &&_toolpaths, clp::Paths &&_infillingAreas, double _z, int _ntool, int _idx, bool _alsoInfillingAreas) : SingleProcessOutput(std::move(_contours), std::move(_toolpaths), std::move(_infillingAreas), _alsoInfillingAreas), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
 } ResultSingleTool;

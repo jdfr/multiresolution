@@ -136,7 +136,7 @@ const char *ERR =
 "    -SVGFILENAME is required (output svg file name).\n\n"
 "    -the color inside the contours can be either 'black' or 'white'.\n\n"
 "    -if 'first' is specified, only the first eligible match is converted to SVG. If 'all' is specified, all eligible paths are converted, creating one SVG file for each one.\n\n"
-"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], c[ontour] or t[oolpath], for the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
+"    -Multiple pairs SPECTYPE VALUE can be specified. SPECTYPE can be either 'type', 'ntool', or 'z'. For the first, VALUE can be either r[aw], c[ontour], p[erimeter] (perimeter toolpath type), i[nfilling] (infilling toolpath type) or t[oolpath] (any toolpath type). For the second, it is an integer, for the latter, a floating-point value. If several pairs have the same SPECTYPE, the latter overwrites the former. If nothing is specified, all paths are eligible.\n\n"
 "This tool writes as a SVG file the first record in PATHSFILENAME that matches the specification.\n\n";
 
 void printError(ParamReader &rd) {

@@ -12,7 +12,7 @@ typedef struct SingleProcessOutput {
     std::string err;
     clp::Paths contours;
     clp::Paths contoursToShow;
-    clp::Paths toolpaths;
+    clp::Paths ptoolpaths, itoolpaths;
     clp::Paths infillingAreas;
     std::vector<clp::Paths> medialAxisIndependentContours;
     std::vector<clp::Paths> infillingsIndependentContours;
@@ -22,7 +22,6 @@ typedef struct SingleProcessOutput {
     SingleProcessOutput(SingleProcessOutput &&x) = default;
 #endif
     SingleProcessOutput(std::string _err) : err(_err) {};
-    SingleProcessOutput(clp::Paths &&_contours, clp::Paths &&_toolpaths, clp::Paths &&_infillingAreas, bool _alsoInfillingAreas) : contours(std::move(_contours)), toolpaths(std::move(_toolpaths)), infillingAreas(std::move(_infillingAreas)), alsoInfillingAreas(_alsoInfillingAreas) {};
 } SingleProcessOutput;
 
 class Multislicer {

@@ -168,7 +168,8 @@ bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int 
         return ret;
     }
     if (spec->global.substractiveOuter) {
-        removeOuter(output.toolpaths, spec->global.outerLimitX, spec->global.outerLimitY);
+        removeOuter(output.ptoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
+        removeOuter(output.itoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
         if (output.alsoInfillingAreas) {
             removeOuter(output.infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
         }

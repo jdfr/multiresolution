@@ -47,11 +47,11 @@ SLICEVIEWER_SCRIPTPATH       : ${SLICEVIEWER_SCRIPTPATH} ;
 SLICEVIEWER_SCRIPTNAME       : slicesViewer.py ;
 
 #this has to be a one liner, however long it may get!
-SLICEVIEWER_2D_FORMATTING    : dict( raw=dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor='#cccccc', edgecolor='none', lw=1)), contour=[dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor=fc, edgecolor='none', lw=1)) for fc in ['#440000', '#000044', '#004400']], toolpath=[dict(usepatches=False, patchstyle=None, linestyle=dict(linewidths=2, colors=c)) for c in ['#ff0000', '#0000ff', '#00ff00']] ) ;
+SLICEVIEWER_2D_FORMATTING    : dict( raw=dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor='#cccccc', edgecolor='none', lw=1)), contour=[dict(usepatches=True, linestyle=None, patchstyle=dict(facecolor=fc, edgecolor='none', lw=1)) for fc in ['#ffaaaa', '#aaaaff', '#aaffaa']], perimeter=[dict(usepatches=False, patchstyle=None, linestyle=dict(linewidths=2, colors=c)) for c in ['#ff0000', '#0000ff', '#00ff00']], infilling=[dict(usepatches=False, patchstyle=None, linestyle=dict(linewidths=2, colors=c)) for c in ['#440000', '#000044', '#004400']] ) ;
 
 #this has to be a one liner, however long it may get!
-SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(0.4,0,0),(0,0.4,0),(0,0,0.4)]], toolpath=[dict(mode='line', args=dict(color=c, line_width=2)) for c in [(1,0,0),(0,1,0),(0,0,1)]] ) ;
+SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(1,0.66,0.66),(0.66,1,0.66),(0.66,0.66,1)]], perimeter=[dict(mode='line', args=dict(color=c, line_width=2)) for c in [(1,0,0),(0,1,0),(0,0,1)]], infilling=[dict(mode='line', args=dict(color=c, line_width=2)) for c in [(0.25,0,0),(0,0.25,0),(0,0,0.25)]] ) ;
 
 #this has to be a one liner, however long it may get!
-_SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(0.4,0,0),(0,0.4,0),(0,0,0.4)]], toolpath=[dict(mode='tube', args=dict(color=c)) for c in [(1,0,0),(0,1,0),(0,0,1)]] ) ;
+_SLICEVIEWER_3D_FORMATTING    : dict( raw=dict(mode='contour', args=dict(color=(0.7, 0.7, 0.7), line_width=2)), contour=[dict(mode='contour', args=dict(color=c, line_width=2)) for c in [(1,0.66,0.66),(0.66,1,0.66),(0.66,0.66,1)]], perimeter=[dict(mode='tube', args=dict(color=c)) for c in [(1,0,0),(0,1,0),(0,0,1)]], infilling=[dict(mode='tube', args=dict(color=c)) for c in [(0.25,0,0),(0,0.25,0),(0,0,0.25)]] ) ;
 

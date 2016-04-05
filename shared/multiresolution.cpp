@@ -280,11 +280,13 @@ inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, Outpu
     switch (pathtype) {
     case PathInfillingAreas:
         paths = &result->res[ntool]->infillingAreas; break;
+    case PathToolPathPerimeter:
+        paths = &result->res[ntool]->ptoolpaths; break;
+    case PathToolPathInfilling:
+        paths = &result->res[ntool]->itoolpaths; break;
     case PathContour:
-        paths = &result->res[ntool]->contoursToShow; break;
-    case PathToolPath:
     default:
-        paths = &result->res[ntool]->toolpaths; break;
+        paths = &result->res[ntool]->contoursToShow; break;
     }
     return paths;
 }

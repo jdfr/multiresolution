@@ -86,7 +86,8 @@ std::string processFile(const char *pathsfilename, SplittingPathWriter &writer) 
             break;
         }
 
-        writer.writePaths(output, (int)sliceheader.type, 0, (int)sliceheader.ntool, sliceheader.z, sliceheader.scaling, sliceheader.type != PATHTYPE_TOOLPATH);
+        bool isClosed = !((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING));
+        writer.writePaths(output, (int)sliceheader.type, 0, (int)sliceheader.ntool, sliceheader.z, sliceheader.scaling, isClosed);
 
         output.clear();
     }

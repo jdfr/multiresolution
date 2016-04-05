@@ -27,11 +27,11 @@ namespace AutoCADMulti {
 
         main.singletonClear singletonClear=null;
 
-        private static readonly byte VALM = 128;
-        private static readonly byte VALG = 200;
         private static readonly byte VALT = 255;
+        private static readonly byte VALG = 200;
+        private static readonly byte VALM = 128;
         private static readonly byte VALC = 64;
-        private static readonly Color[] processColors = {
+        private static readonly Color[] perimeterColors = {
           Color.FromRgb(VALT, 0, 0),
           Color.FromRgb(0, VALT, 0),
           Color.FromRgb(0, 0, VALT),
@@ -39,8 +39,14 @@ namespace AutoCADMulti {
           Color.FromRgb(VALT, 0, VALT),
           Color.FromRgb(0, VALT, VALT),
         };
-        private static readonly Color otherColor = Color.FromRgb(VALM, VALM, VALM);
-        private static readonly Color globalContourColor = Color.FromRgb(VALG, VALG, VALG);
+        private static readonly Color[] infillingColors = {
+          Color.FromRgb(VALM, 0, 0),
+          Color.FromRgb(0, VALM, 0),
+          Color.FromRgb(0, 0, VALM),
+          Color.FromRgb(VALM, VALM, 0),
+          Color.FromRgb(VALM, 0, VALM),
+          Color.FromRgb(0, VALM, VALM),
+        };
         private static readonly Color[] contourColors = {
           Color.FromRgb(VALC, 0, 0),
           Color.FromRgb(0, VALC, 0),
@@ -49,6 +55,8 @@ namespace AutoCADMulti {
           Color.FromRgb(VALC, 0, VALC),
           Color.FromRgb(0, VALC, VALC),
         };
+        private static readonly Color globalContourColor = Color.FromRgb(VALG, VALG, VALG);
+        private static readonly Color otherColor         = Color.FromRgb(VALM, VALM, VALM);
 
         public maindialog(main.singletonClear singletonClear) {
             try {
@@ -224,7 +232,9 @@ namespace AutoCADMulti {
                         SI.LoadPathInfo info = new SI.LoadPathInfo();
                         bool onlyToolpaths = loadGetOnlyToolpaths.Checked;
                         while (loader.readNextPathFromFile(ref isDouble, ref info)) {
-                            if (onlyToolpaths && info.type != (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH) {
+                            if (onlyToolpaths && !(
+                                (info.type == (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_PERIMETER) ||
+                                (info.type == (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_INFILLING))) {
                                 continue;
                             }
                             if (isDouble) {
@@ -241,14 +251,16 @@ namespace AutoCADMulti {
                             }
                             Color col;
                             switch (info.type) {
-                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH:
-                                    col = processColors[ntool]; break;
                                 case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_RAW_CONTOUR:
-                                    col = globalContourColor;   break;
+                                    col = globalContourColor;     break;
                                 case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_PROCESSED_CONTOUR:
-                                    col = contourColors[ntool]; break;
+                                    col = contourColors[ntool];   break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_PERIMETER:
+                                    col = perimeterColors[ntool]; break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_INFILLING:
+                                    col = infillingColors[ntool]; break;
                                 default:
-                                    col = otherColor;           break; //this should never happen
+                                    col = otherColor;             break; //this should never happen
                             }
                             for (int i = 0; i < info.numpaths; i++) {
                                 int numpoints = *(info.numpointsArray++);
@@ -395,9 +407,10 @@ namespace AutoCADMulti {
                 readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathInfillingAreas, processColors, tr, btr);
             }*/
             //something like the commented code above would be necessary to retrieve the areas to infill, if we were going to handle infillings outside of the multislicing engine
-            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPath, processColors, tr, btr);
+            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPathPerimeter, perimeterColors, tr, btr);
+            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPathInfilling, infillingColors, tr, btr);
             if (!alsoContours) return;
-            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathContour,  contourColors, tr, btr);
+            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathContour,             contourColors, tr, btr);
         }
 
         //2d simple multislicing

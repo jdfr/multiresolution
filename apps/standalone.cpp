@@ -490,10 +490,12 @@ int Main(int argc, const char** argv) {
                         return w;
                     };
                     if (!dxf_filename_toolpaths.empty()) {
-                        delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix), [](int type, int ntool, double z) { return type == PATHTYPE_TOOLPATH; });
+                        delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix),
+                            [](int type, int ntool, double z) { return (type == PATHTYPE_TOOLPATH_PERIMETER) || (type == PATHTYPE_TOOLPATH_INFILLING); });
                     }
                     if (!dxf_filename_contours.empty()) {
-                        delegator->addWriter(dxfCreator(dxf_filename_contours + suffix), [](int type, int ntool, double z) { return type == PATHTYPE_PROCESSED_CONTOUR; });
+                        delegator->addWriter(dxfCreator(dxf_filename_contours + suffix),
+                            [](int type, int ntool, double z) { return type == PATHTYPE_PROCESSED_CONTOUR; });
                     }
                 }
                 return d;
@@ -570,7 +572,7 @@ int Main(int argc, const char** argv) {
             slicer->sendZs(&(rawZs.front()), schednuminputslices);
 
             if (show) {
-                numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 2 : schednumoutputslices;
+                numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 3 : schednumoutputslices * 2;
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
 
@@ -620,8 +622,12 @@ int Main(int argc, const char** argv) {
                     double zscaled = single->z                          * factors.internal_to_input;
                     double rad     = multispec->pp[single->ntool].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
-                        if (!pathwriter->writePaths(single->toolpaths, PATHTYPE_TOOLPATH, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
-                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
+                        if (!pathwriter->writePaths(single->ptoolpaths, PATHTYPE_TOOLPATH_PERIMETER, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing perimeter toolpaths for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
+                            return -1;
+                        }
+                        if (!pathwriter->writePaths(single->itoolpaths, PATHTYPE_TOOLPATH_INFILLING, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing infilling toolpaths for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
                             return -1;
                         }
                     }
@@ -669,7 +675,7 @@ int Main(int argc, const char** argv) {
 
             if (show) {
                 //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
-                numoutputs = alsoContours ? numsteps + numresults * 2 : numresults;
+                numoutputs = alsoContours ? numsteps + numresults * 3 : numresults * 2;
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
 
@@ -716,8 +722,12 @@ int Main(int argc, const char** argv) {
                 for (int k = 0; k < numtools; ++k) {
                     double rad     = multispec->pp[k].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
-                        if (!pathwriter->writePaths(ress[k]->toolpaths, PATHTYPE_TOOLPATH, rad, k, zs[i], factors.internal_to_input, false)) {
-                            fprintf(stderr, "Error writing toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
+                        if (!pathwriter->writePaths(ress[k]->ptoolpaths, PATHTYPE_TOOLPATH_PERIMETER, rad, k, zs[i], factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing perimeter toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
+                            return -1;
+                        }
+                        if (!pathwriter->writePaths(ress[k]->itoolpaths, PATHTYPE_TOOLPATH_INFILLING, rad, k, zs[i], factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing infilling toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
                             return -1;
                         }
                     }

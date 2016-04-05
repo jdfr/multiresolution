@@ -37,10 +37,11 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
     const char * Type = "";
     if (!generic_for_type)  {
         switch (_type) {
-        case PATHTYPE_TOOLPATH:          Type = ".toolpaths"; break;
-        case PATHTYPE_PROCESSED_CONTOUR: Type = ".contour";   break;
-        case PATHTYPE_RAW_CONTOUR:       Type = ".raw";       break;
-        default:                         Type = ".unknown";
+        case PATHTYPE_RAW_CONTOUR:        Type = ".raw";       break;
+        case PATHTYPE_PROCESSED_CONTOUR:  Type = ".contour";   break;
+        case PATHTYPE_TOOLPATH_PERIMETER: Type = ".perimeter"; break;
+        case PATHTYPE_TOOLPATH_INFILLING: Type = ".infilling"; break;
+        default:                          Type = ".unknown";
         }
     }
     if (!generic_for_ntool) N = str(".N", _ntool);

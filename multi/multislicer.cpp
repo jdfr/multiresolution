@@ -375,7 +375,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
     erodedInfillingRadius = infillingRadius*(1 - spec->pp[k].infillingLineOverlap);
     infillingUseClearance = spec->pp[k].addInternalClearance;
     accumInfillingsHolder.clear();
-    accumInfillings = &accumInfillingsHolder;//&result.toolpaths[k]; //this gets inserted in real time
+    accumInfillings = &accumInfillingsHolder;//&result.itoolpaths[k]; //this gets inserted in real time
     infillingRecursive = spec->pp[k].infillingRecursive || (!spec->pp[k].medialAxisFactorsForInfillings.empty());
     switch (spec->pp[k].infillingMode) {
     case InfillingConcentric: {
@@ -484,9 +484,6 @@ void Multislicer::applyMedialAxisNotAggregated(size_t k, std::vector<double> &me
 //MULTISLICING LOGIC
 /////////////////////////////////////////////////
 
-//this is a flag for the logic of motion planning
-const bool LUMP_CONTOURS_AND_INFILLINGS_TOGETHER = true;
-
 bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
 
     //start boilerplate
@@ -511,7 +508,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
     infillingAreas->clear();
-    clp::Paths *intermediate_medialaxis;
+    clp::Paths *intermediate_medialaxis_perimeter, *intermediate_medialaxis_infilling;
 
     clp::Paths &lowres = AUX2;
     clp::Paths *contourToProcess;
@@ -550,10 +547,10 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     if (!spec->pp[k].computeToolpaths) {
         output.contours = *contourToProcess; //TODO: do not use deep copy if possible
         AUX4.clear();
-        intermediate_medialaxis = &AUX4; //this may be needed to avoid errors when computing the medial axis
+        intermediate_medialaxis_infilling = &AUX4; //this may be needed to avoid errors when computing the medial axis
     } else {
         clp::Paths &unprocessedToolPaths = AUX3;
-        if (!generateToolPath(k, nextProcessSameKind, *contourToProcess, output.toolpaths, unprocessedToolPaths, AUX4)) {
+        if (!generateToolPath(k, nextProcessSameKind, *contourToProcess, output.ptoolpaths, unprocessedToolPaths, AUX4)) {
             this->clear();
             return false;
         }
@@ -567,11 +564,11 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         bool discardCommonToolpaths = spec->useContoursAlreadyFilled(k);
 
         if (discardCommonToolpaths) {
-            doDiscardCommonToolPaths(k, output.toolpaths, contours_alreadyfilled, AUX4);
+            doDiscardCommonToolPaths(k, output.ptoolpaths, contours_alreadyfilled, AUX4);
         }
         if (nextProcessSameKind && CUSTOMINFILLINGS && spec->pp[k].infillingRecursive) {
             output.infillingsIndependentContours.resize(1);
-            offsetDo(offset, output.infillingsIndependentContours[0], (double)spec->pp[k].radius, output.toolpaths, clp::jtRound, clp::etOpenRound);
+            offsetDo(offset, output.infillingsIndependentContours[0], (double)spec->pp[k].radius, output.ptoolpaths, clp::jtRound, clp::etOpenRound);
         }
 
         //generate the infilling contour only if necessary
@@ -581,7 +578,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             if (discardCommonToolpaths) {
                 //this is more expensive than the alternative, but necessary for possibly open toolpaths
                 if (output.infillingsIndependentContours.empty()) {
-                    operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.toolpaths, (double)spec->pp[k].radius, &AUX4, (clp::Paths*)NULL);
+                    operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.ptoolpaths, (double)spec->pp[k].radius, &AUX4, (clp::Paths*)NULL);
                 } else {
                     clipperDo(clipper, *infillingAreas, clp::ctDifference, output.contours, output.infillingsIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
                 }
@@ -602,7 +599,7 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         }
 
         AUX4.clear();
-        intermediate_medialaxis = &AUX4;
+        intermediate_medialaxis_infilling = &AUX4;
 
         //if ((!output.infillingsIndependentContours.empty()) && (!spec->pp[k].medialAxisFactorsForInfillings.empty())) {
         if (nextProcessSameKind && CUSTOMINFILLINGS && (!spec->pp[k].medialAxisFactorsForInfillings.empty())) {
@@ -611,10 +608,13 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             //elsewhere in the code we use !infillingsIndependentContours.empty() as a test to see if we are doing recursive infillings, so we clear it to make sure we do not break that logic
             if (!spec->pp[k].infillingRecursive) output.infillingsIndependentContours.clear();
             //SHOWCONTOURS(*spec->global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
-            applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis);
+            applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis_infilling);
         }
 
     }
+
+    AUX2.clear();
+    intermediate_medialaxis_perimeter = &AUX2;
 
     if (!spec->pp[k].medialAxisFactors.empty()) {
 
@@ -625,8 +625,8 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         //SHOWCONTOURS(*spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
 
         //but now, apply the medial axis algorithm!!!!
-        applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis);
-        if (!spec->pp[k].computeToolpaths) intermediate_medialaxis->clear();
+        applyMedialAxisNotAggregated(k, spec->pp[k].medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis_perimeter);
+        if (!spec->pp[k].computeToolpaths) intermediate_medialaxis_perimeter->clear();
     }
 
     if (output.infillingsIndependentContours.empty() && nextProcessSameKind) {
@@ -661,51 +661,25 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         accordingly.
         it would also require to modify the motion planner to use the combination of HoledPolygons and infillings
         separated by HoledPolygon. Right now this is the workflow:
-
-        IF LUMP_CONTOURS_AND_INFILLINGS_TOGETHER:
-        -all is lumped together, then motion planning is done
-        ELSE IF THERE ARE NOT CUSTOM INFILLINGS:
-        -contours and medial axes are lumped together, then motion planning is done
-        ELSE
-        -contours are planned, then custom infillings and (if applicable) medial axes are lumped together and then motion planning is done for them
-        Cyclomatic complexity is quite big, redundant code is minimized
-
         */
-        bool use_infillings = CUSTOMINFILLINGS && !accumInfillingsHolder.empty();
-        bool use_medialaxis = !spec->pp[k].medialAxisFactors.empty() && !intermediate_medialaxis->empty();
-        bool add_medialaxis_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec->global.applyMotionPlanner || !use_infillings) && use_medialaxis;
-        bool add_infillings_now = (LUMP_CONTOURS_AND_INFILLINGS_TOGETHER || !spec->global.applyMotionPlanner) && use_infillings;
-        if (add_medialaxis_now) {
-            MOVETO(*intermediate_medialaxis, output.toolpaths);
-            intermediate_medialaxis->clear();
+        if (!intermediate_medialaxis_perimeter->empty()) {
+            MOVETO(*intermediate_medialaxis_perimeter, output.ptoolpaths);
+            intermediate_medialaxis_perimeter->clear();
         }
-        if (add_infillings_now) {
-            MOVETO(accumInfillingsHolder, output.toolpaths);
+
+        if (!accumInfillingsHolder.empty()) {
+            MOVETO(accumInfillingsHolder, output.itoolpaths);
             accumInfillingsHolder.clear();
+        }
+        if (!intermediate_medialaxis_infilling->empty()) {
+            MOVETO(*intermediate_medialaxis_infilling, output.itoolpaths);
+            intermediate_medialaxis_infilling->clear();
         }
 
         if (spec->global.applyMotionPlanner) {
-            //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this (and probably be ruined as well)
-
-            //trying to do the thing below does not feel very good
-            verySimpleMotionPlanner(spec->startState, PathOpen, output.toolpaths); //these are open toolpaths (contains a mix of open and actually closed ones)
-
-            /*the order IS important (start_near is a side-effected configuration value),
-            and should be the same as the output order in the gcode pipeline (alternatively,
-            if the gcode pipeline can reorder arbitrarily both kinds of objects,
-            (some back-ends may not) this should be completely redesigned (and probably deferred until actual gcode creation)*/
-            if (!LUMP_CONTOURS_AND_INFILLINGS_TOGETHER) {
-                if (use_infillings) {
-                    //INVARIANT: add_medialaxis_now is false
-                    if (!spec->pp[k].medialAxisFactors.empty()) {
-                        MOVETO(*intermediate_medialaxis, accumInfillingsHolder);
-                        intermediate_medialaxis->clear();
-                    }
-                    verySimpleMotionPlanner(spec->startState, PathOpen, accumInfillingsHolder);
-                    MOVETO(accumInfillingsHolder, output.toolpaths);
-                    accumInfillingsHolder.clear();
-                }
-            }
+            //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this
+            if (!output.ptoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.ptoolpaths);
+            if (!output.itoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.itoolpaths);
         }
     }
 
@@ -746,7 +720,8 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
         //SHOWCONTOURS(*spec->global.config, str("after_applying_process ", k), &contours_tofill, &(outputs[k]->contours));
         if (!ok) break;
         if (spec->global.substractiveOuter) {
-            removeOuter(outputs[k]->toolpaths,          spec->global.outerLimitX, spec->global.outerLimitY);
+            removeOuter(outputs[k]->ptoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
+            removeOuter(outputs[k]->itoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
             if (outputs[k]->alsoInfillingAreas) {
                 removeOuter(outputs[k]->infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
             }

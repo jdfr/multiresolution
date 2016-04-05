@@ -25,8 +25,8 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
         std::string err = sliceheader.readFromFile(f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
-        bool doProcess = ( toolpaths && (sliceheader.type == PATHTYPE_TOOLPATH)) ||
-                         (!toolpaths && (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR));
+        bool doProcess = ( toolpaths && ((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) ||
+                         (!toolpaths &&  (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR));
         if (!doProcess) {
             fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             continue;

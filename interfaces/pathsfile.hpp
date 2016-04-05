@@ -72,12 +72,13 @@ typedef struct PathInFileSpec {
     bool usetype;
     bool usentool;
     bool usez;
-    PathInFileSpec() : usetype(false), usentool(false), usez(false) {}
-    PathInFileSpec(int _type) : type(_type), usetype(true), usentool(false), usez(false) {}
-    PathInFileSpec(int _type, int _ntool) : type(_type), ntool(_ntool), usetype(true), usentool(true), usez(false) {}
-    PathInFileSpec(int _type, double _z) : type(_type), z(_z), usetype(true), usentool(false), usez(true) {}
-    PathInFileSpec(int _type, int _ntool, double _z) : type(_type), ntool(_ntool), z(_z), usetype(true), usentool(true), usez(true) {}
-    PathInFileSpec(double _z) : z(_z), usetype(false), usentool(false), usez(true) {}
+    bool usetoolpath;
+    PathInFileSpec() :                                                                    usetype(false), usentool(false), usez(false), usetoolpath(false) {}
+    PathInFileSpec(int _type) :                        type(_type),                       usetype(true),  usentool(false), usez(false), usetoolpath(false) {}
+    PathInFileSpec(int _type, int _ntool) :            type(_type), ntool(_ntool),        usetype(true),  usentool(true),  usez(false), usetoolpath(false) {}
+    PathInFileSpec(int _type, double _z) :             type(_type),                z(_z), usetype(true),  usentool(false), usez(true),  usetoolpath(false) {}
+    PathInFileSpec(int _type, int _ntool, double _z) : type(_type), ntool(_ntool), z(_z), usetype(true),  usentool(true),  usez(true),  usetoolpath(false) {}
+    PathInFileSpec(double _z) :                                                    z(_z), usetype(false), usentool(false), usez(true),  usetoolpath(false) {}
     //this function matches writeSlice()'s header
     bool matchesHeader(SliceHeader &h);
     //read at most 'maxtimes' specs (as much as possible if maxtimes<0). If furtherArgs is false, tries to consume all the remaining input until all is consumed, treating anything non-conformant as an error. If it is true, it stops if it cannot recognize an argument, to enable consumption of further arguments by other code

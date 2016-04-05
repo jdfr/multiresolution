@@ -19,7 +19,7 @@ template<typename Function> std::string processToolpaths(std::string &pathsfilen
         std::string err = sliceheader.readFromFile(f);
         if (!err.empty()) { fclose(f); return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
-        if (sliceheader.type != PATHTYPE_TOOLPATH) {
+        if (!((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) {
             fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             continue;
         }
@@ -235,7 +235,7 @@ int main(int argc, const char** argv) {
         auto saveToolpaths = [&pathsplitter, numtools](int idx, SliceHeader &header, clp::Paths &paths) {
             if (header.ntool < 0)         return str("Error: toolpath ", idx, " has negative ntool!\n");
             if (header.ntool >= numtools) return str("Error: toolpath ", idx, " has ntool ", header.ntool, "-th but command line arguments specified numtools=", numtools, "\n");
-            if (!pathsplitter.writePaths(paths, PATHTYPE_TOOLPATH, 0.0, (int)header.ntool, header.z, header.scaling, false)) return pathsplitter.err;
+            if (!pathsplitter.writePaths(paths, (int)header.type, 0.0, (int)header.ntool, header.z, header.scaling, false)) return pathsplitter.err;
             return std::string();
         };
 
