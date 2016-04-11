@@ -255,12 +255,11 @@ void AddPolyTreeToHPs(clp::PolyTree &pt, HoledPolygons &hps) {
         recursiveAddPolyTreeToHPs(*pt.Childs[i], hps);
 }
 
-void AddPathsToHPs(clp::Paths &paths, HoledPolygons &hps) {
-    ClipperLib::Clipper clipper;
-    
+void AddPathsToHPs(clp::Clipper &clipper, clp::Paths &paths, HoledPolygons &hps) {
     clipper.AddPaths(paths, clp::ptSubject, true);
     clp::PolyTree pt;
     clipper.Execute(clp::ctUnion, pt, clp::pftEvenOdd, clp::pftEvenOdd);
+    clipper.Clear();
     
     AddPolyTreeToHPs(pt, hps);
 }

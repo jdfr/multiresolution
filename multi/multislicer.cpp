@@ -360,7 +360,7 @@ bool Multislicer::processInfillingsConcentricRecursive(HoledPolygon &hp) {
     }
     offsetDo(offset, current, -erodedInfillingRadius, next, clp::jtRound, clp::etClosedPolygon);
     HoledPolygons subhps;
-    AddPathsToHPs(current, subhps);
+    AddPathsToHPs(clipper, current, subhps);
     smoothed = current = next = clp::Paths();
     for (auto subhp = subhps.begin(); subhp != subhps.end(); ++subhp) {
         --numconcentric;
@@ -380,7 +380,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
     switch (spec->pp[k].infillingMode) {
     case InfillingConcentric: {
         HoledPolygons hps;
-        AddPathsToHPs(infillingAreas, hps);
+        AddPathsToHPs(clipper, infillingAreas, hps);
         numconcentric = spec->pp[k].useMaxConcentricRecursive ? spec->pp[k].maxConcentricRecursive : std::numeric_limits<int>::max();
         //use the stepping grid for this process, but switch to snapSimple
         applySnapConcentricInfilling = spec->pp[k].applysnap;
@@ -398,7 +398,7 @@ bool Multislicer::processInfillings(size_t k, clp::Paths &infillingAreas, clp::P
             processInfillingsRectilinear(k, infillingAreas, getBB(infillingAreas), spec->pp[k].infillingMode == InfillingRectilinearH);
         } else {
             HoledPolygons hps;
-            AddPathsToHPs(infillingAreas, hps);
+            AddPathsToHPs(clipper, infillingAreas, hps);
             clp::Paths subinfillings;
             for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
                 subinfillings.clear();
@@ -434,7 +434,7 @@ void Multislicer::applyMedialAxisNotAggregated(size_t k, std::vector<double> &me
     clp::Paths accum_medialaxis;
     clp::Paths medialaxis;
     std::vector<clp::Paths> *inflated_acumulator = &accumContours;
-    AddPathsToHPs(shapes, *hps);
+    AddPathsToHPs(clipper, shapes, *hps);
 #ifdef TRY_TO_AVOID_EXTENDING_BIFURCATIONS
     //relative tolerance adjusted to be 100 for a toolpath with a 10um radius
     //clp::cInt TOLERANCE = (clp::cInt)(scaled / 10000.0);

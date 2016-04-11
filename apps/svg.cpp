@@ -79,6 +79,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
     int index = 0;
     IOPaths iop(f);
     clp::Paths output;
+    clp::Clipper clipper;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         std::string e = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
         if (!e.empty()) { err = str("Error reading file ", filename, ": ", e); break; }
@@ -109,7 +110,7 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
             }
         }
         HoledPolygons hps;
-        AddPathsToHPs(output, hps);
+        AddPathsToHPs(clipper, output, hps);
         output.clear();
 
         std::string svgname;

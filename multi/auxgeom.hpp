@@ -130,7 +130,7 @@ template<typename T> void HoledPolygon::offset(clp::ClipperOffset &offset, doubl
 }
 
 
-void AddPathsToHPs(clp::Paths &pt, HoledPolygons &hps);
+void AddPathsToHPs(clp::Clipper &clipper, clp::Paths &pt, HoledPolygons &hps);
 void AddPolyTreeToHPs(clp::PolyTree &pt, HoledPolygons &hps);
 
 void AddHPsToPaths(HoledPolygons &hps, clp::Paths &paths);
