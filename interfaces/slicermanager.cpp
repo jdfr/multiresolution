@@ -151,7 +151,7 @@ int ExternalSlicerManager::askForNextSlice() {
 
 void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     askForNextSlice();
-    if (!iopOUT.readPrefixedClipperPaths(nextSlice)) {
+    if (!iopOUT.readClipperPaths(nextSlice)) {
         err = "Could not read slice from slicer!!!";
         return;
     }
