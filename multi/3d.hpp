@@ -39,8 +39,9 @@ public:
     void takeAdditionalAdditiveContours(double z, clp::Paths &additional) { additionalAdditiveContours.emplace(z, std::move(additional)); }
     void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool);
     std::shared_ptr<MultiSpec> spec;
+    std::shared_ptr<ClippingResources> res;
     Multislicer multi;
-    ToolpathManager(std::shared_ptr<MultiSpec> s) : multi(s) { spec = std::move(s); slicess.resize(spec->numspecs); }
+    ToolpathManager(std::shared_ptr<MultiSpec> s) : multi(s) { res = multi.res; spec = std::move(s); slicess.resize(spec->numspecs); }
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
     void removeUsedSlicesPastZ(double z);
     void removeAdditionalContoursPastZ(double z);

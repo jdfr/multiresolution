@@ -43,24 +43,24 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
         auxUpdate.clear();
         COPYTO(contours, auxUpdate);
     } else {
-        offsetDo(multi.offset, auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
+        res->offsetDo(auxUpdate, -diffwidth, contours, clp::jtRound, clp::etClosedPolygon);
     }
     if (auxUpdate.empty()) return;
     if (spec->global.addsub.addsubWorkflowMode) {
         //here, computeContoursAlreadyFilled will always be false
         if (ntool_contour == 0) {
             //contour auxUpdate is additive
-            multi.clipper.AddPaths(auxUpdate, processToComputeIsAdditive ? clp::ptClip : clp::ptSubject, true);
+            res->clipper.AddPaths(auxUpdate, processToComputeIsAdditive ? clp::ptClip : clp::ptSubject, true);
         } else {
             //contour auxUpdate is subtractive
-            if (!processToComputeIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+            if (!processToComputeIsAdditive) res->clipper.AddPaths(auxUpdate, clp::ptClip, true);
             // processToComputeIsAdditive should never be true here, because of the current way we structure add/sub processes (first 'add', all subsequent 'sub')
         }
     } else {
         //contour auxUpdate is additive
-        if (processToComputeIsAdditive) multi.clipper.AddPaths(auxUpdate, clp::ptClip, true);
+        if (processToComputeIsAdditive) res->clipper.AddPaths(auxUpdate, clp::ptClip, true);
         // processToComputeIsAdditive should always be true here
-        if (computeContoursAlreadyFilled) multi.clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
+        if (computeContoursAlreadyFilled) res->clipper2.AddPaths(auxUpdate, clp::ptSubject, true);
     }
     //SHOWCONTOURS(*spec->global.config, "deflating_contour", &contours, &auxUpdate);
 }
@@ -79,7 +79,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //for additive process:    initialContour <- rawSlice - previously_computed_additive_contours
 
     //process the raw slice
-    multi.clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
+    res->clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
 
     bool doNotUseStoredAdditiveContours = false;
     bool appliedAdditional = false;
@@ -112,7 +112,7 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
             if (contourIsAdditive) continue;
         }
 
-        multi.offset.ArcTolerance = (double)spec->pp[ntool_contour].arctolG;
+        res->offset.ArcTolerance = (double)spec->pp[ntool_contour].arctolG;
         for (auto slice = slicess[ntool_contour].begin(); slice != slicess[ntool_contour].end(); ++slice) {
             if (!(*slice)->contours.empty()) { 
                 double currentWidth = spec->pp[ntool_contour].profile->getWidth(z - (*slice)->z);
@@ -133,11 +133,11 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     }
 
     //apply operations
-    multi.clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
-    multi.clipper.Clear();
+    res->clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
+    res->clipper.Clear();
     if (computeContoursAlreadyFilled) {
-        multi.clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
-        multi.clipper2.Clear();
+        res->clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
+        res->clipper2.Clear();
     }
     //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
@@ -497,14 +497,14 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                         return NULL;
                     }
                     //we use jtSquare here because it is way faster than jtRound and we do not strictly need the extra shape precision provided by jtRound
-                    offsetDo(sched.tm.multi.offset, auxaux, diffwidth, raw[*raw_idx].slice, clp::jtSquare, clp::etClosedPolygon);
+                    sched.tm.res->offsetDo(auxaux, diffwidth, raw[*raw_idx].slice, clp::jtSquare, clp::etClosedPolygon);
                     next = &auxaux;
                 }
                 if (firstTime) {
                     auxRawSlice = std::move(*next);
                     firstTime = false;
                 } else {
-                    clipperDo(sched.tm.multi.clipper, auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
+                    sched.tm.res->clipperDo(auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
                 }
             }
             auxaux.clear();
