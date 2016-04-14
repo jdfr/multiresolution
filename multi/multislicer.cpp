@@ -331,6 +331,7 @@ void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<doubl
     clp::Paths medialaxis;
     std::vector<clp::Paths> *inflated_acumulator = &accumContours;
     AddPathsToHPs(clipper, shapes, *hps);
+    double minidelta = 0.01 * ppspec.radius * *std::min_element(medialAxisFactors.begin(), medialAxisFactors.end());
 #ifdef TRY_TO_AVOID_EXTENDING_BIFURCATIONS
     //relative tolerance adjusted to be 100 for a toolpath with a 10um radius
     //clp::cInt TOLERANCE = (clp::cInt)(scaled / 10000.0);
@@ -347,7 +348,12 @@ void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<doubl
         clp::Paths aux;
         for (HoledPolygons::iterator hp = hps->begin(); hp != hps->end(); ++hp) {
             accum_medialaxis.clear();
-            hp->offset(offset, -factor, offsetedhps);
+            if (minidelta > 0) {
+                //offset by a slightly bigger amount in order to avoid features that may be pathologically thin, with the potential to crash the medial axis algorithm
+                hp->offset2(offset, -factor - minidelta, minidelta, offsetedhps);
+            } else {
+                hp->offset(offset, -factor, offsetedhps);
+            }
             for (HoledPolygons::iterator ohp = offsetedhps.begin(); ohp != offsetedhps.end(); ++ohp) {
                 medialaxis.clear();
                 //TODO: tweak min_width and max_width

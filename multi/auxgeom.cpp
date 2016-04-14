@@ -228,6 +228,17 @@ void HoledPolygon::offset(clp::ClipperOffset &offset, double radius, HoledPolygo
     AddPolyTreeToHPs(pt, result);
 }
 
+void HoledPolygon::offset2(clp::ClipperOffset &offset, double radius1, double radius2, HoledPolygons &result) {
+    result.clear();
+    clp::Paths pth;
+    this->offset(offset, radius1, pth);
+    clp::PolyTree pt;
+    offset.AddPaths(pth, clp::jtRound, clp::etClosedPolygon);
+    offset.Execute(pt, radius2);
+    offset.Clear();
+    AddPolyTreeToHPs(pt, result);
+}
+
 void recursiveAddPolyTreeToHPs(clp::PolyNode& polynode, HoledPolygons &hps) {
     auto child = polynode.Childs.begin();
     auto childend = polynode.Childs.end();

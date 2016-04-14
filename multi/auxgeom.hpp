@@ -105,6 +105,7 @@ typedef struct HoledPolygon {
     void clipPaths(clp::Clipper &clipper, clp::Paths &paths);
     template<typename T> void offset(clp::ClipperOffset &offset, double radius, T &result);
     void offset(clp::ClipperOffset &offset, double radius, HoledPolygons &result);
+    void offset2(clp::ClipperOffset &offset, double radius1, double radius2, HoledPolygons &result);
     inline void moveToPaths(clp::Paths &paths);
     inline void copyToPaths(clp::Paths &paths);
 } HoledPolygon;
