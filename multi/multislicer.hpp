@@ -99,11 +99,12 @@ public:
 protected:
     //state variables for infilling algorithms (necessary because of recursive implementations, to avoid passing an awful lot of context in each stack frame)
     double infillingRadius, erodedInfillingRadius; bool infillingUseClearance, infillingRecursive; int numconcentric;
+    clp::cInt globalShift; bool useGlobalShift;
     clp::Paths *accumInfillings;
     std::vector<clp::Paths> *infillingsIndependentContours;
     bool applySnapConcentricInfilling; SnapToGridSpec concentricInfillingSnapSpec; //this is state for the recursive call to processInfillingsConcentricRecursive
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
-    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox bb, bool horizontal);
+    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, bool horizontal);
 };
 
 class Multislicer {

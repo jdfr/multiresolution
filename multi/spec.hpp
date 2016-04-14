@@ -156,6 +156,7 @@ typedef struct PerProcessSpec {
     std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
     InfillingMode infillingMode;     //how to deal with infillings
     bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
+    bool infillingStatic;            //if infilling is rectilinear, this flag decides if the bounding box is static (global) or computed as specified by flag infillingWhole
     bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
     bool doPreprocessing;            //flag to decide if preprocessing may be applied
     bool useMaxConcentricRecursive;  //flag to decide if maxConcentricRecursive is used

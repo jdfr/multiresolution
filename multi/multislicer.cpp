@@ -412,17 +412,22 @@ bool Infiller::processInfillings(size_t k, std::vector<clp::Paths> *_infillingsI
         break;
     } case InfillingRectilinearV:
       case InfillingRectilinearH:
-        if (ppspec.infillingWhole) {
-            processInfillingsRectilinear(ppspec, infillingAreas, getBB(infillingAreas), ppspec.infillingMode == InfillingRectilinearH);
+        bool horizontal = ppspec.infillingMode == InfillingRectilinearH;
+        if (ppspec.infillingStatic || ppspec.infillingWhole) {
+            BBox bb = getBB(infillingAreas);
+            globalShift = 0; //promote to command line parameter if necessary
+            useGlobalShift = ppspec.infillingStatic;
+            processInfillingsRectilinear(ppspec, infillingAreas, bb, horizontal);
         } else {
             HoledPolygons hps;
             AddPathsToHPs(res->clipper, infillingAreas, hps);
             clp::Paths subinfillings;
+            useGlobalShift = false;
             for (auto hp = hps.begin(); hp != hps.end(); ++hp) {
                 subinfillings.clear();
                 BBox bb = getBB(*hp);
                 hp->moveToPaths(subinfillings);
-                processInfillingsRectilinear(ppspec, subinfillings, bb, ppspec.infillingMode == InfillingRectilinearH);
+                processInfillingsRectilinear(ppspec, subinfillings, bb, horizontal);
             }
         }
         break;
@@ -430,27 +435,32 @@ bool Infiller::processInfillings(size_t k, std::vector<clp::Paths> *_infillingsI
     return true;
 }
 
-void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox bb, bool horizontal) {
+void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, bool horizontal) {
     double epsilon_start = 0;// infillingRadius * 0.01; //do not start the lines exactly on the boundary, but a little bit past it
     double epsilon_erode = infillingRadius * 0.01; //do not erode a full radius, but keep a small offset
     double erode_value = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
     clp::cInt minLineSize = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
-    clp::cInt start = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
     clp::cInt delta = (clp::cInt)(2 * erodedInfillingRadius);
-    clp::cInt numlines = ((horizontal ? bb.maxy : bb.maxx) - start) / delta + 1; //add one line to be sure
+    clp::cInt relevantMin = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
+    clp::cInt relevantMax =  horizontal ? bb.maxy : bb.maxx;
+    clp::cInt shift       = useGlobalShift ? globalShift : relevantMin;
+    clp::cInt start = (clp::cInt)std::round(((double)relevantMin - shift) / delta) - 1;
+    clp::cInt end   = (clp::cInt)std::round(((double)relevantMax - shift) / delta) + 1;
+    clp::cInt numlines = end - start + 1;
     clp::cInt accum = start;
     clp::Paths lines(numlines, clp::Path(2));
     for (auto &line : lines) {
         if (horizontal) {
             line.front().X = bb.minx;
             line.back().X  = bb.maxx;
-            line.back().Y  = line.front().Y = accum;
+            line.back().Y  =
+            line.front().Y = (accum++) * delta + shift;
         } else { //vertical
             line.front().Y = bb.miny;
             line.back().Y  = bb.maxy;
-            line.back().X  = line.front().X = accum;
+            line.back().X  =
+            line.front().X = (accum++) * delta + shift;
         }
-        accum             += delta;
     }
     if (erode_value != 0.0) {
         clp::Paths aux;

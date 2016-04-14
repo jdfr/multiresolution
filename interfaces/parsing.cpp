@@ -201,7 +201,9 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<double>()->default_value(0.001)->value_name("ratio"),
             "This is the ratio of overlapping between lines, if --infill (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value.")
         ("infill-byregion",
-            "If specified, and --infill (lines|hlinesv) is specified, the infill lines are computed separately for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases)")
+            "If specified, and --infill (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --infill-static-mode is specified, this option is ignored.")
+        ("infill-static-mode",
+            "If specified, and --infill (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --infill-lineoverlap). This option overrides --infill-byregion.")
         ("infill-recursive",
             "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only for --infill (linesh|linesv|concentric))")
         ("infill-medialaxis-radius",
@@ -814,8 +816,9 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         else                                      throw po::error(str("For process ", k, ": invalid infill mode: ", val));
         spec.pp[k].infillingPerimeterOverlap  = vm["infill-perimeter-overlap"].as<double>();
         spec.pp[k].infillingLineOverlap       = vm["infill-lineoverlap"]      .as<double>();
-        spec.pp[k].infillingRecursive         = vm.count("infill-recursive") != 0;
-        spec.pp[k].infillingWhole             = vm.count("infill-byregion")  == 0;
+        spec.pp[k].infillingRecursive         = vm.count("infill-recursive")    != 0;
+        spec.pp[k].infillingWhole             = vm.count("infill-byregion")     == 0;
+        spec.pp[k].infillingStatic            = vm.count("infill-static-mode")  != 0;
         spec.pp[k].useMaxConcentricRecursive  = (spec.pp[k].infillingMode == InfillingConcentric) && (vm.count("infill-maxconcentric") != 0);
         if (spec.pp[k].useMaxConcentricRecursive) {
             spec.pp[k].maxConcentricRecursive = vm["infill-maxconcentric"].as<int>();
