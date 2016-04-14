@@ -93,8 +93,6 @@ template<PathFun pathfun, VectorOption opt> inline void applyToPaths(clp::Paths 
     }
 }
 
-struct BBox;
-
 struct HoledPolygon;
 typedef std::vector<HoledPolygon> HoledPolygons;
 
