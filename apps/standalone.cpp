@@ -511,11 +511,12 @@ int Main(int argc, const char** argv) {
             if (save || (!dxf_filename_toolpaths.empty())) {
                 pathwriters_toolpath.push_back(w);
             }
-            if (save && alsoContours && saveInGridConf_justone) {
+            bool allowContourSplitting = false; //do not normally allow contours to be splitted: it is only useful for debugging *and* is quite expensive
+            if (allowContourSplitting && save && alsoContours && saveInGridConf_justone) {
                 //if we do not include !saveInGridConf_justone in the condition, errors will happen down the writer pipeline. It is just easier not writing raw contours in this case...
                 pathwriters_raw.push_back(w);
             }
-            if ((save && alsoContours) || (!dxf_filename_contours.empty())) {
+            if (allowContourSplitting && ((save && alsoContours) || (!dxf_filename_contours.empty()))) {
                 pathwriters_contour.push_back(w);
             }
         }
