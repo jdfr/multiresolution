@@ -30,16 +30,16 @@ typedef struct {
   size_t               numPoint;
 } gridInfo;
 
-//sophisticated functions: do snapping while dilating/eroding and simplifying the contours
-int snapPathToGrid(ClipperLib::Path &outputs, ClipperLib::Path &inputs, SnapToGridSpec &spec, gridInfo *gridinfo=NULL);
+//sophisticated function: do snapping while dilating/eroding and simplifying the contours
 bool snapClipperPathsToGrid(Configuration &config, clp::Paths &output, clp::Paths &inputs, SnapToGridSpec &snapspec, std::string &err);
 
-//unsophisticated versions, suitable for open, very short, slightly processed toolpaths (ignores spec.mode: always works as if it is SnapSimple)
-void simpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec);
+//unsophisticated version, suitable for open, very short, slightly processed toolpaths (ignores spec.mode: always works as if it is SnapSimple)
 void simpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec);
 
-//unsophisticated versions, suitable for open, very short, slightly processed toolpaths (ignores spec.mode: always works as if it is SnapSimple, and does not remove coincient points)
-void verySimpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec);
+//unsophisticated version, suitable for open, very short, slightly processed toolpaths (ignores spec.mode: always works as if it is SnapSimple, and does not remove coincident points)
 void verySimpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec);
+
+//this is almost the same code as verySimpleSnapPathsToGrid(), but it just returns the indexes, without snapping
+void verySimpleGetSnapIndex(ClipperLib::Paths &paths, SnapToGridSpec &spec);
 
 #endif

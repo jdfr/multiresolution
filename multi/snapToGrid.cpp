@@ -21,6 +21,22 @@ void inline verySimpleSnapPathToGridWithoutShift(ClipperLib::Path &path, SnapToG
     }
 }
 
+void inline verySimpleGetSnapIndexWithShift(ClipperLib::Path &path, SnapToGridSpec &spec) {
+    for (ClipperLib::Path::iterator pit = path.begin(); pit != path.end(); ++pit) {
+        //discretize for the grid
+        pit->X = (ClipperLib::cInt)round((((double)pit->X) - spec.shiftX) / spec.gridstepX);
+        pit->Y = (ClipperLib::cInt)round((((double)pit->Y) - spec.shiftY) / spec.gridstepY);
+    }
+}
+
+void inline verySimpleGetSnapIndexWithoutShift(ClipperLib::Path &path, SnapToGridSpec &spec) {
+    for (ClipperLib::Path::iterator pit = path.begin(); pit != path.end(); ++pit) {
+        //discretize for the grid
+        pit->X = (ClipperLib::cInt)round(((double)pit->X) / spec.gridstepX);
+        pit->Y = (ClipperLib::cInt)round(((double)pit->Y) / spec.gridstepY);
+    }
+}
+
 void verySimpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec) {
     if ((spec.shiftX == 0.0) && (spec.shiftY == 0.0)) {
         for (clp::Paths::iterator path = paths.begin(); path != paths.end(); ++path) {
@@ -33,12 +49,15 @@ void verySimpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec) {
     }
 }
 
-
-void verySimpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec) {
+void verySimpleGetSnapIndex(ClipperLib::Paths &paths, SnapToGridSpec &spec) {
     if ((spec.shiftX == 0.0) && (spec.shiftY == 0.0)) {
-        verySimpleSnapPathToGridWithoutShift(path, spec);
+        for (clp::Paths::iterator path = paths.begin(); path != paths.end(); ++path) {
+            verySimpleGetSnapIndexWithoutShift(*path, spec);
+        }
     } else {
-        verySimpleSnapPathToGridWithShift(path, spec);
+        for (clp::Paths::iterator path = paths.begin(); path != paths.end(); ++path) {
+            verySimpleGetSnapIndexWithShift(*path, spec);
+        }
     }
 }
 
@@ -57,11 +76,6 @@ void skipRepeatedPoints(ClipperLib::Path &path) {
 
     }
     if (npts != path.size()) path.resize(npts);
-}
-
-void simpleSnapPathToGrid(ClipperLib::Path &path, SnapToGridSpec &spec) {
-    verySimpleSnapPathToGrid(path, spec);
-    skipRepeatedPoints(path);
 }
 
 void simpleSnapPathsToGrid(ClipperLib::Paths &paths, SnapToGridSpec &spec) {
