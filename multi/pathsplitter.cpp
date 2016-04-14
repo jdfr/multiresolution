@@ -239,7 +239,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
                     position->Y = numy - 1;
                     fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->Y >= numy)\n");
                 }
-                simpler_snap_valid = simpler_snap_valid && testInsideSquare(*point, buffer.at(position->X, position->Y).actualSquare);
+                simpler_snap_valid = simpler_snap_valid && testInsideSquare(*point, buffer.at((int)position->X, (int)position->Y).actualSquare);
                 positionsToTest.clear();
                 if (simpler_snap_valid) {
                     //in this case, there can be only one current position, and possibly a previous position
