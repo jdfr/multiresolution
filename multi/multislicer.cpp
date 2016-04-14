@@ -390,7 +390,7 @@ bool Infiller::processInfillings(size_t k, std::vector<clp::Paths> *_infillingsI
     auto &ppspec = res->spec->pp[k];
     infillingsIndependentContours = _infillingsIndependentContours;
     infillingRadius = (double)ppspec.radius;
-    erodedInfillingRadius = infillingRadius*(1 - ppspec.infillingLineOverlap);
+    erodedInfillingRadius = std::abs(infillingRadius*(1 - ppspec.infillingLineOverlap));
     infillingUseClearance = ppspec.addInternalClearance;
     accumInfillingsHolder.clear();
     accumInfillings = &accumInfillingsHolder;
