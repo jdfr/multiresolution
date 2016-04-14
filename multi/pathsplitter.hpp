@@ -1,8 +1,7 @@
 #ifndef PATHSPLITTER_HEADER
 #define PATHSPLITTER_HEADER
 
-#include "common.hpp"
-#include "config.hpp"
+#include "snapToGrid.hpp"
 
 /*to write an object in a machine that works in chunks (i.e. nanoscribe),
 we must divide it in small blocks. The blocks are cuboids, placed in a
@@ -26,6 +25,7 @@ public:
     Matrix(int _numx, int _numy) : numx(_numx), numy(_numy), data(_numx*_numy) {}
     void clear() { numx = numy = 0; data.clear(); }
     void reset(int _numx, int _numy) { numx = _numx; numy = _numy; data.clear(); data.resize(numx*numy); }
+    void assign(T d) { data.assign(data.size(), std::move(d)); }
     T& at(int x, int y) { return data[x*numy + y]; }
 };
 
@@ -48,11 +48,15 @@ public:
     bool setup();
     bool processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling);
 protected:
+    Matrix<char> insideSquare; //we want Matrix<bool>, but that does not play nice with references inside the container...
+    std::vector<std::pair<int, int>> positionsToTest;
     Configuration *cfg;
     clp::Clipper clipper;
+    SnapToGridSpec snapspec;
     double sinangle;
     bool setup_done;
-    bool singlex, singley;
+    bool simpler_snap;
+    bool singlex, singley, justone;
 };
 
 inline void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::PolyTree &intermediate, clp::Paths &result) {
