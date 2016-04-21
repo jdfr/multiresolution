@@ -6,6 +6,7 @@
 #include "pathwriter_dxf.hpp"
 #include "pathwriter_nanoscribe.hpp"
 #include <iostream>
+#include <time.h>
 
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #ifdef STANDALONE_USEPYTHON
@@ -41,7 +42,6 @@ template<bool GLOBAL> void ParserStandaloneLocalAndGlobal::addOptions(po::option
             po::value<std::vector<double>>()->multitoken(),
             "This is a per-process version of the option --save-in-grid (please see the help for --save-in-grid for details on why use this option, and a description of the parameters it takes). If --save-in-grid is used, all processes will be partitioned with the same grid. If --pp--save-in-grid is used, one --pp--save-in-grid must be specified for each process, so that each process will have a different grid. Usage of --save-in-grid and pp-save-in-grid are mutually exclusive.")
             ;
-
     }
 }
 
@@ -777,16 +777,17 @@ int Main(int argc, const char** argv) {
 }
 
 int main(int argc, const char** argv) {
+    clock_t start, finish;
+    start = clock();
+    int ret = -1;
     try {
-        return Main(argc, argv);
+        ret = Main(argc, argv);
     } catch (std::exception &e) {
-        fprintf(stderr, "Unhandled exception NOT while computing the output.\n   Exception    type: %s\n   Exception message: %s\n", typeid(e).name(), e.what()); return -1;
+        fprintf(stderr, "Unhandled exception NOT while computing the output.\n   Exception    type: %s\n   Exception message: %s\n", typeid(e).name(), e.what());
     } catch (std::string &e) {
         fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): %s\n", e.c_str());
-    } catch (const char *e) {
-        fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): ");
-        fflush( stderr);
-        fprintf(stderr, "%s\n", e);
     }
-    return -1;
+    finish = clock();
+    fprintf(stdout, "TOTAL TIME%s: %f\n", ret==0? "" : " UNTIL ERROR", ((double)(finish - start) / CLOCKS_PER_SEC));
+    return ret;
 }
