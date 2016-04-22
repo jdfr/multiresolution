@@ -135,11 +135,11 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //apply operations
     res->clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
     res->clipper.Clear();
-    if (CLIPPER_MMANAGER::useReset) ResetWithManager(res->clipper);
+    ClipperEndOperation(res->clipper);
     if (computeContoursAlreadyFilled) {
         res->clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
         res->clipper2.Clear();
-        if (CLIPPER_MMANAGER::useReset) ResetWithManager(res->clipper2);
+        ClipperEndOperation(res->clipper2);
     }
     //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
@@ -470,7 +470,7 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             }
             clipper.Execute(clp::ctIntersection, auxRawSlice, clp::pftNonZero, clp::pftNonZero);
             clipper.Clear();
-            if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper);
+            ClipperEndOperation(clipper);
             return &auxRawSlice;*/
 
             //ADVANCED METHOD: OFFSET CONTOURS TO TAKE INTO ACCOUNT THE PROFILE OF THE VOXEL

@@ -63,7 +63,7 @@ template<typename T, typename INFLATEDACCUM> void ClippingResources::operateInfl
     }
     clipper.Execute(mode, res, clp::pftEvenOdd, clp::pftNonZero);
     clipper.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<T, clp::PolyTree>::value) ResetWithManager(clipper);
+    if (!std::is_same<T, clp::PolyTree>::value) ClipperEndOperation(clipper);
 }
 
 template<typename T, typename INFLATEDACCUM> void ClippingResources::operateInflatedLinesAndContours(clp::ClipType mode, T &res, clp::Paths &contours, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator) {
@@ -76,7 +76,7 @@ template<typename Output, typename Input> inline void ClippingResources::unitePa
     //maybe clp::pftPositive is better?
     clipper.Execute(clp::ctUnion, output, clp::pftNonZero, clp::pftNonZero);
     clipper.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(clipper);
+    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(clipper);
 }
 
 template<typename Output, typename Input1, typename Input2> void ClippingResources::unitePaths(Output &output, Input1 &subject, Input2 &clip) {
@@ -85,18 +85,18 @@ template<typename Output, typename Input1, typename Input2> void ClippingResourc
     //maybe clp::pftPositive is better?
     clipper.Execute(clp::ctUnion, output, clp::pftNonZero, clp::pftNonZero);
     clipper.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(clipper);
+    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(clipper);
 }
 
 template<typename Output, typename Input> void ClippingResources::offsetDo2(Output &output, double delta1, double delta2, Input &input, clp::Paths &aux, clp::JoinType jointype, clp::EndType endtype) {
     AddPaths(input, jointype, endtype);
     offset.Execute(aux, delta1);
     offset.Clear();
-    if (CLIPPER_MMANAGER::useReset) ResetWithManager(offset);
+    ClipperEndOperation(offset);
     offset.AddPaths(aux, jointype, endtype);
     offset.Execute(output, delta2);
     offset.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(offset);
+    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(offset);
 }
 
 
@@ -237,7 +237,7 @@ void ClippingResources::overwriteHighResDetails(size_t k, clp::Paths &contours, 
         //clp::Paths old_lowres = lowres;
         clipper2.Execute(clp::ctUnion, lowres, clp::pftNonZero, clp::pftNonZero);
         clipper2.Clear();
-        if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper2);
+        ClipperEndOperation(clipper2);
         //SHOWCONTOURS(*spec->global.config, "contour before and after overwriting", &old_lowres, &lowres);
     }
 
@@ -262,11 +262,11 @@ void ClippingResources::doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths
     clipper.AddPaths(aux1, clp::ptClip, true);
     //execute the difference. NOTE: for intersected paths, the result can be either an open path or a pair of open paths for each path sharing a common arc with lower resolution contours.
     //the latter (two paths) happens if the endpoint is not in the common arc. unintersected paths should not be affected by the operation
-    clp::PolyTree pt(clipper.allocPolyNode);
+    clp::PolyTree pt(clipper);
     clipper.Execute(clp::ctDifference, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
     clp::PolyTreeToPaths(pt, toolpaths); //copies both closed and open paths
-    if (CLIPPER_MMANAGER::useReset)  ResetWithManager(clipper, &pt);
+    ClipperEndOperation(clipper, &pt);
 }
 
 bool ClippingResources::generateToolPath(size_t k, bool nextProcessSameKind, clp::Paths &contour, clp::Paths &toolpaths, clp::Paths &temp_toolpath, clp::Paths &aux1) {
@@ -374,10 +374,10 @@ void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<doubl
             //offset the medial axis paths and substract the result from the remaining contours
             clipper.AddPath(hp->contour, clp::ptSubject, true);
             clipper.AddPaths(hp->holes, clp::ptSubject, true);
-            clp::PolyTree pt(clipper.allocPolyNode);
+            clp::PolyTree pt(clipper);
             operateInflatedLinesAndContoursInClipper(clp::ctDifference, pt, accum_medialaxis, (double)ppspec.radius, &aux, inflated_acumulator);
             AddPolyTreeToHPs(pt, *newhps);
-            if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper, &pt);
+            ClipperEndOperation(clipper, &pt);
             MOVETO(accum_medialaxis, medialaxis_accumulator);
         }
         std::swap(hps, newhps);
@@ -478,10 +478,10 @@ void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &
     }
     res->clipper.AddPaths(lines, clp::ptSubject, false);
     {
-        clp::PolyTree pt(res->clipper.allocPolyNode);
+        clp::PolyTree pt(res->clipper);
         res->clipper.Execute(clp::ctIntersection, pt, clp::pftEvenOdd, clp::pftEvenOdd);
         clp::PolyTreeToPaths(pt, lines);
-        if (CLIPPER_MMANAGER::useReset)  ResetWithManager(res->clipper, &pt);
+        ClipperEndOperation(res->clipper, &pt);
     }
     res->clipper.Clear();
     if (ppspec.applysnap) {
@@ -793,7 +793,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
             }
             res->clipper.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero);
             res->clipper.Clear();
-            if (CLIPPER_MMANAGER::useReset) ResetWithManager(res->clipper);
+            ClipperEndOperation(res->clipper);
         }
         //SHOWCONTOURS(*spec->global.config, "before_applying_process_1", &contours_tofill);
         //SHOWCONTOURS(*spec->global.config, "before_applying_process_2", &contours_alreadyfilled);
@@ -817,7 +817,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
                 res->AddPaths(outputs[k]->medialAxisIndependentContours, clp::ptClip, true);
                 res->clipper.Execute(clp::ctDifference, contours_tofill, clp::pftNonZero, clp::pftNonZero);
                 res->clipper.Clear();
-                if (CLIPPER_MMANAGER::useReset) ResetWithManager(res->clipper);
+                ClipperEndOperation(res->clipper);
                 //SHOWCONTOURS(*spec->global.config, "after_applying_infillings_1", &(contours_tofill));
             }
         } else {
@@ -827,7 +827,7 @@ int Multislicer::applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp:
             res->AddPaths(contours_tofill, clp::ptClip, true);
             res->clipper.Execute(clp::ctDifference, contours_tofill, clp::pftNonZero, clp::pftNonZero);
             res->clipper.Clear();
-            if (CLIPPER_MMANAGER::useReset) ResetWithManager(res->clipper);
+            ClipperEndOperation(res->clipper);
             //SHOWCONTOURS(*spec->global.config, "output contours", &MYAUX, &outputs[k]->contours, &contours_tofill);
             //clipperDo(clipper, contours_tofill, clp::ctDifference, outputs[k]->contours, contours_tofill, clp::pftEvenOdd, clp::pftEvenOdd);
             //SHOWCONTOURS(*spec->global.config, "after_addsub_switch", &MYAUX, &outputs[k]->contours, &contours_tofill);// , &contours_alreadyfilled);

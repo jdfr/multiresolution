@@ -14,7 +14,7 @@ void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool
         OpenPathsFromPolyTree(intermediate, result);
         intermediate.Clear();
     }
-    if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
+    ClipperEndOperation(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
 }
 
 
@@ -219,7 +219,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
 
     if (pathsClosed) {
         //for closed paths, we need to use full-blown clipping. Downside: extremely slow!!!
-        clp::PolyTree pt(res->clipper.allocPolyNode);
+        clp::PolyTree pt(res->clipper);
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 auto &enclosed = buffer.at(x, y);

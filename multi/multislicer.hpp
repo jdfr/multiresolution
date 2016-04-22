@@ -72,13 +72,13 @@ template<typename Output, typename Input1, typename Input2> void ClippingResourc
     AddPaths(clip, clp::ptClip, true);
     clipper.Execute(operation, output, subjectFillType, clipFillType);
     clipper.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(clipper);
+    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(clipper);
 }
 template<typename Output, typename Input> void ClippingResources::offsetDo(Output &output, double delta, Input &input, clp::JoinType jointype, clp::EndType endtype) {
     AddPaths(input, jointype, endtype);
     offset.Execute(output, delta);
     offset.Clear();
-    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(offset);
+    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(offset);
 }
 inline bool ClippingResources::AddPaths(clp::Path  &path,  clp::PolyType pt, bool closed) { return clipper.AddPath (path,  pt, closed); }
 inline bool ClippingResources::AddPaths(clp::Paths &paths, clp::PolyType pt, bool closed) { return clipper.AddPaths(paths, pt, closed); }
