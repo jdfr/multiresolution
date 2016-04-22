@@ -24,15 +24,25 @@ typedef struct SingleProcessOutput {
     SingleProcessOutput(std::string _err) : err(_err) {};
 } SingleProcessOutput;
 
+//this is a failsafe to avoid compiler errors, but users should set a default arena chunk size accordingly to the expected usage patterns
+#ifndef INITIAL_ARENA_SIZE
+#  define INITIAL_ARENA_SIZE (50*1024*1024)
+#endif
+
 //Common resources for all multislicing subsystems
 class ClippingResources {
-public:
+public: 
+    CLIPPER_MMANAGER manager_offset;
+    CLIPPER_MMANAGER manager_clipper;
+    CLIPPER_MMANAGER manager_clipper2;
     clp::ClipperOffset offset;
     clp::Clipper clipper;
     clp::Clipper clipper2; //we need this in order to conduct more than one clipping in parallel, if necessary
     std::string *err; //this is a temp. pointer which is set up by applyXXX() methods in MultiSlicer
     std::shared_ptr<MultiSpec> spec;
-    ClippingResources(std::shared_ptr<MultiSpec> _spec) : spec(std::move(_spec)), err(NULL) {}
+    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if< CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : manager_offset(INITIAL_ARENA_SIZE), manager_clipper(INITIAL_ARENA_SIZE), manager_clipper2(INITIAL_ARENA_SIZE), offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
+    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if<!CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
+
     //// STATELESS, LOW LEVEL HELPER TEMPLATES ////
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContoursInClipper(clp::ClipType mode, T &res, clp::Paths &lines,                       double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContours(         clp::ClipType mode, T &res, clp::Paths &contours, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
@@ -62,11 +72,13 @@ template<typename Output, typename Input1, typename Input2> void ClippingResourc
     AddPaths(clip, clp::ptClip, true);
     clipper.Execute(operation, output, subjectFillType, clipFillType);
     clipper.Clear();
+    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(clipper);
 }
 template<typename Output, typename Input> void ClippingResources::offsetDo(Output &output, double delta, Input &input, clp::JoinType jointype, clp::EndType endtype) {
     AddPaths(input, jointype, endtype);
     offset.Execute(output, delta);
     offset.Clear();
+    if (CLIPPER_MMANAGER::useReset && !std::is_same<Output, clp::PolyTree>::value) ResetWithManager(offset);
 }
 inline bool ClippingResources::AddPaths(clp::Path  &path,  clp::PolyType pt, bool closed) { return clipper.AddPath (path,  pt, closed); }
 inline bool ClippingResources::AddPaths(clp::Paths &paths, clp::PolyType pt, bool closed) { return clipper.AddPaths(paths, pt, closed); }
@@ -114,7 +126,7 @@ protected:
     clp::Paths AUX1, AUX2, AUX3, AUX4, accumInfillingsHolder;
 public:
     std::shared_ptr<ClippingResources> res;
-    Multislicer(std::shared_ptr<MultiSpec> _spec) : infiller(std::make_shared<ClippingResources>(std::move(_spec))) { res = infiller.res; }
+    Multislicer(std::shared_ptr<ClippingResources> _res) : infiller(_res), res(std::move(_res)) { }
     void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear(); infiller.clear(); }
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the contours left 
     //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm

@@ -19,6 +19,9 @@ option(GENERATE_FILEINFO     "generate info dumper for paths files"  ON)
 option(GENERATE_FILEUNION    "generate tool to merge several paths files into one"  ON)
 option(GENERATE_FILETOUCH    "generate slice header setter for paths files"  ON)
 
+option(CLIPPER_USE_ARENA       "enable ArenaMemoryManager for ClipperLib" ON)
+set(INITIAL_ARENA_SIZE "52428800" CACHE STRING "Initial size for ArenaMemoryManager")
+
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 if(GENERATE_LIBRARY OR GENERATE_EXECUTABLE)
   set(GENERATE_LIBRARY_OR_EXECUTABLE ON)
@@ -115,15 +118,20 @@ if("${Boost_INCLUDE_DIR}" STREQUAL "")
   endif()
 endif()
 
+if (CLIPPER_USE_ARENA)
+  ADD_DEFINITIONS(-DCLIPPER_USE_ARENA -DCLIPPER_ALLOCATOR_CXX11 -DINITIAL_ARENA_SIZE=${INITIAL_ARENA_SIZE})
+endif()
+
 set(clipper_include_dir ${CLIPPER_BASE_DIR}/clipper)
 set(iopaths_include_dir ${CLIPPER_BASE_DIR}/iopaths)
 set(clipper_source ${clipper_include_dir}/clipper.cpp)
 set(clipper_header ${clipper_include_dir}/clipper.hpp)
+set(alloc_header   ${clipper_include_dir}/allocation_schemes.hpp)
 set(iopaths_source ${iopaths_include_dir}/iopaths.cpp)
 set(iopaths_header ${iopaths_include_dir}/iopaths.hpp)
 set(common_header  ${iopaths_include_dir}/common.hpp)
 
-if(NOT EXISTS ${clipper_source} OR NOT EXISTS ${iopaths_source} OR NOT EXISTS ${clipper_header} OR NOT EXISTS ${iopaths_header} OR NOT EXISTS ${common_header})
+if(NOT EXISTS ${clipper_source} OR NOT EXISTS ${iopaths_source} OR NOT EXISTS ${clipper_header} OR NOT EXISTS ${iopaths_header} OR NOT EXISTS ${common_header} OR NOT EXISTS ${alloc_header})
   message(FATAL_ERROR "tweaked clipper/iopaths base dir does not contain the expected files and directories!!!")
 endif()
 
@@ -186,6 +194,7 @@ set (INCLUDE_DIRS
 include_directories(${INCLUDE_DIRS})
 
 set(CORESOURCES
+  ${alloc_header}
   ${clipper_header}
   ${clipper_source}
   ${iopaths_header}

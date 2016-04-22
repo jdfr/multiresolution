@@ -126,6 +126,7 @@ template<typename T> void HoledPolygon::offset(clp::ClipperOffset &offset, doubl
     offset.AddPaths(this->holes, clp::jtRound, clp::etClosedPolygon);
     offset.Execute(result, radius);
     offset.Clear();
+    if (CLIPPER_MMANAGER::useReset && !std::is_same<T, clp::PolyTree>::value) ResetWithManager(offset);
 }
 
 

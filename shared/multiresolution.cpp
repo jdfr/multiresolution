@@ -97,9 +97,9 @@ StateHandle initState(std::shared_ptr<Configuration> config, std::shared_ptr<Met
     }
     if (state->spec->global.useScheduler) {
         bool removeUnused = true;
-        state->sched = std::make_shared<SimpleSlicingScheduler>(removeUnused, state->spec);
+        state->sched = std::make_shared<SimpleSlicingScheduler>(removeUnused, std::make_shared<ClippingResources>(state->spec));
     } else {
-        state->multi = std::make_shared<Multislicer>(state->spec);
+        state->multi = std::make_shared<Multislicer>(std::make_shared<ClippingResources>(state->spec));
     }
     //state->args.err = "hellooooooooo"; return args;
     return state;

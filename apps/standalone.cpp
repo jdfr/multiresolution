@@ -426,6 +426,8 @@ int Main(int argc, const char** argv) {
         return -1;
     }
 
+    std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(multispec);
+
     clp::IntPoint bbmn, bbmx;
     bbmn.X = (clp::cInt) (minx * factors.input_to_internal);
     bbmn.Y = (clp::cInt) (miny * factors.input_to_internal);
@@ -438,7 +440,7 @@ int Main(int argc, const char** argv) {
             split.min = bbmn;
             split.max = bbmx;
         }
-        std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(*multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+        std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
         pathwriters_arefiles.push_back(pathsplitter);
         pathwriters_toolpath.push_back(pathsplitter);
     }
@@ -506,7 +508,7 @@ int Main(int argc, const char** argv) {
                 return d;
             };
             bool saveInGridConf_justone = saveInGridConf.size() == 1;
-            std::shared_ptr<PathWriter> w = std::make_shared<SplittingPathWriter>(*multispec, callback, saveInGridConf, "SPLITTING_DELEGATOR");
+            std::shared_ptr<PathWriter> w = std::make_shared<SplittingPathWriter>(clipres, *multispec, callback, saveInGridConf, "SPLITTING_DELEGATOR");
             pathwriters_arefiles.push_back(w);
             if (save || (!dxf_filename_toolpaths.empty())) {
                 pathwriters_toolpath.push_back(w);
@@ -531,7 +533,7 @@ int Main(int argc, const char** argv) {
         if (multispec->global.useScheduler) {
 
             bool removeUnused = true; //!saveContours;
-            SimpleSlicingScheduler sched(removeUnused, multispec);
+            SimpleSlicingScheduler sched(removeUnused, clipres);
 
             if (multispec->global.schedMode == ManualScheduling) {
                 for (auto pair = multispec->global.schedSpec.begin(); pair != multispec->global.schedSpec.end(); ++pair) {
@@ -648,7 +650,7 @@ int Main(int argc, const char** argv) {
 
         } else {
 
-            Multislicer multi(multispec);
+            Multislicer multi(clipres);
             std::vector<ResultSingleTool> res;
             std::vector<SingleProcessOutput*> ress(numtools);
             double zstep = multispec->global.z_uniform_step;

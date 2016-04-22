@@ -67,6 +67,14 @@ void writeSVG(const char * filename, HoledPolygons &hps, bool insideIsBlack, dou
     fclose(f);
 }
 
+//this is a failsafe to avoid compiler errors, but users should set a default arena chunk size accordingly to the expected usage patterns
+#ifndef INITIAL_ARENA_SIZE
+#  define INITIAL_ARENA_SIZE (50*1024*1024)
+#endif
+
+template<typename CM = CLIPPER_MMANAGER> typename std::enable_if< CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER(INITIAL_ARENA_SIZE); }
+template<typename CM = CLIPPER_MMANAGER> typename std::enable_if<!CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER(); }
+
 std::string processMatches(const char * filename, const char * svgfilename, PathInFileSpec spec, bool matchFirst, bool insideIsBlack) {
     FILE * f = fopen(filename, "rb");
     if (f == NULL) { return str("Could not open file ", filename); }
@@ -79,7 +87,8 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
     int index = 0;
     IOPaths iop(f);
     clp::Paths output;
-    clp::Clipper clipper;
+    CLIPPER_MMANAGER manager = getManager();
+    clp::Clipper clipper(manager);
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         std::string e = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
         if (!e.empty()) { err = str("Error reading file ", filename, ": ", e); break; }

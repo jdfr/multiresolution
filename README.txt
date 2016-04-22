@@ -3,8 +3,9 @@ This project has been successfully compiled in MinGW-64, Visual Studio 2013, and
 BEFORE COMPILING:
 
 1. If it is not already at ../clipper, download or clone git repo at https://github.com/jdfr/clipper to have correctly placed the following files:
-      ../clipper/clipper.hpp
-      ../clipper/clipper.cpp
+      ../clipper/clipper/clipper.hpp
+      ../clipper/clipper/clipper.cpp
+      ../clipper/clipper/allocation_schemes.hpp
       ../clipper/iopaths/common.hpp
       ../clipper/iopaths/iopaths.hpp
       ../clipper/iopaths/iopaths.cpp

@@ -41,7 +41,7 @@ public:
     std::shared_ptr<MultiSpec> spec;
     std::shared_ptr<ClippingResources> res;
     Multislicer multi;
-    ToolpathManager(std::shared_ptr<MultiSpec> s) : multi(s) { res = multi.res; spec = std::move(s); slicess.resize(spec->numspecs); }
+    ToolpathManager(std::shared_ptr<ClippingResources> _res) : multi(std::move(_res)) { res = multi.res; spec = multi.res->spec; slicess.resize(spec->numspecs); }
     bool multislice(clp::Paths &input, double z, int ntool, int output_index);
     void removeUsedSlicesPastZ(double z);
     void removeAdditionalContoursPastZ(double z);
@@ -142,7 +142,7 @@ public:
 
     void clear() { input.clear(); output.clear(); err = std::string(); has_err = false; input_idx = output_idx = 0; zmin = zmax = 0.0; rm.clear(); }
 
-    SimpleSlicingScheduler(bool _removeUnused, std::shared_ptr<MultiSpec> s) : removeUnused(_removeUnused), has_err(false), tm(std::move(s)), rm(*this) {}
+    SimpleSlicingScheduler(bool _removeUnused, std::shared_ptr<ClippingResources> _res) : removeUnused(_removeUnused), has_err(false), tm(std::move(_res)), rm(*this) {}
     void createSlicingSchedule(double minz, double maxz, double epsilon, SchedulingMode mode);
 
     void computeNextInputSlices();

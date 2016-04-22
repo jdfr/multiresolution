@@ -2,6 +2,22 @@
 #include "showcontours.hpp"
 #include <cmath>
 
+void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::PolyTree &intermediate, clp::Paths &result) {
+    clipper.AddPath(clip, clp::ptClip, true);
+    clipper.AddPaths(subject, clp::ptSubject, subjectClosed);
+    if (subjectClosed) {
+        clipper.Execute(clp::ctIntersection, result, clp::pftNonZero, clp::pftNonZero);
+        clipper.Clear();
+    } else {
+        clipper.Execute(clp::ctIntersection, intermediate, clp::pftNonZero, clp::pftNonZero);
+        clipper.Clear();
+        OpenPathsFromPolyTree(intermediate, result);
+        intermediate.Clear();
+    }
+    if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
+}
+
+
 bool intersectSegmentAndHLine(const clp::IntPoint a, const clp::IntPoint ab, const clp::cInt abminy, const clp::cInt abmaxy, clp::cInt y, const clp::cInt minxl, const clp::cInt maxxl, clp::IntPoint &result) {
 
     if (ab.Y == 0) return false;
@@ -203,11 +219,11 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
 
     if (pathsClosed) {
         //for closed paths, we need to use full-blown clipping. Downside: extremely slow!!!
-        clp::PolyTree pt;
+        clp::PolyTree pt(res->clipper.allocPolyNode);
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 auto &enclosed = buffer.at(x, y);
-                clipPaths(clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
+                clipPaths(res->clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
             }
         }
     } else {

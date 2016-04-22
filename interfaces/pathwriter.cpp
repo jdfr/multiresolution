@@ -154,7 +154,7 @@ bool PathsFileWriter::close() {
     return ok;
 }
 
-bool SplittingPathWriter::setup(int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+bool SplittingPathWriter::setup(std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
     filename = std::move(file);
     numtools = ntools;
     isopen   = false;
@@ -185,7 +185,7 @@ bool SplittingPathWriter::setup(int ntools, Configuration *_cfg, SplittingSubPat
             prefix = filename; //assign each iteration because the state takes ownership of the string
         }
 
-        states.emplace_back(prefix, std::move(*conf));// , _cfg);
+        states.emplace_back(_res, prefix, std::move(*conf));// , _cfg);
         auto &splitter   = states.back().splitter;
         auto &subwriters = states.back().subwriters;
 

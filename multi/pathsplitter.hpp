@@ -1,7 +1,7 @@
 #ifndef PATHSPLITTER_HEADER
 #define PATHSPLITTER_HEADER
 
-#include "snapToGrid.hpp"
+#include "multislicer.hpp"
 
 /*to write an object in a machine that works in chunks (i.e. nanoscribe),
 we must divide it in small blocks. The blocks are cuboids, placed in a
@@ -41,36 +41,22 @@ public:
     clp::IntPoint originalSize;
     std::string err;
     Matrix<EnclosedPaths> buffer;
+    std::shared_ptr<ClippingResources> res;
     int numx, numy; //matrix sizes
     bool angle90;
     PathSplitterConfig config;
-    PathSplitter(PathSplitterConfig _config, Configuration *_cfg = NULL) : config(std::move(_config)), setup_done(false), cfg(_cfg) {}
+    PathSplitter(PathSplitterConfig _config, std::shared_ptr<ClippingResources> _res, Configuration *_cfg = NULL) : res(std::move(_res)), config(std::move(_config)), setup_done(false), cfg(_cfg) {}
     bool setup();
     bool processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling);
 protected:
     Matrix<char> insideSquare; //we want Matrix<bool>, but that does not play nice with references inside the container...
     std::vector<std::pair<int, int>> positionsToTest;
     Configuration *cfg;
-    clp::Clipper clipper;
     SnapToGridSpec snapspec;
     double sinangle;
     bool setup_done;
     bool simpler_snap;
     bool singlex, singley, justone;
 };
-
-inline void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::PolyTree &intermediate, clp::Paths &result) {
-    clipper.AddPath(clip, clp::ptClip, true);
-    clipper.AddPaths(subject, clp::ptSubject, subjectClosed);
-    if (subjectClosed) {
-        clipper.Execute(clp::ctIntersection, result, clp::pftNonZero, clp::pftNonZero);
-        clipper.Clear();
-    } else {
-        clipper.Execute(clp::ctIntersection, intermediate, clp::pftNonZero, clp::pftNonZero);
-        clipper.Clear();
-        OpenPathsFromPolyTree(intermediate, result);
-        intermediate.Clear();
-    }
-}
 
 #endif

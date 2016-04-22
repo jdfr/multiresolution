@@ -226,7 +226,8 @@ int main(int argc, const char** argv) {
             split.max.Y = bb.maxy;
         }
 
-        NanoscribeSplittingPathWriter pathsplitter(*multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+        std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(std::shared_ptr<MultiSpec>());
+        NanoscribeSplittingPathWriter pathsplitter(clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
 
         if (!pathsplitter.err.empty()) { fprintf(stderr, "%s\n", pathsplitter.err.c_str()); return -1; }
 

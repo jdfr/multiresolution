@@ -1,14 +1,14 @@
 #ifndef SUBPROCESS_HEADER
 #define SUBPROCESS_HEADER
 
+#include "common.hpp"
+#include "config.hpp"
+
 #if defined(_WIN32) || defined(_WIN64)
 #  define INWINDOWS
 #  include <windows.h>
 #  include <io.h>
 #endif
-
-#include "common.hpp"
-#include "config.hpp"
 
 #include <stdio.h>
 #include <string>

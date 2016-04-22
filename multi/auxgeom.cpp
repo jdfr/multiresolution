@@ -223,20 +223,22 @@ void HoledPolygon::addToSegments(Segments &segments) {
 
 void HoledPolygon::offset(clp::ClipperOffset &offset, double radius, HoledPolygons &result) {
     result.clear();
-    clp::PolyTree pt;
+    clp::PolyTree pt(offset.allocPolyNode);
     this->offset(offset, radius, pt);
     AddPolyTreeToHPs(pt, result);
+    if (CLIPPER_MMANAGER::useReset) ResetWithManager(offset, &pt);
 }
 
 void HoledPolygon::offset2(clp::ClipperOffset &offset, double radius1, double radius2, HoledPolygons &result) {
     result.clear();
     clp::Paths pth;
     this->offset(offset, radius1, pth);
-    clp::PolyTree pt;
+    clp::PolyTree pt(offset.allocPolyNode);
     offset.AddPaths(pth, clp::jtRound, clp::etClosedPolygon);
     offset.Execute(pt, radius2);
     offset.Clear();
     AddPolyTreeToHPs(pt, result);
+    if (CLIPPER_MMANAGER::useReset) ResetWithManager(offset, &pt);
 }
 
 void recursiveAddPolyTreeToHPs(clp::PolyNode& polynode, HoledPolygons &hps) {
@@ -268,11 +270,12 @@ void AddPolyTreeToHPs(clp::PolyTree &pt, HoledPolygons &hps) {
 
 void AddPathsToHPs(clp::Clipper &clipper, clp::Paths &paths, HoledPolygons &hps) {
     clipper.AddPaths(paths, clp::ptSubject, true);
-    clp::PolyTree pt;
+    clp::PolyTree pt(clipper.allocPolyNode);
     clipper.Execute(clp::ctUnion, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
     
     AddPolyTreeToHPs(pt, hps);
+    if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper, &pt);
 }
 
 void AddHPsToPaths(HoledPolygons &hps, clp::Paths &paths) {
@@ -317,9 +320,10 @@ void HoledPolygon::clipPaths(clp::Clipper &clipper, clp::Paths &paths) {
     clipper.AddPath(this->contour, clp::ptClip, true);
     //out =
     clipper.AddPaths(this->holes, clp::ptClip, true);
-    clp::PolyTree polytree;
-    clipper.Execute(clp::ctIntersection, polytree, clp::pftEvenOdd, clp::pftEvenOdd);
+    clp::PolyTree pt(clipper.allocPolyNode);
+    clipper.Execute(clp::ctIntersection, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
-    clp::PolyTreeToPaths(polytree, paths);
+    clp::PolyTreeToPaths(pt, paths);
+    if (CLIPPER_MMANAGER::useReset) ResetWithManager(clipper, &pt);
 }
 

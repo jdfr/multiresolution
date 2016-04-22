@@ -231,7 +231,7 @@ bool SimpleNanoscribePathWriter::writePathsSpecific(clp::Paths &paths, int type,
                 subconf.useOrigin = false;
                 subconf.min = square[0];
                 subconf.max = square[2];
-                PathSplitter subsplitter(subconf);
+                PathSplitter subsplitter(subconf, splitter.res);
                 bool old_overrideGalvoMode = overrideGalvoMode;
                 overrideGalvoMode = true;
                 if (!subsplitter.setup()) {
@@ -375,7 +375,7 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
 }
 
 
-NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
+NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(std::shared_ptr<ClippingResources> _res, MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
     nanoconfigs = std::move(_nanoconfigs);
     double epsilon = spec.global.z_epsilon;
     SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string &filename, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
@@ -383,7 +383,7 @@ NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(MultiSpec &spec, Si
         double eps = epsilon * nanoconfigs[i]->factor_internal_to_input;
         return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z);
     };
-    setup((int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
+    setup(std::move(_res), (int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }
 
 bool writeSquare(FILE *f, clp::Path square, double factor) {
