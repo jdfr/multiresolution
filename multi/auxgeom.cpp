@@ -223,7 +223,7 @@ void HoledPolygon::addToSegments(Segments &segments) {
 
 void HoledPolygon::offset(clp::ClipperOffset &offset, double radius, HoledPolygons &result) {
     result.clear();
-    clp::PolyTree pt(offset);
+    clp::PolyTree pt;
     this->offset(offset, radius, pt);
     AddPolyTreeToHPs(pt, result);
     ClipperEndOperation(offset, &pt);
@@ -233,7 +233,7 @@ void HoledPolygon::offset2(clp::ClipperOffset &offset, double radius1, double ra
     result.clear();
     clp::Paths pth;
     this->offset(offset, radius1, pth);
-    clp::PolyTree pt(offset);
+    clp::PolyTree pt;
     offset.AddPaths(pth, clp::jtRound, clp::etClosedPolygon);
     offset.Execute(pt, radius2);
     offset.Clear();
@@ -270,7 +270,7 @@ void AddPolyTreeToHPs(clp::PolyTree &pt, HoledPolygons &hps) {
 
 void AddPathsToHPs(clp::Clipper &clipper, clp::Paths &paths, HoledPolygons &hps) {
     clipper.AddPaths(paths, clp::ptSubject, true);
-    clp::PolyTree pt(clipper);
+    clp::PolyTree pt;
     clipper.Execute(clp::ctUnion, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
     
@@ -320,7 +320,7 @@ void HoledPolygon::clipPaths(clp::Clipper &clipper, clp::Paths &paths) {
     clipper.AddPath(this->contour, clp::ptClip, true);
     //out =
     clipper.AddPaths(this->holes, clp::ptClip, true);
-    clp::PolyTree pt(clipper);
+    clp::PolyTree pt;
     clipper.Execute(clp::ctIntersection, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
     clp::PolyTreeToPaths(pt, paths);

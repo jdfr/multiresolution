@@ -262,7 +262,7 @@ void ClippingResources::doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths
     clipper.AddPaths(aux1, clp::ptClip, true);
     //execute the difference. NOTE: for intersected paths, the result can be either an open path or a pair of open paths for each path sharing a common arc with lower resolution contours.
     //the latter (two paths) happens if the endpoint is not in the common arc. unintersected paths should not be affected by the operation
-    clp::PolyTree pt(clipper);
+    clp::PolyTree pt;
     clipper.Execute(clp::ctDifference, pt, clp::pftEvenOdd, clp::pftEvenOdd);
     clipper.Clear();
     clp::PolyTreeToPaths(pt, toolpaths); //copies both closed and open paths
@@ -374,7 +374,7 @@ void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<doubl
             //offset the medial axis paths and substract the result from the remaining contours
             clipper.AddPath(hp->contour, clp::ptSubject, true);
             clipper.AddPaths(hp->holes, clp::ptSubject, true);
-            clp::PolyTree pt(clipper);
+            clp::PolyTree pt;
             operateInflatedLinesAndContoursInClipper(clp::ctDifference, pt, accum_medialaxis, (double)ppspec.radius, &aux, inflated_acumulator);
             AddPolyTreeToHPs(pt, *newhps);
             ClipperEndOperation(clipper, &pt);
@@ -478,7 +478,7 @@ void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &
     }
     res->clipper.AddPaths(lines, clp::ptSubject, false);
     {
-        clp::PolyTree pt(res->clipper);
+        clp::PolyTree pt;
         res->clipper.Execute(clp::ctIntersection, pt, clp::pftEvenOdd, clp::pftEvenOdd);
         clp::PolyTreeToPaths(pt, lines);
         ClipperEndOperation(res->clipper, &pt);

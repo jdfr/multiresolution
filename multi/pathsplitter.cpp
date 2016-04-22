@@ -219,7 +219,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
 
     if (pathsClosed) {
         //for closed paths, we need to use full-blown clipping. Downside: extremely slow!!!
-        clp::PolyTree pt(res->clipper);
+        clp::PolyTree pt;
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 auto &enclosed = buffer.at(x, y);
