@@ -17,6 +17,15 @@ void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool
     ClipperEndOperation(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
 }
 
+void clipPaths(clp::Clipper &clipper, bool pathsClosed, clp::Paths &paths, Matrix<PathSplitter::EnclosedPaths> &buffer) {
+    clp::PolyTree pt;
+    for (int x = 0; x < buffer.numx; ++x) {
+        for (int y = 0; y < buffer.numy; ++y) {
+            auto &enclosed = buffer.at(x, y);
+            clipPaths(clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
+        }
+    }
+}
 
 bool intersectSegmentAndHLine(const clp::IntPoint a, const clp::IntPoint ab, const clp::cInt abminy, const clp::cInt abmaxy, clp::cInt y, const clp::cInt minxl, const clp::cInt maxxl, clp::IntPoint &result) {
 
@@ -218,14 +227,8 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
     }
 
     if (pathsClosed) {
-        //for closed paths, we need to use full-blown clipping. Downside: extremely slow!!!
-        clp::PolyTree pt;
-        for (int x = 0; x < numx; ++x) {
-            for (int y = 0; y < numy; ++y) {
-                auto &enclosed = buffer.at(x, y);
-                clipPaths(res->clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
-            }
-        }
+       //for closed paths, we need to use full-blown clipping. Downside: very slow!!!
+        clipPaths(res->clipper, pathsClosed, paths, buffer);
     } else {
         //for open paths, clipping can be greatly accelerated
         clp::Paths snappeds(paths);
@@ -320,7 +323,11 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
                                     previouslyInside = true;
                                 } else {
                                     //the intersection could not be computed: this should never happen.
-                                    fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (currentlyInside && !previouslyInside): could not compute intersection between segment and square\n");
+                                    //fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (currentlyInside && !previouslyInside): could not compute intersection between segment and square\n");
+                                  
+                                    //this state may be reached sometimes, but we do not have time to debug it. Abort current operation and trade speed of execution for speed of development...
+                                    clipPaths(res->clipper, pathsClosed, paths, buffer);
+                                    return true;
                                 }
                             }
                         } else {
@@ -336,7 +343,11 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
                                     enclosed.paths.back().push_back(p);
                                 } else {
                                     //the intersection could not be computed: this should never happen.
-                                    fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (!currentlyInside && previouslyInside): could not compute intersection between segment and square\n");
+                                    //fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (!currentlyInside && previouslyInside): could not compute intersection between segment and square\n");
+                                  
+                                    //this state may be reached sometimes, but we do not have time to debug it. Abort current operation and trade speed of execution for speed of development...
+                                    clipPaths(res->clipper, pathsClosed, paths, buffer);
+                                    return true;
                                 }
                             } else {
                                 //point is not inside, and the square contained no points: do nothing
