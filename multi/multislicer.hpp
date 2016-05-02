@@ -29,9 +29,11 @@ typedef struct SingleProcessOutput {
 #  define INITIAL_ARENA_SIZE (50*1024*1024)
 #endif
 
+
 //Common resources for all multislicing subsystems
 class ClippingResources {
 public: 
+    static const bool MemoryManagerPrintDebugMessages = false;
     CLIPPER_MMANAGER manager_offset;
     CLIPPER_MMANAGER manager_clipper;
     CLIPPER_MMANAGER manager_clipper2;
@@ -40,8 +42,13 @@ public:
     clp::Clipper clipper2; //we need this in order to conduct more than one clipping in parallel, if necessary
     std::string *err; //this is a temp. pointer which is set up by applyXXX() methods in MultiSlicer
     std::shared_ptr<MultiSpec> spec;
-    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if< CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : manager_offset(INITIAL_ARENA_SIZE), manager_clipper(INITIAL_ARENA_SIZE), manager_clipper2(INITIAL_ARENA_SIZE), offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
-    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if<!CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
+    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if< CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : 
+        manager_offset  ("OFFSET",   MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
+        manager_clipper ("CLIPPER",  MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
+        manager_clipper2("CLIPPER2", MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
+        offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
+    template<typename MS = MultiSpec> ClippingResources(typename std::enable_if<!CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) :
+        offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
 
     //// STATELESS, LOW LEVEL HELPER TEMPLATES ////
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContoursInClipper(clp::ClipType mode, T &res, clp::Paths &lines,                       double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
