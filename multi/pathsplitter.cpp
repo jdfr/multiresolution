@@ -186,6 +186,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
         return false;
     }
     if (justone) {
+        buffer.data[0].actualSquare = buffer.data[0].originalSquare;
         buffer.data[0].paths = paths;
         return true;
     }
