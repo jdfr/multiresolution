@@ -386,7 +386,7 @@ int Main(int argc, const char** argv) {
         }
 
     } catch (std::exception &e) {
-        fprintf(stderr, e.what()); return -1;
+        fprintf(stderr, "%s\n", e.what()); return -1;
     }
 
     if (dryrun) {
@@ -751,7 +751,7 @@ int Main(int argc, const char** argv) {
         }
     } catch (clp::clipperException &e) {
         std::string err = handleClipperException(e);
-        fprintf(stderr, err.c_str());
+        fprintf(stderr, "%s\n", err.c_str());
     } catch (std::exception &e) {
         fprintf(stderr, "Unhandled exception while computing the output.\n   Exception    type: %s\n   Exception message: %s\n", typeid(e).name(), e.what()); return -1;
     }
