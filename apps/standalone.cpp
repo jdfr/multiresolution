@@ -433,7 +433,7 @@ int Main(int argc, const char** argv) {
     bbmn.X = (clp::cInt) (minx * factors.input_to_internal);
     bbmn.Y = (clp::cInt) (miny * factors.input_to_internal);
     bbmx.X = (clp::cInt) (maxx * factors.input_to_internal);
-    bbmx.Y = (clp::cInt) (maxx * factors.input_to_internal);
+    bbmx.Y = (clp::cInt) (maxy * factors.input_to_internal);
 
     if (nanoSpec.useSpec) {
         //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
