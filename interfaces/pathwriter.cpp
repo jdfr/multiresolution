@@ -199,8 +199,8 @@ bool SplittingPathWriter::setup(std::shared_ptr<ClippingResources> _res, int nto
         auto numx = splitter.numx;
         auto numy = splitter.numy;
         subwriters.reset(numx, numy);
-        int num0x = (int)std::ceil(std::log10(numx-1));
-        int num0y = (int)std::ceil(std::log10(numy-1));
+        int num0x = numx < 10 ? 1 : (int)std::ceil(std::log10(numx-1));
+        int num0y = numy < 10 ? 1 : (int)std::ceil(std::log10(numy-1));
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 std::string suffix = str(".N", n, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), y);
