@@ -92,16 +92,17 @@ void ParserStandaloneLocalAndGlobal::parseSaveInGridOption(po::variables_map &vm
         }
         throw po::error(str("option --", opt, " requires either 2 or 4 arguments, but it has ", s));
     }
+    double scale        = factors.doparamscale ? factors.param_to_internal : 1.0;
     double displacement = vals[0];
     double margin       = vals[1];
     conf.wallAngle      = 90; //no need to set conf[0].zmin
     conf.displacement.X =
-    conf.displacement.Y = (clp::cInt)(vals[0] * factors.input_to_internal);
-    conf.margin         = (clp::cInt)(vals[1] * factors.input_to_internal);
+    conf.displacement.Y = (clp::cInt)(vals[0] * scale);
+    conf.margin         = (clp::cInt)(vals[1] * scale);
     conf.useOrigin      = s==4;
     if (conf.useOrigin) {
-        conf.origin.X   = (clp::cInt)(vals[2] * factors.input_to_internal);
-        conf.origin.Y   = (clp::cInt)(vals[3] * factors.input_to_internal);
+        conf.origin.X   = (clp::cInt)(vals[2] * scale);
+        conf.origin.Y   = (clp::cInt)(vals[3] * scale);
     }
 }
 
