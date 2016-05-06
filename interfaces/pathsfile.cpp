@@ -250,3 +250,15 @@ int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode) {
     s *= 8;
     return s;
 }
+
+void writeTriangleMeshToOFF(FILE *f, const char *float_format, TriangleMesh &mesh) {
+    fprintf(f, "OFF\n%ld %ld 0\n", mesh.points.size(), mesh.triangles.size());
+    std::string formatstr = str(float_format, ' ', float_format, ' ', float_format, "\n");
+    const char * format = formatstr.c_str();
+    for (auto &point : mesh.points) {
+      fprintf(f, format, point.x, point.y, point.z);
+    }
+    for (auto &triangle : mesh.triangles) {
+      fprintf(f, "3 %d %d %d\n", triangle.a, triangle.b, triangle.c);
+    }
+}

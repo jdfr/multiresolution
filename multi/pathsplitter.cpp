@@ -180,6 +180,51 @@ bool PathSplitter::setup() {
     return true;
 }
 
+std::vector<TriangleMesh::Triangle> generateGridCubeTriangles() {
+    return std::vector<TriangleMesh::Triangle>({
+      TriangleMesh::Triangle(0, 2, 1),
+      TriangleMesh::Triangle(1, 2, 3),
+      TriangleMesh::Triangle(0, 4, 6),
+      TriangleMesh::Triangle(0, 6, 2),
+      TriangleMesh::Triangle(1, 3, 5),
+      TriangleMesh::Triangle(3, 7, 5),
+      TriangleMesh::Triangle(1, 5, 0),
+      TriangleMesh::Triangle(0, 5, 4),
+      TriangleMesh::Triangle(2, 6, 3),
+      TriangleMesh::Triangle(3, 6, 7),
+      TriangleMesh::Triangle(4, 7, 6),
+      TriangleMesh::Triangle(4, 5, 7)
+    });
+}
+
+void generateGridCubePoints(std::vector<TriangleMesh::Point> &ps, clp::Path &square, double scaling, double zmin, double zmax) {
+    double xmin = square[0].X * scaling;
+    double ymin = square[0].Y * scaling;
+    double xmax = square[2].X * scaling;
+    double ymax = square[2].Y * scaling;
+    ps.reserve(8);
+    ps.emplace_back(xmin, ymin, zmin);
+    ps.emplace_back(xmax, ymin, zmin);
+    ps.emplace_back(xmin, ymax, zmin);
+    ps.emplace_back(xmax, ymax, zmin);
+    ps.emplace_back(xmin, ymin, zmax);
+    ps.emplace_back(xmax, ymin, zmax);
+    ps.emplace_back(xmin, ymax, zmax);
+    ps.emplace_back(xmax, ymax, zmax);
+}
+
+Matrix<TriangleMesh> PathSplitter::generateGridCubes(double scaling, double zmin, double zmax) {
+    Matrix<TriangleMesh> result(numx, numy);
+    auto trs = generateGridCubeTriangles();
+    auto output = result.data.begin();
+    for (auto encl = buffer.data.begin(); encl != buffer.data.end(); ++encl, ++output) {
+       output->triangles = trs;
+       generateGridCubePoints(output->points, encl->originalSquare, scaling, zmin, zmax);
+    }
+    return result;
+}
+
+
 bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling) {
     if ((z < config.zmin) && !angle90) {
         err = str("Error while splitting toolpaths: z=%g < zmin=%g (this is illegal because the configuration specifies a non-right angle)");

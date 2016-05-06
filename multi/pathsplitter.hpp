@@ -47,6 +47,7 @@ public:
     PathSplitterConfig config;
     PathSplitter(PathSplitterConfig _config, std::shared_ptr<ClippingResources> _res, Configuration *_cfg = NULL) : res(std::move(_res)), config(std::move(_config)), setup_done(false), cfg(_cfg) {}
     bool setup();
+    Matrix<TriangleMesh> generateGridCubes(double scaling, double zmin, double zmax);
     bool processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling);
 protected:
     Matrix<char> insideSquare; //we want Matrix<bool>, but that does not play nice with references inside the container...

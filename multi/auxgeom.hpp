@@ -226,4 +226,21 @@ BBox getBB(clp::Paths &paths);
 BBox getBB(HoledPolygon &hp);
 BBox getBB(HoledPolygons &hps);
 
+typedef struct TriangleMesh {
+  struct Point {
+    double x, y, z;
+    Point() = default;
+    Point(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
+  };
+  struct Triangle {
+    int a, b, c;
+    Triangle() = default;
+    Triangle(int _a, int _b, int _c) : a(_a), b(_b), c(_c) {}
+  };
+  std::vector<Point>    points;
+  std::vector<Triangle> triangles;
+  TriangleMesh() = default;
+  TriangleMesh(int npoints, int ntriangles) : points(npoints), triangles(ntriangles) {}
+} TriangleMesh;
+
 #endif

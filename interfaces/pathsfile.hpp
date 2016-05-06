@@ -91,4 +91,6 @@ bool read3DPaths(IOPaths &iop, Paths3D &paths);
 bool write3DPaths(IOPaths &iop, Paths3D &paths, PathCloseMode mode);
 int getPathsSerializedSize(Paths3D &paths, PathCloseMode mode);
 
+void writeTriangleMeshToOFF(FILE *f, const char *float_format, TriangleMesh &mesh);
+
 #endif
