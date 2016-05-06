@@ -584,7 +584,7 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
     if (sched.tm.spec->global.fb.feedbackMesh) {
 
-        std::shared_ptr<SlicerManager> feedbackSlicer = getExternalSlicerManager(config, factors, config.getValue("SLICER_DEBUGFILE_FEEDBACK"));
+        std::shared_ptr<SlicerManager> feedbackSlicer = getExternalSlicerManager(config, factors, config.getValue("SLICER_DEBUGFILE_FEEDBACK"), "");
 
         char *meshfullpath = fullPath(sched.tm.spec->global.fb.feedbackFile.c_str());
         if (meshfullpath == NULL) {

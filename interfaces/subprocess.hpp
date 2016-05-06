@@ -18,9 +18,10 @@ public:
     std::vector<std::string> args;
     std::string workdir;
     std::string execpath;
+    std::string exename;
     bool pipeInput, pipeOutput;
     FILE *pipeIN, *pipeOUT;
-    SubProcessManager(bool pipeI = false, bool pipeO = false) : pipeInput(pipeI), pipeOutput(pipeO), inUse(false) {}
+    SubProcessManager(bool pipeI = false, bool pipeO = false) : pipeInput(pipeI), pipeOutput(pipeO), inUse(false), exename("subprocess") {}
     virtual ~SubProcessManager() { wait(); }
     virtual std::string start();
     virtual bool started() { return inUse; }

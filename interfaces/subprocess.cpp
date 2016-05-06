@@ -157,7 +157,7 @@ std::string SubProcessManager::start() {
 
         std::vector<const char *> argv;
 		argv.reserve(args.size()+2);
-        argv.push_back("subprocess");
+        argv.push_back(exename.c_str());
         for (auto arg = args.begin(); arg != args.end(); ++arg) {
             argv.push_back(arg->c_str());
         }

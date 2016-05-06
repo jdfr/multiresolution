@@ -24,6 +24,6 @@ public:
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep);
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep);
 
-std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME);
+std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME, std::string postfix);
 
 #endif

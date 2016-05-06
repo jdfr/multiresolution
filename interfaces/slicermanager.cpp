@@ -12,6 +12,7 @@ class ExternalSlicerManager : public SlicerManager {
 #ifdef SLICER_USE_DEBUG_FILE
     std::string debugfile;
 #endif
+    std::string postfix;
     std::string execpath;
     std::string workdir;
     std::string err;
@@ -26,11 +27,11 @@ public:
 #ifdef SLICER_USE_DEBUG_FILE
         std::string _debugfile,
 #endif
-    std::string _execpath, std::string _workdir, bool _repair, bool _incremental, double _scaled) :
+    std::string _postfix, std::string _execpath, std::string _workdir, bool _repair, bool _incremental, double _scaled) :
 #ifdef SLICER_USE_DEBUG_FILE
     debugfile(std::move(_debugfile)),
 #endif
-    subp(true, true), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scaled(_scaled), scale((long)_scaled), useIntegerScale(((double)scale)==scaled), scalingFactor(0.0) {}
+    subp(true, true), postfix(_postfix), execpath(std::move(_execpath)), workdir(std::move(_workdir)), repair(_repair), incremental(_incremental), scaled(_scaled), scale((long)_scaled), useIntegerScale(((double)scale)==scaled), scalingFactor(0.0) {}
     virtual ~ExternalSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
     virtual bool terminate();
@@ -58,6 +59,8 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
     subp.args.push_back(std::string(incremental ? "incremental" : "noincremental"));
     subp.args.push_back(stlfilename);
+    
+    if (!postfix.empty()) subp.exename += postfix;
 
     err = subp.start();
 
@@ -171,11 +174,13 @@ void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
 }
 
 
-std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME) {
+std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME, std::string postfix) {
+    DEBUG_FILE_NAME += postfix;
     return std::make_shared<ExternalSlicerManager>(
 #ifdef SLICER_USE_DEBUG_FILE
         std::move(DEBUG_FILE_NAME),
 #endif
+        std::move(postfix),
         config.getValue("SLICER_EXEC"),
         config.getValue("SLICER_PATH"),
         config.getValue("SLICER_REPAIR").compare("true") == 0,
