@@ -131,7 +131,7 @@ void createCubesFromGrid(const char *cubeNameTemplate, PathSplitterConfigs &save
     }
     fprintf(stdout, "\n");
     for (auto &prefix : prefixes) {
-      fprintf(stdout, "meshlabserver -i \"%s.output.off\" \"%s.output.stl\"\n", prefix.c_str(), prefix.c_str());
+      fprintf(stdout, "meshlabserver -i \"%s.output.off\" -o \"%s.output.stl\"\n", prefix.c_str(), prefix.c_str());
     }
     fprintf(stdout, "\n\nAnd that's it.\n");
 }
