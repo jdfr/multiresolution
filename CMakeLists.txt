@@ -67,7 +67,7 @@ if( ("${PYTHON_EXECUTABLE}" STREQUAL "") OR ("${PYTHON_EXECUTABLE_SETUP}" STREQU
   endif()
 endif()
 
-set(SHOW_RESULT_PARAMETERS "show --2d" CACHE PATH "configuration option for the example param.txt file")
+set(SHOW_RESULT_PARAMETERS "--show 2d" CACHE PATH "configuration option for the example param.txt file")
 set(INITIAL_MESH_FILE "PUT_HERE_YOUR_STL_FILE" CACHE PATH "configuration option for the example param.txt file")
 
 if (USE_PYTHON_DEBUG OR USE_PYTHON_VIEWER)
