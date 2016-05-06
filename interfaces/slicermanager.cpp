@@ -51,9 +51,9 @@ bool ExternalSlicerManager::start(const char * stlfilename) {
     subp.args.clear();
 #ifdef SLICER_USE_DEBUG_FILE
     if (debugfile.empty()) {
-        debugfile = "slicerlog.standalone.txt";
+        debugfile = "slicerlog.standalone";
     }
-    subp.args.push_back(debugfile);
+    subp.args.push_back(str(debugfile, ".txt"));
 #endif
     subp.args.push_back(std::string(repair ? "repair" : "norepair"));
     subp.args.push_back(std::string(incremental ? "incremental" : "noincremental"));
@@ -170,24 +170,15 @@ void ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     }
 }
 
-std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, MetricFactors &factors, SlicerManagerType type) {
-    switch (type) {
 
-    case SlicerManagerExternal: {
-
-        return std::make_shared<ExternalSlicerManager>(
+std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME) {
+    return std::make_shared<ExternalSlicerManager>(
 #ifdef SLICER_USE_DEBUG_FILE
-            config.getValue("SLICER_DEBUGFILE"),
+        std::move(DEBUG_FILE_NAME),
 #endif
-            config.getValue("SLICER_EXEC"),
-            config.getValue("SLICER_PATH"),
-            config.getValue("SLICER_REPAIR").compare("true") == 0,
-            config.getValue("SLICER_INCREMENTAL").compare("true") == 0,
-            factors.slicer_to_internal);
-
-    } case SlicerManagerNative:
-    default:
-        //not implemented yet
-        return std::shared_ptr<ExternalSlicerManager>();
-    }
+        config.getValue("SLICER_EXEC"),
+        config.getValue("SLICER_PATH"),
+        config.getValue("SLICER_REPAIR").compare("true") == 0,
+        config.getValue("SLICER_INCREMENTAL").compare("true") == 0,
+        factors.slicer_to_internal);
 }

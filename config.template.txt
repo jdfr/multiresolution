@@ -13,8 +13,8 @@
 #comments, keys and values. A more complex tokenizer may be used to avoid this restriction altogether.
 
 # config values for the external slicer
-SLICER_DEBUGFILE             : slicerlog.standalone.txt ;
-SLICER_DEBUGFILE_FEEDBACK    : slicerlog.feedback.txt ;
+SLICER_DEBUGFILE             : slicerlog.standalone ;
+SLICER_DEBUGFILE_FEEDBACK    : slicerlog.feedback ;
 SLICER_PATH                  : ${SLICER_PATH} ;
 SLICER_EXEC                  : ${SLICER_EXEC} ;
 SLICER_REPAIR                : true ;

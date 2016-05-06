@@ -584,19 +584,7 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
     if (sched.tm.spec->global.fb.feedbackMesh) {
 
-#ifdef SLICER_USE_DEBUG_FILE
-        //make sure that the log file is not the same as for the other slicer instance!
-        const char * feedbackKey = "SLICER_DEBUGFILE_FEEDBACK";
-        std::string feedbackdebugfile = config.hasKey(feedbackKey) ? config.getValue(feedbackKey) : "slicerlog.feedback.txt";
-        std::string oldValue = config.getValue("SLICER_DEBUGFILE");
-        config.update("SLICER_DEBUGFILE", feedbackdebugfile);
-#endif
-
-        std::shared_ptr<SlicerManager> feedbackSlicer = getSlicerManager(config, factors, SlicerManagerExternal);
-
-#ifdef SLICER_USE_DEBUG_FILE
-        config.update("SLICER_DEBUGFILE", oldValue);
-#endif
+        std::shared_ptr<SlicerManager> feedbackSlicer = getExternalSlicerManager(config, factors, config.getValue("SLICER_DEBUGFILE_FEEDBACK"));
 
         char *meshfullpath = fullPath(sched.tm.spec->global.fb.feedbackFile.c_str());
         if (meshfullpath == NULL) {

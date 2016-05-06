@@ -398,8 +398,7 @@ int Main(int argc, const char** argv) {
         }
     }
 
-    std::shared_ptr<SlicerManager> slicer = getSlicerManager(*config, factors, SlicerManagerExternal);
-    //SlicerManager *slicer = getSlicerManager(SlicerManagerNative);
+    std::shared_ptr<SlicerManager> slicer = getExternalSlicerManager(*config, factors, config->getValue("SLICER_DEBUGFILE"));
 #ifdef STANDALONE_USEPYTHON
     std::shared_ptr<SlicesViewer> slicesViewer;
     if (show) {

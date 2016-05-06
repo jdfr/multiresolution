@@ -24,11 +24,6 @@ public:
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep);
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep);
 
-enum SlicerManagerType {
-    SlicerManagerExternal,
-    SlicerManagerNative
-};
-
-std::shared_ptr<SlicerManager> getSlicerManager(Configuration &config, MetricFactors &factors, SlicerManagerType type);
+std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME);
 
 #endif
