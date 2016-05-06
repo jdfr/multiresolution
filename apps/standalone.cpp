@@ -281,7 +281,7 @@ int Main(int argc, const char** argv) {
         std::string meshfilename;
         if (mainOpts.count("load")) {
             meshfilename = std::move(mainOpts["load"].as<std::string>());
-        } else if (!dryrun) {
+        } else {
             fprintf(stderr, "Error: load parameter has not been specified!");
         }
 
