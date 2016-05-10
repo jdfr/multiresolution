@@ -17,7 +17,7 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
     std::vector<FILE *> is(numinputs, NULL);
     std::vector<FileHeader> fileheaders_i(numinputs);
     FileHeader fileheader_o;
-    fileheader_o.version  = 0; //if we ever have more than one version, we will need to handle this meaningfully instead of just hard-coding it
+    fileheader_o.version  = 1; //this must be kept in sync with FileHeader read/write code in pathsfile.cpp
     fileheader_o.numtools = 0;
     fileheader_o.useSched = false;
     fileheader_o.numRecords = 0;
@@ -31,6 +31,11 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
             fileheader_o.numtools = fileheaders_i[i].numtools;
             fileheader_o.useSched = fileheaders_i[i].useSched;
             fileheader_o.voxels   = fileheaders_i[i].voxels;
+            if (fileheaders_i[i].version > 0) { //there is no clear way to do this. For the moment, just overwrite data...
+                if (!fileheaders_i[i].additional.empty()) {
+                    fileheader_o.additional = std::move(fileheaders_i[i].additional);
+                }
+            }
         }
     }
 

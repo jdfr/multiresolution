@@ -27,6 +27,17 @@ std::string printPathInfo(const char * filename, bool verbose) {
             }
             fprintf(stdout, "\n");
         }
+    }
+    
+    fprintf(stdout, "File version: %d\n", fileheader.version);
+    if ((fileheader.version > 0) && (!fileheader.additional.empty())) {
+        fprintf(stdout, "Additional metadata: %ld words\n", fileheader.additional.size());
+        for (int i = 0; i < fileheader.additional.size(); ++i) {
+            fprintf(stdout, "  %d int64: %21ld, double: %.12f\n", i, fileheader.additional[i].i, fileheader.additional[i].d);
+        }
+    }
+    
+    if (verbose) {
         fprintf(stdout, "Number of Records: %d\n", fileheader.numRecords);
         fprintf(stdout, "\n\n");
     }

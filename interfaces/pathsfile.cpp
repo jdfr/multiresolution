@@ -25,7 +25,7 @@ char *fullPath(const char *path) {
 }
 
 void FileHeader::buildFrom(MultiSpec &multispec, MetricFactors &factors) {
-    version  = 0;
+    version  = 1;
     numtools = multispec.numspecs;
     useSched = multispec.global.useScheduler;
     voxels.reserve(numtools);
@@ -57,6 +57,13 @@ std::string FileHeader::writeToFile(FILE *f, bool alsoNumRecords) {
             if (fwrite(&(voxels[k].z_applicationPoint), sizeof(double), 1, f) != 1) return std::string("could not write Z application point to file!");
         }
     }
+    if (version>0) {
+        int64 numadditional = additional.size();
+        if (fwrite(&numadditional, sizeof(numadditional), 1, f) != 1) return std::string("Could not write additonal size!");
+        if (numadditional>0) {
+            if (fwrite(&additional.front(), sizeof(numadditional), numadditional, f) != numadditional) return std::string("Could not write additonal data!");
+        }
+    }
     if (alsoNumRecords) {
         if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) return std::string("could not write numRecords to file!");
     }
@@ -64,13 +71,13 @@ std::string FileHeader::writeToFile(FILE *f, bool alsoNumRecords) {
 }
 
 int FileHeader::numRecordsOffset() {
-    return (int)(sizeof(double) * (3 + (numtools * (useSched ? 4 : 1))));
+    return (int)(sizeof(double) * (3 + (numtools * (useSched ? 4 : 1)) + (version==0 ? 0 : 1 + additional.size())));
 }
 
 std::string FileHeader::readFromFile(FILE * f) {
     if (fread(&version, 4, 1, f) != 1) return std::string("could not read magic number from file!");
     if (fread(&version, 4, 1, f) != 1) return std::string("could not read version from file!");
-    if (version != 0) return std::string("File has non-supported version!!!");
+    if (version > 1) return std::string("File has non-supported version!!!");
     if (fread(&numtools, sizeof(numtools), 1, f) != 1) return std::string("could not read numtools from file!");
     if (fread(&useSched, sizeof(useSched), 1, f) != 1) return std::string("could not read useSched from file!");
     voxels.clear(); voxels.resize(numtools);
@@ -80,6 +87,14 @@ std::string FileHeader::readFromFile(FILE * f) {
             if (fread(&(voxels[k].zrad),               sizeof(double), 1, f) != 1) return str("Could not read radiusZ for tool ", k);
             if (fread(&(voxels[k].zheight),            sizeof(double), 1, f) != 1) return str("Could not read Z height for tool ", k);
             if (fread(&(voxels[k].z_applicationPoint), sizeof(double), 1, f) != 1) return str("Could not read Z app point for tool ", k);
+        }
+    }
+    if (version > 0) {
+        int64 numadditional;
+        if (fread(&numadditional, sizeof(numadditional), 1, f) != 1) return std::string("could not read additional size!");
+        if (numadditional>0) {
+            additional.resize(numadditional);
+            if (fread(&additional.front(), sizeof(numadditional), numadditional, f) != numadditional) return std::string("could not read additional data!");
         }
     }
     if (fread(&numRecords, sizeof(numRecords), 1, f) != 1) return std::string("could not read numRecords from file!");

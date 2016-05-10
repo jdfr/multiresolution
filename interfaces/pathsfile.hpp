@@ -34,6 +34,7 @@ typedef struct FileHeader {
     int64 numtools;
     int64 useSched;
     std::vector<VoxelFileSpec> voxels;
+    std::vector<T64> additional;
     int64 numRecords;
     FileHeader() = default;
     FileHeader(MultiSpec &multispec, MetricFactors &factors) { buildFrom(multispec, factors); }
