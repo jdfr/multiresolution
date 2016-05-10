@@ -14,6 +14,24 @@
 #    include "sliceviewer.hpp"
 #endif
 
+
+#ifdef _WIN32
+#   include <Windows.h>
+    double getWallTime(){
+        LARGE_INTEGER time,freq;
+        if (!QueryPerformanceFrequency(&freq)) return 0; // error
+        if (!QueryPerformanceCounter(&time))   return 0; // error
+        return (double)time.QuadPart / freq.QuadPart;
+    }
+#else //POSIX
+#   include <sys/time.h>
+    double getWallTime(){
+        struct timeval time;
+        if (gettimeofday(&time,NULL)) return 0; // error
+        return (double)time.tv_sec + (double)time.tv_usec * .000001;
+    }
+#endif
+
 //this class handles the *save-in-grid options, which must be coordinated acroos global and per-process options
 class ParserStandaloneLocalAndGlobal : public ParserAllLocalAndGlobal {
 public:
@@ -892,7 +910,9 @@ int Main(int argc, const char** argv) {
 
 int main(int argc, const char** argv) {
     clock_t start, finish;
-    start = clock();
+    double wstart, wfinish;
+    start  = clock();
+    wstart = getWallTime();
     int ret = -1;
     try {
         ret = Main(argc, argv);
@@ -901,7 +921,8 @@ int main(int argc, const char** argv) {
     } catch (std::string &e) {
         fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): %s\n", e.c_str());
     }
-    finish = clock();
-    fprintf(stdout, "TOTAL TIME%s: %f\n", ret==0? "" : " UNTIL ERROR", ((double)(finish - start) / CLOCKS_PER_SEC));
+    finish  = clock();
+    wfinish = getWallTime();
+    fprintf(stdout, "TOTAL TIME%s: CPU %f, WALL TIME %f\n", ret==0? "" : " UNTIL ERROR", ((double)(finish - start) / CLOCKS_PER_SEC), wfinish - wstart);
     return ret;
 }
