@@ -147,7 +147,7 @@ template <PathCloseMode mode> void verysimple_get_nearest_path(clp::IntPoint sta
                     }
                 }
             }
-#   else //defined(_WIN64) is guaranteed because we HAVE to compile in 64 bits
+#   elif defined(_WIN64) && defined(_MSC_VER)
             //hopefully, this would be faster and better than converting to and operating on doubles.
             //However, it turns out that the speed penalty is minimal, at least for current workloads
             dx = (start_point.X - path->front().X);
@@ -197,6 +197,8 @@ template <PathCloseMode mode> void verysimple_get_nearest_path(clp::IntPoint sta
                     }
                 }
             }
+#   else
+#       error For now, the only supported compilers are GCC and MSVC in 64 bit mode
 #   endif
 #else
             dx = (double)(start_point.X - path->front().X);
