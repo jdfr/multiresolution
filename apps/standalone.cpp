@@ -511,24 +511,28 @@ int Main(int argc, const char** argv) {
     bbmx.X = (clp::cInt) (maxx * factors.input_to_internal);
     bbmx.Y = (clp::cInt) (maxy * factors.input_to_internal);
 
-    if (nanoSpec.useSpec) {
-        //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
-        for (auto & split : nanoSpec.splits) {
-            split.min = bbmn;
-            split.max = bbmx;
-        }
-        std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
-        pathwriters_arefiles.push_back(pathsplitter);
-        pathwriters_toolpath.push_back(pathsplitter);
-    }
-
     bool alsoContours = multispec->global.alsoContours;
     clp::Paths rawslice, dummy;
     int64 numoutputs, numsteps;
     int numtools = (int)multispec->numspecs;
     {
         std::shared_ptr<FileHeader> header;
-        if (save || show) header = std::make_shared<FileHeader>(*multispec, factors);
+        if (nanoSpec.useSpec || save || show) header = std::make_shared<FileHeader>(*multispec, factors);
+        
+        if (nanoSpec.useSpec) {
+            //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
+            for (auto & split : nanoSpec.splits) {
+                split.min = bbmn;
+                split.max = bbmx;
+            }
+            std::shared_ptr<FileHeader> headerForNano;
+            const bool doDebug = false;
+            if (doDebug) headerForNano = header; //this is for debugging purposes
+            std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(headerForNano, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+            pathwriters_arefiles.push_back(pathsplitter);
+            pathwriters_toolpath.push_back(pathsplitter);
+        }
+    
 #ifdef STANDALONE_USEPYTHON
         if (show) {
             pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);

@@ -375,13 +375,26 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
 }
 
 
-NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(std::shared_ptr<ClippingResources> _res, MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
+NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(std::shared_ptr<FileHeader> _header, std::shared_ptr<ClippingResources> _res, MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
+    header      = std::move(_header);
     nanoconfigs = std::move(_nanoconfigs);
     double epsilon = spec.global.z_epsilon;
     SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string &filename, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
-        int i = nanoconfigs.size() == 1 ? 0 : idx;
-        double eps = epsilon * nanoconfigs[i]->factor_internal_to_input;
-        return std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z);
+        int i       = nanoconfigs.size() == 1 ? 0 : idx;
+        double eps  = epsilon * nanoconfigs[i]->factor_internal_to_input;
+        auto writer = std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z);
+        std::shared_ptr<PathWriter> result;
+        if (!header) {
+            result = writer;
+        } else {
+            auto delegator = std::make_shared<PathWriterDelegator>(filename+suffix);
+
+            delegator->addWriter(std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z), [](int type, int ntool, double z) {return true; });
+            delegator->addWriter(std::make_shared<PathsFileWriter>(filename + suffix, (FILE*)NULL, header, PATHFORMAT_INT64), [](int type, int ntool, double z) {return true; });
+            
+            result = delegator;
+        }
+        return result;
     };
     setup(std::move(_res), (int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }
@@ -456,7 +469,13 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
             };
             auto includeSubWriter = [this, &includeNanoscribeSubscript, &fname, &subwriters, &splitter, &ok](int x, int y) {
                 //we are sure that the object is a SimpleNanoscribePathWriter, as we created it with the callback defined in the constructor
-                auto writer = reinterpret_cast<SimpleNanoscribePathWriter*>(subwriters.at(x, y).get());
+                SimpleNanoscribePathWriter *writer;
+                if (header) {
+                    auto delegator = dynamic_cast<PathWriterDelegator*>(subwriters.at(x, y).get());
+                    writer         = dynamic_cast<SimpleNanoscribePathWriter*>(delegator->getWriter(0));
+                } else {
+                    writer         = dynamic_cast<SimpleNanoscribePathWriter*>(subwriters.at(x, y).get());
+                }
                 if (writer->delegateWork) {
                     for (auto &subw : writer->subwriters) {
                         if (subw->delegateWork) {

@@ -4,13 +4,20 @@
 #include <iomanip>
 #include <limits>
 
-template<typename Function> std::string processToolpaths(std::string &pathsfilename, Function function) {
-    FILE * f = fopen(pathsfilename.c_str(), "rb");
+std::string openFile(std::string &pathsfilename, FILE * &f, FileHeader &header) {
+    f = fopen(pathsfilename.c_str(), "rb");
     if (f == NULL) { return str("Could not open file ", pathsfilename); }
 
-    FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
+    std::string err = header.readFromFile(f);
     if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
+    return std::string();
+}
+
+template<typename Function> std::string processToolpaths(std::string &pathsfilename, Function function) {
+    FILE * f;
+    FileHeader fileheader;
+    std::string err = openFile(pathsfilename, f, fileheader);
+    if (!err.empty()) return err;
 
     SliceHeader sliceheader;
     IOPaths iop(f);
@@ -134,6 +141,7 @@ int main(int argc, const char** argv) {
     NanoscribeSpec nanoSpec;
     std::string pathsfile;
     std::shared_ptr<MultiSpec> multispec; //this is a skeleton, we only use it for the fields used by the nanoscribe writing machinery
+    std::shared_ptr<FileHeader> fileheader; //this is for debugging purposes
     BBox bb;
     bool specified_bb;
     try {
@@ -156,6 +164,19 @@ int main(int argc, const char** argv) {
             pathsfile = std::move(mainOpts["load"].as<std::string>());
         } else {
             fprintf(stderr, "Error: load parameter has not been specified!");
+            return -1;
+        }
+        
+        const bool doDebug = false;
+        if (doDebug) {
+            fileheader = std::make_shared<FileHeader>();
+            FILE * f;
+            std::string err = openFile(pathsfile, f, *fileheader);
+            if (!err.empty()) {
+                fprintf(stderr, err.c_str());
+                return -1;
+            }
+            fclose(f);
         }
 
         std::string configfilename = std::move(mainOpts["config"].as<std::string>());
@@ -227,7 +248,7 @@ int main(int argc, const char** argv) {
         }
 
         std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(std::shared_ptr<MultiSpec>());
-        NanoscribeSplittingPathWriter pathsplitter(clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+        NanoscribeSplittingPathWriter pathsplitter(fileheader, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
 
         if (!pathsplitter.err.empty()) { fprintf(stderr, "%s\n", pathsplitter.err.c_str()); return -1; }
 

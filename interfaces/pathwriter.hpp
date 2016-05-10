@@ -33,6 +33,7 @@ public:
     virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
     void addWriter(std::shared_ptr<PathWriter> writer, PathFilter filter) { subs.emplace_back(std::move(filter), std::move(writer)); };
+    PathWriter *getWriter(int idx) { return subs[idx].second.get(); }
 protected:
     std::vector<std::pair<PathFilter, std::shared_ptr<PathWriter>>> subs;
     bool isopen;
