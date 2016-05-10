@@ -257,7 +257,7 @@ void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shar
             clipres.clipper.AddPaths(rawsl, clp::ptSubject, true);
             rawsl.clear();
         }
-        clipres.clipper.Execute(clp::ctUnion, rawslice, clp::pftEvenOdd, clp::pftEvenOdd);
+        clipres.clipper.Execute(clp::ctUnion, rawslice, clp::pftNonZero, clp::pftNonZero);
         clipres.clipper.Clear();
         ClipperEndOperation(clipres.clipper);
     }
