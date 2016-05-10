@@ -153,6 +153,9 @@ MainSpec::MainSpec() {
         ("load",
             po::value<std::string>()->value_name("filename"),
             "input mesh file")
+        ("load-raw",
+            po::value<std::string>()->value_name("filename"),
+            "input raw file (it should have been previously generated with option --just-save-raw)")
         ("load-multi",
             po::value<std::vector<std::string>>()->multitoken()->value_name("filename1 ..."),
             "input multiple mesh files, which will be 'fused' and processed as a single object")
@@ -246,10 +249,9 @@ void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shar
     auto rawsl = rawslices.begin();
     for (auto slicer = slicers.begin(); slicer!= slicers.end(); ++slicer, ++rawsl) {
         rawsl->clear();
-        (*slicer)->readNextSlice(*rawsl);
-        std::string err = (*slicer)->getErrorMessage();
-        if (!err.empty()) {
-            fprintf(stderr, "Error while trying to read the %d-th slice from the slicer manager: %s!!!\n", nslice, err.c_str());
+        if (!(*slicer)->readNextSlice(*rawsl)) {
+            std::string err = (*slicer)->getErrorMessage();
+            fprintf(stderr, "Error while trying to read the %d-th slice from the %ld-th slicer manager: %s!!!\n", nslice, slicer-slicers.begin(), err.c_str());
         }
     }
 
@@ -268,7 +270,7 @@ void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shar
 
 int Main(int argc, const char** argv) {
     std::vector<std::string> meshfilenames;
-    bool useload, usemultiload;
+    bool useloadraw, useload, usemultiload;
 
     bool show, use2d, useviewparams;
     std::string viewparams;
@@ -329,23 +331,25 @@ int Main(int argc, const char** argv) {
 
         useload      = mainOpts.count("load")        != 0;
         usemultiload = mainOpts.count("load-multi")  != 0;
+        useloadraw   = mainOpts.count("load-raw")    != 0;
         
-        if (!useload && !usemultiload) {
-            fprintf(stderr, "Error: either --load or --load-multi must be specified!!!!");
-        }
-        if (useload && usemultiload) {
-            fprintf(stderr, "Error: --load and --load-multi can not be used together!!!!");
+        if ((((int)useload) + ((int)usemultiload) + ((int)useloadraw)) != 1) {
+            fprintf(stderr, "Error: must specify *JUST* one of these options: --load (%sspecified), --load-multi (%sspecified), --load-raw (%sspecified)", useload ? "" : "not ", usemultiload ? "" : "not ", useloadraw ? "" : "not ");
         }
         
         if (useload) {
             meshfilenames.reserve(1);
             meshfilenames.push_back(std::move(mainOpts["load"].as<std::string>()));
         }
+        if (useloadraw) {
+            meshfilenames.reserve(1);
+            meshfilenames.push_back(std::move(mainOpts["load-raw"].as<std::string>()));
+        }
         if (usemultiload) {
             meshfilenames = std::move(mainOpts["load-multi"].as<std::vector<std::string>>());
         }
         for (auto &meshfilename : meshfilenames) {
-          if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input mesh file %s!!!!", meshfilename.c_str()); return -1; }
+          if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input %s file %s!!!!", useloadraw ? "raw" : "mesh", meshfilename.c_str()); return -1; }
           if (!getMeshFullPath(meshfilename)) return -1;
         }
 
@@ -468,13 +472,19 @@ int Main(int argc, const char** argv) {
     std::vector<std::shared_ptr<SlicerManager>> slicers;
     std::vector<clp::Paths> rawslices(meshfilenames.size());
     slicers.reserve(meshfilenames.size());
-    std::string SLICER_DEBUGFILE = config->getValue("SLICER_DEBUGFILE");
+    std::string SLICER_DEBUGFILE;
+    if (!useloadraw) SLICER_DEBUGFILE = config->getValue("SLICER_DEBUGFILE");
     for (auto meshfilename = meshfilenames.begin(); meshfilename != meshfilenames.end(); ++meshfilename) {
         std::string slic3r_debugfile;
         if (usemultiload) {
             slic3r_debugfile = str('.', meshfilename-meshfilenames.begin());
         }
-        std::shared_ptr<SlicerManager> slicer = getExternalSlicerManager(*config, factors, SLICER_DEBUGFILE, std::move(slic3r_debugfile));
+        std::shared_ptr<SlicerManager> slicer;
+        if (useloadraw) {
+            slicer = getRawSlicerManager(multispec->global.z_epsilon);
+        } else {
+            slicer = getExternalSlicerManager(*config, factors, SLICER_DEBUGFILE, std::move(slic3r_debugfile));
+        }
         
         if (!slicer->start(meshfilename->c_str())) {
             std::string err = slicer->getErrorMessage();
@@ -529,7 +539,10 @@ int Main(int argc, const char** argv) {
         if (justSaveRaw || nanoSpec.useSpec || save || show) header = std::make_shared<FileHeader>(*multispec, factors);
         
         if (justSaveRaw) {
-            pathwriters_arefiles.push_back(std::make_shared<PathsFileWriter>(outputrawslicesfilename, (FILE*)NULL, header, PATHFORMAT_INT64));
+            std::shared_ptr<FileHeader> headerForRaw = std::make_shared<FileHeader>(*header);
+            prepareRawFileHeader(*headerForRaw, slicer_to_input, minx, maxx, miny, maxy, minz, maxz);
+            
+            pathwriters_arefiles.push_back(std::make_shared<PathsFileWriter>(outputrawslicesfilename, (FILE*)NULL, headerForRaw, PATHFORMAT_INT64));
             pathwriters_raw     .push_back(pathwriters_arefiles.back());
         }
         
@@ -672,7 +685,12 @@ int Main(int argc, const char** argv) {
                 }
             }
 
-            for (auto &slicer : slicers) slicer->sendZs(&(rawZs.front()), schednuminputslices);
+            for (auto &slicer : slicers) {
+                if (!slicer->sendZs(&(rawZs.front()), schednuminputslices)) {
+                    std::string err = slicer->getErrorMessage();
+                    fprintf(stderr, "Error sending Z values to slicer manager: %s", err.c_str());
+                }
+            }
 
             if (show) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 3 : schednumoutputslices * 2;
@@ -752,7 +770,13 @@ int Main(int argc, const char** argv) {
             } else {
                 zs = prepareSTLSimple(minz, maxz, zstep);
             }
-            for (auto &slicer : slicers) slicer->sendZs(&zs.front(), (int)zs.size());
+
+            for (auto &slicer : slicers) {
+                if (!slicer->sendZs(&(zs.front()), (int)zs.size())) {
+                    std::string err = slicer->getErrorMessage();
+                    fprintf(stderr, "Error sending Z values to slicer manager: %s", err.c_str());
+                }
+            }
 
             if (dryrunOpt) {
                 printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());

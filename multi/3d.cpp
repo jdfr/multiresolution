@@ -607,19 +607,21 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
             return str("Error: the scalingFactor from the slicer is ", feedbackSlicer->getScalingFactor(), " while the factor from the configuration is different: ", slicer_to_input, "!!!\n");
         }
 
-        feedbackSlicer->sendZs(&(zs[0]), (int)zs.size());
+        if (!feedbackSlicer->sendZs(&(zs[0]), (int)zs.size())) {
+                std::string err = feedbackSlicer->getErrorMessage();
+                feedbackSlicer->terminate();
+                return str("Error while trying to send Z values to the feedback slicer manager: ", err, "!!!\n");
+        }
 
         clp::Paths rawslice;
 
         for (int k = 0; k < zs.size(); ++k) {
             rawslice.clear();
 
-            feedbackSlicer->readNextSlice(rawslice); {
+            if (!feedbackSlicer->readNextSlice(rawslice)) {
                 std::string err = feedbackSlicer->getErrorMessage();
-                if (!err.empty()) {
-                    feedbackSlicer->terminate();
-                    return str("Error while trying to read the ", k, "-th slice from the slicer manager: ", err, "!!!\n");
-                }
+                feedbackSlicer->terminate();
+                return str("Error while trying to read the ", k, "-th slice from the feedback slicer manager: ", err, "!!!\n");
             }
 
             sched.tm.takeAdditionalAdditiveContours(scaled_zs[k], rawslice);

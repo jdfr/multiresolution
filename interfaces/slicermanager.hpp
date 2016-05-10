@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "config.hpp"
+#include "pathsfile.hpp"
 #include <stdexcept>
 #include <memory>
 
@@ -16,14 +17,16 @@ public:
     virtual std::string getErrorMessage() { throw std::runtime_error("getErrorMessage not implemented!!!"); }
     virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz) { throw std::runtime_error("getZLimits not implemented!!!"); }
     virtual double getScalingFactor() { throw std::runtime_error("getScalingFactor not implemented!!!"); }
-    virtual void sendZs(double *values, int numvalues) { throw std::runtime_error("sendZs not implemented!!!"); }
-    virtual int  askForNextSlice() { throw std::runtime_error("askForNextSlice not implemented!!!"); }
-    virtual void readNextSlice(clp::Paths &nextSlice) { throw std::runtime_error("readNextSlice not implemented!!!"); }
+    virtual bool sendZs(double *values, int numvalues) { throw std::runtime_error("sendZs not implemented!!!"); }
+    virtual bool readNextSlice(clp::Paths &nextSlice) { throw std::runtime_error("readNextSlice not implemented!!!"); }
 };
 
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep);
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep);
 
 std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME, std::string postfix);
+std::shared_ptr<SlicerManager> getRawSlicerManager(double z_epsilon);
+
+void prepareRawFileHeader(FileHeader &header, double scalingFactor, double minx, double maxx, double miny, double maxy, double minz, double maxz);
 
 #endif
