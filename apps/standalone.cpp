@@ -167,6 +167,9 @@ MainSpec::MainSpec() {
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
         ("dry-run",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
+        ("just-save-raw",
+            po::value<std::string>()->value_name("filename"),
+            "if this option is specified, the system does not compute anything, it only asks for the raw slices and stores them in a pathsfile with the specified filename.")
         ;
     addResponseFileOption(*opts_toparse.back());
 
@@ -283,9 +286,9 @@ int Main(int argc, const char** argv) {
 
     PathSplitterConfigs saveInGridConf;
 
-    std::string singleoutputfilename;
+    std::string singleoutputfilename, outputrawslicesfilename;
 
-    bool dryrun;
+    bool dryrun, dryrunOpt, justSaveRaw;
     
     std::shared_ptr<Configuration> config = std::make_shared<Configuration>();
     std::shared_ptr<MultiSpec>  multispec = std::make_shared<MultiSpec>(config);
@@ -315,8 +318,14 @@ int Main(int argc, const char** argv) {
             return 1;
         }
 
-        dryrun = mainOpts.count("dry-run") != 0;
-        save   = mainOpts.count("save")    != 0;
+        dryrunOpt    = mainOpts.count("dry-run") != 0;
+        justSaveRaw  = mainOpts.count("just-save-raw") != 0;
+        save         = mainOpts.count("save")    != 0;
+        dryrun       = dryrunOpt || justSaveRaw;
+        
+        if (justSaveRaw) {
+            outputrawslicesfilename = std::move(mainOpts["just-save-raw"].as<std::string>());
+        }
 
         useload      = mainOpts.count("load")        != 0;
         usemultiload = mainOpts.count("load-multi")  != 0;
@@ -517,7 +526,12 @@ int Main(int argc, const char** argv) {
     int numtools = (int)multispec->numspecs;
     {
         std::shared_ptr<FileHeader> header;
-        if (nanoSpec.useSpec || save || show) header = std::make_shared<FileHeader>(*multispec, factors);
+        if (justSaveRaw || nanoSpec.useSpec || save || show) header = std::make_shared<FileHeader>(*multispec, factors);
+        
+        if (justSaveRaw) {
+            pathwriters_arefiles.push_back(std::make_shared<PathsFileWriter>(outputrawslicesfilename, (FILE*)NULL, header, PATHFORMAT_INT64));
+            pathwriters_raw     .push_back(pathwriters_arefiles.back());
+        }
         
         if (nanoSpec.useSpec) {
             //we need to give a bounding box to the Splitter. The easiest (if not most correct) thing to do is to use the bounding box of the mesh file
@@ -637,7 +651,7 @@ int Main(int argc, const char** argv) {
                 *z *= factors.internal_to_input;
             }
 
-            if (dryrun) {
+            if (dryrunOpt) {
                 printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
                 for (const auto &z : rawZs) {
                     printf("%.20g\n", z);
@@ -679,6 +693,8 @@ int Main(int argc, const char** argv) {
                         fprintf(stderr, "Error writing raw contour for z=%f: %s\n", rawZs[i], w->err.c_str());
                     }
                 }
+
+                if (justSaveRaw) continue;
 
                 //after this, sched.rm takes ownership of the contents of rawslice, so our variable is in an undefined state!!!!
                 sched.rm.receiveNextRawSlice(rawslice);
@@ -738,7 +754,7 @@ int Main(int argc, const char** argv) {
             }
             for (auto &slicer : slicers) slicer->sendZs(&zs.front(), (int)zs.size());
 
-            if (dryrun) {
+            if (dryrunOpt) {
                 printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
                 for (const auto &z : zs) {
                     printf("%.20g\n", z);
@@ -784,12 +800,14 @@ int Main(int argc, const char** argv) {
                 }
 
                 readNextSlice(i, *clipres, slicers, rawslices, rawslice);
-
+                
                 for (auto &w : pathwriters_raw) {
                     if (!w->writePaths(rawslice, PATHTYPE_RAW_CONTOUR, 0, -1, zs[i], factors.internal_to_input, true)) {
                         fprintf(stderr, "Error writing raw contour for z=%f: %s\n", zs[i], w->err.c_str());
                     }
                 }
+                
+                if (justSaveRaw) continue;
 
                 int lastk = multi.applyProcesses(ress, rawslice, dummy);
                 if (lastk != numtools) {
