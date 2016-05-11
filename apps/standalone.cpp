@@ -183,6 +183,15 @@ MainSpec::MainSpec() {
         ("save-format",
             po::value<std::string>()->default_value("integer"),
             "Format of coordinates in the save file, either 'integer' or 'double'. The default is 'integer'")
+        ("checkpoint-save",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "This option takes two arguments: FILENAME NUM_ITERATION. If specified, just before reading raw slice NUM_ITERATION, application state is dumped to FILENAME, and the program exits. The computation can be restarted later with --checkpoint-load. This option is primarily intended for debugging. While it may be used for actual checkpointing, it will be cumbersome to use, very low performance, and more crucially it does not detect if an error ocurred mid-computation. Also, very limited support is provided for saving the results (*.paths files will be correctly resumed, but DXF and GWL files will be overwritten when restarting the computation with --checkpoint-load). Finally, output with --save-in-grid will have a different ordering, because each element in the grid has a diferent state for motion planning, and these states are not saved in the checkpoint")
+        ("checkpoint-save-every",
+            po::value<std::vector<std::string>>()->multitoken(),
+            "This option is similar to --checkpoint-save, but the number is not the iteration to checkpoint. Instead, the checkpoint will be overwritten for every NUM_ITERATION iterations.")
+        ("checkpoint-load",
+            po::value<std::string>()->value_name("FILENAME"),
+            "If specified, this option restores a computation state saved to file FILENAME with --checkpoint-save or --checkpoint-save-every. ATTENTION: read description of --checkpoint-save for a more complete description of this mechanism. If this option is used, it is recommended to use --load-raw, as a very big performance penalty will be incurred if using --load or --load-multi. Also, it does not work with --slicing-uniform. WARNING: to avoid undefined behavior, make sure that the application is called with exactly the same arguments as when using --checkpoint-save")
         ("show",
             po::value<std::vector<std::string>>()->multitoken(),
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
@@ -286,6 +295,68 @@ void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shar
     }
 }
 
+//this class encapsulates the boilerplate logic for saving/loading checkpoints
+class CheckPoint {
+public:
+    int64 numToSkipInLoad;
+    int64 numToSkipInSave;
+    std::string loadfile, savefile;
+    bool load;
+    bool save;
+    bool saveEvery;
+    
+    CheckPoint() : numToSkipInLoad(0), load(false), save(false) {}
+    
+    void noCheckpointing()     { load = save = saveEvery = false; }
+    bool test()                { return load ||  save || saveEvery; }
+    bool endApplication(int i) { return save && (i == numToSkipInSave); }
+    bool testSave(int i)       { return endApplication(i) || (saveEvery && ((i % (int)numToSkipInSave) == 0)); }
+    bool testLoad()            { return load; }
+    
+    void doSave(SimpleSlicingScheduler &sched, int i) {
+        int64 num = i;
+        fprintf(stderr, "BEFORE ITERATION %ld, SAVING STATE TO %s...\n", num, savefile.c_str());
+        FILE *f = fopen(savefile.c_str(), "wb");
+        if (fwrite("SERIALST", 8, 1, f) != 1) throw std::runtime_error("Serialization error!");
+        sched.serialize(f);
+        if (fwrite(&num, sizeof(num), 1, f) != 1) throw std::runtime_error("Serialization error!");
+        fclose(f);
+        fprintf(stderr, "      ->SAVED!\n");
+    }
+    
+    void doLoad(SimpleSlicingScheduler &sched, std::vector<std::shared_ptr<SlicerManager>> &slicers) {
+        fprintf(stderr, "LOADING STATE FROM %s...\n", loadfile.c_str());
+        FILE *f = fopen(loadfile.c_str(), "rb");
+        fseek(f, 8, SEEK_CUR); //skip magic
+        sched.deserialize(f);
+        if (fread(&numToSkipInLoad, sizeof(numToSkipInLoad), 1, f) != 1) throw std::runtime_error("Serialization error!");
+        fclose(f);
+        fprintf(stderr, "      ->SKIPPING TO ITERATION %ld...\n", numToSkipInLoad);
+        for (auto &slicer : slicers) if (!slicer->skipNextSlices((int)numToSkipInLoad)) throw std::runtime_error("Error while skipping slices!!!");
+    }
+    
+    void fillValues(po::variables_map &vm) {
+        load      = vm.count("checkpoint-load")       != 0;
+        save      = vm.count("checkpoint-save")       != 0;
+        saveEvery = vm.count("checkpoint-save-every") != 0;
+        
+        if (save && saveEvery) throw po::error("options --checkpoint-save and --checkpoint-save-every cannot be used at the same time!!!");
+        
+        if (load) {
+            loadfile = std::move(vm["checkpoint-load"].as<std::string>());
+        }
+        
+        if (save || saveEvery) {
+            std::vector<std::string> args = std::move(vm[save ? "checkpoint-save" : "checkpoint-save-every"].as<std::vector<std::string>>());
+            savefile = std::move(args[0]);
+            char *endptr;
+            numToSkipInSave = strtoll(args[1].c_str(), &endptr, 10);
+            if ((*endptr)!=0)         throw po::error(str("Second argument of --checkpoint-save is invalid: <", args[1], ">\n"));
+            if (numToSkipInSave <= 0) throw po::error(str("Second argument of --", save ? "checkpoint-save" : "checkpoint-save-every", " must be over 0!!! It was: ", numToSkipInSave));
+        }
+    }
+};
+
 int Main(int argc, const char** argv) {
     std::vector<std::string> meshfilenames;
     bool useloadraw, useload, usemultiload;
@@ -298,6 +369,7 @@ int Main(int argc, const char** argv) {
     bool saveNano = false;
     int64 saveFormat;
     
+    CheckPoint checkpoint;
     bool resume = false;
 
     DXFWMode dxfmode;
@@ -372,6 +444,10 @@ int Main(int argc, const char** argv) {
           if (!fileExists(meshfilename.c_str())) { fprintf(stderr, "Could not open input %s file %s!!!!", useloadraw ? "raw" : "mesh", meshfilename.c_str()); return -1; }
           if (!getMeshFullPath(meshfilename)) return -1;
         }
+        
+        checkpoint.fillValues(mainOpts);
+        if (dryrun) checkpoint.noCheckpointing();
+        resume = checkpoint.testLoad();
 
         std::string configfilename = std::move(mainOpts["config"].as<std::string>());
 
@@ -464,6 +540,11 @@ int Main(int argc, const char** argv) {
 
     } catch (std::exception &e) {
         fprintf(stderr, "%s\n", e.what()); return -1;
+    }
+    
+    if (checkpoint.test() && !multispec->global.useScheduler) {
+        fprintf(stderr, "can do checkpointing only with --slicing-scheduler or --slicing-manual!!!!\n");
+        return -1;
     }
 
     if (dryrun) {
@@ -721,8 +802,16 @@ int Main(int argc, const char** argv) {
             if (saveContours) {
                 results.reserve(schednumoutputslices);
             }
+            
+            if (checkpoint.testLoad()) checkpoint.doLoad(sched, slicers);
 
-            for (int i = 0; i < schednuminputslices; ++i) {
+            for (int i = (int)checkpoint.numToSkipInLoad; i < schednuminputslices; ++i) {
+              
+                if (checkpoint.testSave(i)) {
+                    checkpoint.doSave(sched, i);
+                    if (checkpoint.endApplication(i)) break;
+                }
+
                 printf("reading raw slice %d/%d\n", i, schednuminputslices - 1);
 
                 readNextSlice(i, *clipres, slicers, rawslices, rawslice);

@@ -5,7 +5,7 @@
 #include "spec.hpp"
 #include <map>
 
-typedef struct ResultSingleTool : public virtual SingleProcessOutput {
+typedef struct ResultSingleTool : public SingleProcessOutput {
     double z;
     int ntool;
     int idx;
@@ -14,6 +14,8 @@ typedef struct ResultSingleTool : public virtual SingleProcessOutput {
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 } ResultSingleTool;
 
 class SimpleSlicingScheduler;
@@ -46,6 +48,8 @@ public:
     void removeUsedSlicesPastZ(double z);
     void removeAdditionalContoursPastZ(double z);
     void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 };
 
 typedef struct InputSliceData {
@@ -55,6 +59,8 @@ typedef struct InputSliceData {
     int mapInputToRaw; //many to one mapping
     std::vector<int> requiredRawSlices; //this is only required if flag avoidVerticalOverwriting is set
     InputSliceData(double _z, int _ntool) : z(_z), ntool(_ntool) {}
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 } InputSliceData;
 
 typedef struct OutputSliceData {
@@ -71,25 +77,29 @@ typedef struct RawSliceData {
     bool wasUsed;         //flag to catch error conditions
     clp::Paths slice;
     std::vector<int> mapRawToInput; //one to many mapping
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 } RawSliceData;
 
 /*this class keeps track of raw slices. Its functionality is semantically part of
 the scheduler (it even requires a reference to the scheduler!), but most of it is
 contained here, because the scheduler is already quite complex on its own*/
 class RawSlicesManager {
-    SimpleSlicingScheduler &sched;
+    SimpleSlicingScheduler *sched;
 public:
     clp::Paths auxRawSlice, auxaux;
     int raw_idx;
     std::vector<RawSliceData> raw;
     std::vector<double> rawZs; //this is required in computeSlicesZs()
-    RawSlicesManager(SimpleSlicingScheduler &s) : sched(s) {}
+    RawSlicesManager(SimpleSlicingScheduler &s) : sched(&s) {}
     void removeUsedRawSlices();
     void clear() { raw.clear();  rawZs.clear();  auxRawSlice.clear();  auxaux.clear();  raw_idx = 0; }
     bool singleRawSliceReady(int raw_idx, int input_idx);
     bool rawReady(int input_idx);
     clp::Paths *getRawContour(int raw_idx, int input_idx);
     void receiveNextRawSlice(clp::Paths &input); //this method has to trust that the input slice will be according to the list of Z input values
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 };
 
 enum SchedulingMode { ScheduleTwoPhotonSimple, ScheduleLaserSimple };
@@ -147,6 +157,8 @@ public:
 
     void computeNextInputSlices();
     std::shared_ptr<ResultSingleTool> giveNextOutputSlice(); //this method will return slices in the correct order
+    void serialize(FILE *f);
+    void deserialize(FILE *f);
 };
 
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs);

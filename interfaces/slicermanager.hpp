@@ -19,6 +19,7 @@ public:
     virtual double getScalingFactor() { throw std::runtime_error("getScalingFactor not implemented!!!"); }
     virtual bool sendZs(double *values, int numvalues) { throw std::runtime_error("sendZs not implemented!!!"); }
     virtual bool readNextSlice(clp::Paths &nextSlice) { throw std::runtime_error("readNextSlice not implemented!!!"); }
+    virtual bool skipNextSlices(int numSkip) { throw std::runtime_error("readNextSlice not implemented!!!"); }
 };
 
 std::vector<double> prepareSTLSimple(double zmin, double zmax, double zbase, double zstep);

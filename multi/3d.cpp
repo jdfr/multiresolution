@@ -414,10 +414,10 @@ void RawSlicesManager::receiveNextRawSlice(clp::Paths &input) {
     raw[raw_idx].wasUsed = raw[raw_idx].inUse = true;
     raw[raw_idx].slice = std::move(input);
     ++raw_idx;
-    if (sched.tm.spec->global.substractiveOuter) {
-        addOuter(raw[raw_idx].slice, sched.tm.spec->global.limitX, sched.tm.spec->global.limitY);
+    if (sched->tm.spec->global.substractiveOuter) {
+        addOuter(raw[raw_idx].slice, sched->tm.spec->global.limitX, sched->tm.spec->global.limitY);
     }
-    if (sched.tm.spec->global.correct || sched.tm.spec->global.substractiveOuter) {
+    if (sched->tm.spec->global.correct || sched->tm.spec->global.substractiveOuter) {
         orientPaths(raw[raw_idx].slice);
     }
 }
@@ -425,19 +425,19 @@ void RawSlicesManager::receiveNextRawSlice(clp::Paths &input) {
 bool RawSlicesManager::singleRawSliceReady(int raw_idx, int input_idx) {
     //catch errors before the scheduler's state gets mangled beyond debuggability
     if ((!raw[raw_idx].inUse) && raw[raw_idx].wasUsed) {
-        sched.has_err = true;
-        sched.err     = str("error: a raw slice at idx_raw=", raw_idx, " was previously freed but it is required NOW at input_idx=", input_idx);
+        sched->has_err = true;
+        sched->err     = str("error: a raw slice at idx_raw=", raw_idx, " was previously freed but it is required NOW at input_idx=", input_idx);
         return false;
     }
     return raw[raw_idx].inUse;
 }
 
 bool RawSlicesManager::rawReady(int input_idx) {
-    if (sched.tm.spec->global.avoidVerticalOverwriting) {
-        std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
+    if (sched->tm.spec->global.avoidVerticalOverwriting) {
+        std::vector<int> &raw_idxs = sched->input[input_idx].requiredRawSlices;
         if (raw_idxs.empty()) { //catch this error condition before it propagates!
-            sched.has_err = true;
-            sched.err     = str("error: avoidVerticalOverwriting is set, but at input_idx=", input_idx, " no raw slices were required!!!!");
+            sched->has_err = true;
+            sched->err     = str("error: avoidVerticalOverwriting is set, but at input_idx=", input_idx, " no raw slices were required!!!!");
             return false;
         }
         for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
@@ -445,15 +445,15 @@ bool RawSlicesManager::rawReady(int input_idx) {
         }
         return true;
     } else {
-        int idx_raw = sched.input[input_idx].mapInputToRaw;
+        int idx_raw = sched->input[input_idx].mapInputToRaw;
         return singleRawSliceReady(idx_raw, input_idx);
     }
 }
 
 clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
     //here, we trust that rawReady() has returned TRUE PREVIOUSLY, Otherwise... CLUSTERFUCK!!!!
-    if (sched.tm.spec->global.avoidVerticalOverwriting) {
-        std::vector<int> &raw_idxs = sched.input[input_idx].requiredRawSlices;
+    if (sched->tm.spec->global.avoidVerticalOverwriting) {
+        std::vector<int> &raw_idxs = sched->input[input_idx].requiredRawSlices;
         if (raw_idxs.size() == 1) {
             //trivial case
             --raw[raw_idxs[0]].numRemainingUses;
@@ -463,7 +463,7 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             //this is naive because it shrinks the shape more than it is scritctly necessary
             /*bool first = true;
             //NOTE: THIS WILL NOT WORK UNLESS CLIPPINGS ARE DONE ONE BY ONE (AS FOUND WHILE DEBUGGING THE NON-COMMENTED VERSION OF THE CODE)
-            clp::Clipper &clipper = sched.tm.multi.clipper;
+            clp::Clipper &clipper = sched->tm.multi.clipper;
             for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
                 clipper.AddPaths(raw[*raw_idx].slice, first ? clp::ptClip : clp::ptSubject, true);
                 first = false;
@@ -474,8 +474,8 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             return &auxRawSlice;*/
 
             //ADVANCED METHOD: OFFSET CONTOURS TO TAKE INTO ACCOUNT THE PROFILE OF THE VOXEL
-            double inputz = sched.input[input_idx].z;
-            int ntool = sched.input[input_idx].ntool;
+            double inputz = sched->input[input_idx].z;
+            int ntool = sched->input[input_idx].ntool;
             bool firstTime = true;
             clp::Paths *next = NULL;
             for (auto raw_idx = raw_idxs.begin(); raw_idx != raw_idxs.end(); ++raw_idx) {
@@ -485,29 +485,29 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                     //in this codepath, this assignment should be always executed exactly once
                     next = &raw[*raw_idx].slice;
                 } else {
-                    double width_at_raw = sched.tm.spec->pp[ntool].profile->getWidth(rawz - inputz);
+                    double width_at_raw = sched->tm.spec->pp[ntool].profile->getWidth(rawz - inputz);
                     //this edge case happens from time to time due to misconfigurations, just let's handle it gracefully instead of erroring out
                     if (width_at_raw == 0) continue;
                     if (width_at_raw < 0) {
-                        sched.has_err = true;
-                        sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the voxel's width at the raw slice Z was illegal: ", width_at_raw);
+                        sched->has_err = true;
+                        sched->err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the voxel's width at the raw slice Z was illegal: ", width_at_raw);
                         return NULL;
                     }
-                    double diffwidth = sched.tm.spec->pp[ntool].radius - width_at_raw;
+                    double diffwidth = sched->tm.spec->pp[ntool].radius - width_at_raw;
                     if (diffwidth < 0) {
-                        sched.has_err = true;
-                        sched.err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the diffwidth is below 0: ", diffwidth);
+                        sched->has_err = true;
+                        sched->err     = str("error for input slice with input_idx=", input_idx, " at z=", inputz, ", a raw slice with raw_idx=", *raw_idx, " at z=", rawz, " was required, but the diffwidth is below 0: ", diffwidth);
                         return NULL;
                     }
                     //we use jtSquare here because it is way faster than jtRound and we do not strictly need the extra shape precision provided by jtRound
-                    sched.tm.res->offsetDo(auxaux, diffwidth, raw[*raw_idx].slice, clp::jtSquare, clp::etClosedPolygon);
+                    sched->tm.res->offsetDo(auxaux, diffwidth, raw[*raw_idx].slice, clp::jtSquare, clp::etClosedPolygon);
                     next = &auxaux;
                 }
                 if (firstTime) {
                     auxRawSlice = std::move(*next);
                     firstTime = false;
                 } else {
-                    sched.tm.res->clipperDo(auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
+                    sched->tm.res->clipperDo(auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
                 }
             }
             auxaux.clear();
@@ -678,4 +678,191 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         return err;
     }
 
+}
+
+
+template<typename T> struct has_serialization {
+private:
+    template<typename A, A, typename B, B> class check {};
+
+    template<typename C> static char f(check<void (C::*)(FILE *), &C::serialize, void (C::*)(FILE *), &C::deserialize> *);
+    template<typename C> static long f(...);
+
+public:
+    static const bool value = (sizeof(f<T>(nullptr)) == sizeof(char));
+};
+
+template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type   serialize_data(FILE *f, T &data) {
+    data.serialize(f);
+}
+
+template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type deserialize_data(FILE *f, T &data) {
+    data.deserialize(f);
+}
+
+template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type   serialize_data(FILE *f, T &data) {
+    if (fwrite(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!");
+}
+
+template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type deserialize_data(FILE *f, T &data) {
+    if (fread(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!");
+}
+
+template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type   serialize_vector(FILE *f, std::vector<T> &data) {
+    size_t numdata = data.size();
+    if (fwrite(&numdata, sizeof(size_t), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    for (auto &d : data) d.serialize(f);
+}
+
+template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type deserialize_vector(FILE *f, std::vector<T> &data, T sample = T()) {
+    size_t numdata;
+    if (fread(&numdata, sizeof(numdata), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    data.clear();
+    data.reserve(numdata);
+    for (size_t i = 0; i < numdata; ++i) {
+        sample.deserialize(f);
+        data.push_back(std::move(sample));
+    }
+}
+
+template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type   serialize_vector(FILE *f, std::vector<T> &data) {
+    size_t numdata = data.size();
+    if (fwrite(&numdata, sizeof(size_t), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    if (numdata>0) if (fwrite(&data.front(), sizeof(T), numdata, f) != numdata) throw std::runtime_error("Serialization error!");
+}
+
+template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type deserialize_vector(FILE *f, std::vector<T> &data) {
+    size_t numdata;
+    if (fread(&numdata, sizeof(numdata), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    data.resize(numdata);
+    if (numdata>0) if (fread(&data.front(), sizeof(T), numdata, f) != numdata) throw std::runtime_error("Serialization error!");
+}
+
+void   serialize_clipper(IOPaths &iop,             clp::Paths  &paths)  { iop.writeClipperPaths(paths, PathOpen); }
+void deserialize_clipper(IOPaths &iop,             clp::Paths  &paths)  { iop.readClipperPaths (paths); }
+void   serialize_clipper(IOPaths &iop, std::vector<clp::Paths> &pathss) {
+    size_t num = pathss.size();
+    serialize_data(iop.f, num);
+    for (auto &paths : pathss)   serialize_clipper(iop, paths);
+}
+void deserialize_clipper(IOPaths &iop, std::vector<clp::Paths> &pathss) {
+    size_t num;
+    deserialize_data(iop.f, num);
+    pathss.clear();
+    pathss.resize(num);
+    for (auto &paths : pathss) deserialize_clipper(iop, paths);
+}
+
+template<typename... Args> void   serialize_data_all   (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize_data  (f, args), 0)... }; }
+template<typename... Args> void deserialize_data_all   (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize_data  (f, args), 0)... }; }
+template<typename... Args> void   serialize_vector_all (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize_vector(f, args), 0)... }; }
+template<typename... Args> void deserialize_vector_all (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize_vector(f, args), 0)... }; }
+template<typename... Args> void   serialize_clipper_all(FILE * f, Args&... args) { IOPaths iop(f); int dummy[sizeof...(Args)] = { (  serialize_clipper(iop, args), 0)... }; }
+template<typename... Args> void deserialize_clipper_all(FILE * f, Args&... args) { IOPaths iop(f); int dummy[sizeof...(Args)] = { (deserialize_clipper(iop, args), 0)... }; }
+
+
+void SimpleSlicingScheduler::serialize(FILE *f) {
+    serialize_vector    (f, input);
+    serialize_vector_all(f, output, num_output_by_tool);
+    serialize_data_all  (f, zmin, zmax, input_idx, output_idx, tm, rm);
+}
+
+void SimpleSlicingScheduler::deserialize(FILE *f) {
+    deserialize_vector    (f, input, InputSliceData(0, 0));
+    deserialize_vector_all(f, output, num_output_by_tool);
+    deserialize_data_all  (f, zmin, zmax, input_idx, output_idx, tm, rm);
+}
+
+void RawSlicesManager::serialize(FILE *f) {
+    serialize_vector_all(f, raw, rawZs);
+    serialize_data_all  (f, raw_idx);
+}
+
+void RawSlicesManager::deserialize(FILE *f) {
+    deserialize_vector_all(f, raw, rawZs);
+    deserialize_data_all  (f, raw_idx);
+}
+
+void InputSliceData::serialize(FILE *f) {
+    serialize_vector_all(f, requiredRawSlices);
+    serialize_data_all  (f, z, ntool, mapInputToOutput, mapInputToRaw);
+}
+
+void InputSliceData::deserialize(FILE *f) {
+    deserialize_vector_all(f, requiredRawSlices);
+    deserialize_data_all  (f, z, ntool, mapInputToOutput, mapInputToRaw);
+}
+
+void RawSliceData::serialize(FILE *f) {
+    serialize_clipper_all(f, slice);
+    serialize_vector_all (f, mapRawToInput);
+    serialize_data_all   (f, z, numRemainingUses, inUse, wasUsed);
+}
+
+void RawSliceData::deserialize(FILE *f) {
+    deserialize_clipper_all(f, slice);
+    deserialize_vector_all (f, mapRawToInput);
+    deserialize_data_all   (f, z, numRemainingUses, inUse, wasUsed);
+}
+
+void ResultSingleTool::serialize(FILE *f) {
+    serialize_clipper_all(f, contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours);
+    serialize_data_all   (f, z, ntool, idx, alsoInfillingAreas, used);
+}
+
+void ResultSingleTool::deserialize(FILE *f) {
+    deserialize_clipper_all(f, contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours);
+    deserialize_data_all   (f, z, ntool, idx, alsoInfillingAreas, used);
+}
+
+void ToolpathManager::serialize(FILE *f) {
+    IOPaths iop(f);
+    size_t num;
+    
+    num = additionalAdditiveContours.size();
+    serialize_data(f, num);
+    for (auto &add : additionalAdditiveContours) {
+        serialize_data(f, add.first);
+        serialize_clipper(iop, add.second);
+    }
+    
+    num = slicess.size();
+    serialize_data(f, num);
+    for (auto &slices : slicess) {
+        num = slices.size();
+        serialize_data(f, num);
+        for (auto &slice : slices) slice->serialize(f);
+    }
+    
+    serialize_data(f, spec->startState);
+}
+
+void ToolpathManager::deserialize(FILE *f) {
+    IOPaths iop(f);
+    size_t num;
+    double key;
+    clp::Paths value;
+    
+    additionalAdditiveContours.clear();
+    deserialize_data(f, num);
+    for (size_t i = 0; i < num; ++i) {
+        deserialize_data(f, key);
+        value.clear();
+        deserialize_clipper(iop, value);
+        additionalAdditiveContours.emplace(std::move(key), std::move(value));
+    }
+    
+    deserialize_data(f, num);
+    slicess.clear();
+    slicess.resize(num);
+    for (auto &slices : slicess) {
+        deserialize_data(f, num);
+        slices.resize(num);
+        for (auto &slice : slices) {
+            slice = std::make_shared<ResultSingleTool>();
+            slice->deserialize(f);
+        }
+    }
+    
+    deserialize_data(f, spec->startState);
 }

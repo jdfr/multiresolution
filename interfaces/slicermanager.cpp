@@ -41,6 +41,7 @@ public:
     virtual double getScalingFactor();
     virtual bool sendZs(double *values, int numvalues);
     virtual bool readNextSlice(clp::Paths &nextSlice);
+    virtual bool skipNextSlices(int numSkip);
 };
 
 bool ExternalSlicerManager::start(const char * stlfilename) {
@@ -169,6 +170,13 @@ bool ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     return true;
 }
 
+bool ExternalSlicerManager::skipNextSlices(int numSkip) {
+    for (int i = 0; i < numSkip; ++i) {
+        clp::Paths dummy;
+        readNextSlice(dummy);
+    }
+    return true;
+}
 
 std::shared_ptr<SlicerManager> getExternalSlicerManager(Configuration &config, MetricFactors &factors, std::string DEBUG_FILE_NAME, std::string postfix) {
     DEBUG_FILE_NAME += postfix;
@@ -226,6 +234,7 @@ public:
     virtual double getScalingFactor() { return scalingFactor; }
     virtual bool sendZs(double *values, int numvalues);
     virtual bool readNextSlice(clp::Paths &nextSlice);
+    virtual bool skipNextSlices(int numSkip);
 };
 
 bool RawSlicerManager::start(const char * fname) {
@@ -306,7 +315,7 @@ bool RawSlicerManager::readNextSlice(clp::Paths &nextSlice) {
         err = str("Error reading ", numSlice, "-th slice header from ", filename, ": z is ", sliceheader.z, "but it was expected to be ", expectedzs[numSlice]);
         return false;
     }
-
+    
     nextSlice.clear();
     if (sliceheader.saveFormat == PATHFORMAT_INT64) {
         if (!iop_f.readClipperPaths(nextSlice)) {
@@ -327,6 +336,16 @@ bool RawSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     for (auto &path : nextSlice) if (!path.empty()) path.resize(path.size()-1);
     
     ++numSlice;
+    return true;
+}
+
+bool RawSlicerManager::skipNextSlices(int numSkip) {
+    int64 totalSize;
+    for (int i = 0; i < numSkip; ++i) {
+        if (fread(&totalSize,  sizeof(totalSize),  1, f) != 1) return false;
+        long toSkip = (long)(totalSize - sizeof(totalSize));
+        if (toSkip>0) if (fseek(f, toSkip, SEEK_CUR)!=0) return false;
+    }
     return true;
 }
 
