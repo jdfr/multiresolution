@@ -30,6 +30,7 @@ SimpleNanoscribePathWriter::SimpleNanoscribePathWriter(PathSplitter &_splitter, 
     firstTime(true),
     current_z_block(0),
     overrideGalvoMode(splitter.config.wallAngle == 90.0) {
+    resumeAtStart = false;
     bool generic_type = true;
     this->init(std::move(file), GWLEXTENSION, epsilon, generic_type, generic_ntool, generic_z);
 }
@@ -375,11 +376,11 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
 }
 
 
-NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(std::shared_ptr<FileHeader> _header, std::shared_ptr<ClippingResources> _res, MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
+NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(bool resume, std::shared_ptr<FileHeader> _header, std::shared_ptr<ClippingResources> _res, MultiSpec &spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool, bool generic_z) {
     header      = std::move(_header);
     nanoconfigs = std::move(_nanoconfigs);
     double epsilon = spec.global.z_epsilon;
-    SplittingSubPathWriterCreator callback = [this, epsilon](int idx, PathSplitter& splitter, std::string &filename, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+    SplittingSubPathWriterCreator callback = [this, epsilon](bool resume, int idx, PathSplitter& splitter, std::string &filename, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
         int i       = nanoconfigs.size() == 1 ? 0 : idx;
         double eps  = epsilon * nanoconfigs[i]->factor_internal_to_input;
         auto writer = std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z);
@@ -390,13 +391,19 @@ NanoscribeSplittingPathWriter::NanoscribeSplittingPathWriter(std::shared_ptr<Fil
             auto delegator = std::make_shared<PathWriterDelegator>(filename+suffix);
 
             delegator->addWriter(std::make_shared<SimpleNanoscribePathWriter>(splitter, nanoconfigs[i], filename + suffix, eps, generic_ntool, generic_z), [](int type, int ntool, double z) {return true; });
-            delegator->addWriter(std::make_shared<PathsFileWriter>(filename + suffix, (FILE*)NULL, header, PATHFORMAT_INT64), [](int type, int ntool, double z) {return true; });
+            delegator->addWriter(std::make_shared<PathsFileWriter>(resume, filename + suffix, (FILE*)NULL, header, PATHFORMAT_INT64), [](int type, int ntool, double z) {return true; });
             
             result = delegator;
         }
         return result;
     };
-    setup(std::move(_res), (int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
+    if (resume) {
+        fprintf(stderr, "WARNING: nanoscribe files will not be resumed but overwritten\n");
+        if (header) {
+            fprintf(stderr, "         HOWEVER, their associated debug files will be correctly resumed\n");
+        }
+    }
+    setup(resume, std::move(_res), (int)spec.numspecs, spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), true, generic_ntool, generic_z);
 }
 
 bool writeSquare(FILE *f, clp::Path square, double factor) {

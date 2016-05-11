@@ -7,17 +7,21 @@ template class PathWriterMultiFile<DXFBinaryPathWriter>;
 template class DXFPathWriter<DXFAscii>;
 template class DXFPathWriter<DXFBinary>;
 
-template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
+template<DXFWMode mode> DXFPathWriter<mode>::DXFPathWriter(bool resume, std::string file, double _epsilon, bool _generic_type, bool _generic_ntool, bool _generic_z) {
+    this->resumeAtStart = resume;
     this->init(std::move(file), ".dxf", _epsilon, _generic_type, _generic_ntool, _generic_z);
 }
 
 template<DXFWMode mode> std::shared_ptr<DXFPathWriter<mode>> DXFPathWriter<mode>::createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z) {
-    return std::make_shared<DXFPathWriter<mode>>(std::move(file), epsilon, generic_type, _generic_ntool, _generic_z);
+    return std::make_shared<DXFPathWriter<mode>>(this->resumeAtStart, std::move(file), epsilon, generic_type, _generic_ntool, _generic_z);
 }
 
 static_assert(sizeof(char) == 1, "To write binary DXF files we expect char to be 1 byte long!");
 
 template<DXFWMode mode> bool DXFPathWriter<mode>::startWriter() {
+    if (this->resumeAtStart) {
+        fprintf(stderr, "WARNING: ovewriting file (cannot resume) %s\n", this->filename.c_str());
+    }
     this->f = fopen(this->filename.c_str(), (mode == DXFAscii) ? "wt" : "wb");
     if (this->f == NULL) {
         this->err = str("DXF output file <", this->filename, ">: file could not be open");

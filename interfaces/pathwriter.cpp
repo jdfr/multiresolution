@@ -94,19 +94,36 @@ bool PathsFileWriter::start() {
         }
         if (!f_already_open) {
             addExtension(this->filename, ".paths");
-            f = fopen(filename.c_str(), "wb");
+            f = fopen(filename.c_str(), resumeAtStart ? "r+b" : "wb");
             if (f == NULL) {
                 err = str("output pathsfile <", filename, ">: file could not be open");
                 return false;
             }
         }
         isOpen = true;
-        err = fileheader->writeToFile(f, false);
-        if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
-            err = str("output pathsfile <", filename, ">: could not write number of records");
-            return false;
+        if (resumeAtStart) {
+            FileHeader fheader; //attention: this will break if the file's FileHeader has a different size than the current one!
+            err = fheader.readFromFile(f);
+            if (!err.empty()) return false;
+            numRecords = fheader.numRecords;
+            //fseek(f, 0 , SEEK_END); //fast but brittle
+            int64 totalSize;
+            for (int i = 0; i < numRecords; ++i) { //slower but more robust
+                if (fread(&totalSize,  sizeof(totalSize),  1, f) != 1) { err = str("output pathsfile <", filename, ">: could not read size of record ", i); return false; }
+                long toSkip = (long)(totalSize - sizeof(totalSize));
+                if (toSkip>0) if (fseek(f, toSkip, SEEK_CUR)!=0) { err = str("output pathsfile <", filename, ">: could skip record ", i); return false; }
+                /*there is no way to portably truncate a file using the stdio.h interface.
+                However, we assume that it is not actually necessary to do it, because we will eventually overwrite all the contents
+                (and if not, the final FileHeader's numToRecords is anyway used to iterate over the file's contents, so it is not relevant if there is some gargabe at the end of the file)*/
+            }
+        } else {
+            err = fileheader->writeToFile(f, false);
+            if (fwrite(&numRecords, sizeof(numRecords), 1, f) != 1) {
+                err = str("output pathsfile <", filename, ">: could not write number of records");
+                return false;
+            }
+            if (!err.empty()) return false;
         }
-        if (!err.empty()) return false;
     }
     return true;
 }
@@ -154,7 +171,8 @@ bool PathsFileWriter::close() {
     return ok;
 }
 
-bool SplittingPathWriter::setup(std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+bool SplittingPathWriter::setup(bool resume, std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+    resumeAtStart = resume;
     filename = std::move(file);
     numtools = ntools;
     isopen   = false;
@@ -204,7 +222,7 @@ bool SplittingPathWriter::setup(std::shared_ptr<ClippingResources> _res, int nto
         for (int x = 0; x < numx; ++x) {
             for (int y = 0; y < numy; ++y) {
                 std::string suffix = str(".N", n, '.', std::setw(num0x), std::setfill('0'), x, '.', std::setw(num0y), std::setfill('0'), y);
-                subwriters.at(x, y) = callback(n, splitter, filename, std::move(suffix), generic_type, generic_ntool, generic_z);
+                subwriters.at(x, y) = callback(resumeAtStart, n, splitter, filename, std::move(suffix), generic_type, generic_ntool, generic_z);
             }
         }
     }

@@ -297,6 +297,8 @@ int Main(int argc, const char** argv) {
     bool saveDXF  = false;
     bool saveNano = false;
     int64 saveFormat;
+    
+    bool resume = false;
 
     DXFWMode dxfmode;
     bool dxf_generic_by_typeT, dxf_generic_by_ntool, dxf_generic_by_z;
@@ -435,12 +437,12 @@ int Main(int argc, const char** argv) {
             if (dxfOpts.count("dxf-toolpaths")) dxf_filename_toolpaths = std::move(dxfOpts["dxf-toolpaths"].as<std::string>());
             if (dxfOpts.count("dxf-contours"))  dxf_filename_contours  = std::move(dxfOpts["dxf-contours" ].as<std::string>());
 
-            auto createDXFWriter = [dxfmode, epsilon_meshunits, dxf_generic_by_ntool, dxf_generic_by_z](std::string &fname, bool generic_type) {
+            auto createDXFWriter = [resume, dxfmode, epsilon_meshunits, dxf_generic_by_ntool, dxf_generic_by_z](std::string &fname, bool generic_type) {
                 std::shared_ptr<PathWriter> w;
                 if (dxfmode == DXFAscii) {
-                    w = std::make_shared<DXFAsciiPathWriter >(fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
+                    w = std::make_shared<DXFAsciiPathWriter >(resume, fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
                 } else {
-                    w = std::make_shared<DXFBinaryPathWriter>(fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
+                    w = std::make_shared<DXFBinaryPathWriter>(resume, fname, epsilon_meshunits, generic_type, dxf_generic_by_ntool, dxf_generic_by_z);
                 }
                 return w;
             };
@@ -560,7 +562,7 @@ int Main(int argc, const char** argv) {
             std::shared_ptr<FileHeader> headerForRaw = std::make_shared<FileHeader>(*header);
             prepareRawFileHeader(*headerForRaw, slicer_to_input, minx, maxx, miny, maxy, minz, maxz);
             
-            pathwriters_arefiles.push_back(std::make_shared<PathsFileWriter>(outputrawslicesfilename, (FILE*)NULL, headerForRaw, PATHFORMAT_INT64));
+            pathwriters_arefiles.push_back(std::make_shared<PathsFileWriter>(resume, outputrawslicesfilename, (FILE*)NULL, headerForRaw, PATHFORMAT_INT64));
             pathwriters_raw     .push_back(pathwriters_arefiles.back());
         }
         
@@ -573,14 +575,15 @@ int Main(int argc, const char** argv) {
             std::shared_ptr<FileHeader> headerForNano;
             const bool doDebug = false;
             if (doDebug) headerForNano = header; //this is for debugging purposes
-            std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(headerForNano, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+            std::shared_ptr<NanoscribeSplittingPathWriter> pathsplitter = std::make_shared<NanoscribeSplittingPathWriter>(resume, headerForNano, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
             pathwriters_arefiles.push_back(pathsplitter);
             pathwriters_toolpath.push_back(pathsplitter);
         }
     
 #ifdef STANDALONE_USEPYTHON
         if (show) {
-            pathwriter_viewer = std::make_shared<PathsFileWriter>("sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
+            if (resume) { fprintf(stderr, "ERROR: cannot resume if using --show!!!\n"); return -1; }
+            pathwriter_viewer = std::make_shared<PathsFileWriter>(resume, "sliceViewerStream", slicesViewer->pipeIN, header, PATHFORMAT_INT64);
             pathwriters_toolpath   .push_back(pathwriter_viewer);
             if (alsoContours) {
                 pathwriters_raw    .push_back(pathwriter_viewer);
@@ -589,7 +592,7 @@ int Main(int argc, const char** argv) {
         }
 #endif
         if (save) {
-            pathwriters_arefiles   .push_back(std::make_shared<PathsFileWriter>(singleoutputfilename, (FILE*)NULL, header, saveFormat));
+            pathwriters_arefiles   .push_back(std::make_shared<PathsFileWriter>(resume, singleoutputfilename, (FILE*)NULL, header, saveFormat));
             pathwriters_toolpath   .push_back(pathwriters_arefiles.back());
             if (alsoContours) {
                 pathwriters_raw    .push_back(pathwriters_arefiles.back());
@@ -605,20 +608,20 @@ int Main(int argc, const char** argv) {
             SplittingSubPathWriterCreator callback =
                 [save, saveFormat, saveDXF, dxfmode, dxf_generic_by_typeT, &dxf_filename_toolpaths, &dxf_filename_contours, epsilon_meshunits, &singleoutputfilename, &header]
 
-                (int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
+                (bool resume, int idx, PathSplitter& splitter, std::string &fname, std::string suffix, bool generic_type, bool generic_ntool, bool generic_z) {
 
                 std::shared_ptr<PathWriter> d = std::make_shared<PathWriterDelegator>(fname+suffix);
                 PathWriterDelegator *delegator = static_cast<PathWriterDelegator*>(d.get());
                 if (save) {
-                    delegator->addWriter(std::make_shared<PathsFileWriter>(singleoutputfilename+suffix, (FILE*)NULL, header, saveFormat), [](int type, int ntool, double z) {return true; });
+                    delegator->addWriter(std::make_shared<PathsFileWriter>(resume, singleoutputfilename+suffix, (FILE*)NULL, header, saveFormat), [](int type, int ntool, double z) {return true; });
                 }
                 if (saveDXF) {
-                    auto dxfCreator = [dxfmode, epsilon_meshunits, generic_ntool, generic_z](std::string fn, bool generic_type) {
+                    auto dxfCreator = [resume, dxfmode, epsilon_meshunits, generic_ntool, generic_z](std::string fn, bool generic_type) {
                         std::shared_ptr<PathWriter> w;
                         if (dxfmode == DXFAscii) {
-                            w = std::make_shared<DXFAsciiPathWriter >(fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
+                            w = std::make_shared<DXFAsciiPathWriter >(resume, fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
                         } else {
-                            w = std::make_shared<DXFBinaryPathWriter>(fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
+                            w = std::make_shared<DXFBinaryPathWriter>(resume, fn, epsilon_meshunits, generic_type, generic_ntool, generic_z);
                         }
                         return w;
                     };
@@ -634,7 +637,7 @@ int Main(int argc, const char** argv) {
                 return d;
             };
             bool saveInGridConf_justone = saveInGridConf.size() == 1;
-            std::shared_ptr<PathWriter> w = std::make_shared<SplittingPathWriter>(clipres, *multispec, callback, saveInGridConf, "SPLITTING_DELEGATOR");
+            std::shared_ptr<PathWriter> w = std::make_shared<SplittingPathWriter>(resume, clipres, *multispec, callback, saveInGridConf, "SPLITTING_DELEGATOR");
             pathwriters_arefiles.push_back(w);
             if (save || (!dxf_filename_toolpaths.empty())) {
                 pathwriters_toolpath.push_back(w);

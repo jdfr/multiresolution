@@ -9,6 +9,7 @@ class PathWriter {
 public:
     std::string err;
     std::string filename;
+    bool resumeAtStart;
     virtual ~PathWriter() {}
     virtual bool start(); //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
@@ -42,7 +43,7 @@ protected:
 //this class implements a PathWriter using the file format specified by FileHeader and SliceHeader
 class PathsFileWriter : public PathWriter {
 public:
-    PathsFileWriter(std::string file, FILE *_f, std::shared_ptr<FileHeader> _fileheader, int64 _saveFormat) : f(_f), f_already_open(_f != NULL), isOpen(false), saveFormat(_saveFormat), fileheader(std::move(_fileheader)), numRecords(0), numRecordsSet(false) { filename = std::move(file); }
+    PathsFileWriter(bool resume, std::string file, FILE *_f, std::shared_ptr<FileHeader> _fileheader, int64 _saveFormat) : f(_f), f_already_open(_f != NULL), isOpen(false), saveFormat(_saveFormat), fileheader(std::move(_fileheader)), numRecords(0), numRecordsSet(false) { filename = std::move(file); resumeAtStart = resume;}
     virtual ~PathsFileWriter() { close(); }
     virtual bool start();
     void setNumRecords(int64 _numRecords) { numRecordsSet = true; numRecords = _numRecords; } //this method is required when the FILE* is a pipe because of the way standalone.cpp is structured
@@ -56,7 +57,7 @@ protected:
     bool isOpen, f_already_open, numRecordsSet;
 };
 
-typedef std::function<std::shared_ptr<PathWriter>(int, PathSplitter&, std::string&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
+typedef std::function<std::shared_ptr<PathWriter>(bool, int, PathSplitter&, std::string&, std::string, bool, bool, bool)> SplittingSubPathWriterCreator;
 
 typedef struct SplittingPathWriterState {
     PathSplitter splitter;
@@ -70,8 +71,8 @@ typedef struct SplittingPathWriterState {
 class SplittingPathWriter : public PathWriter {
 public:
     //either a single PathSplitterConfig, or one for each tool
-    SplittingPathWriter(std::shared_ptr<ClippingResources> _res, MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(std::move(_res), (int)_spec.numspecs, _spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
-    SplittingPathWriter(std::shared_ptr<ClippingResources> _res, int numtools,     SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(std::move(_res), numtools,            NULL,                      callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
+    SplittingPathWriter(bool resume, std::shared_ptr<ClippingResources> _res, MultiSpec &_spec, SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(resume, std::move(_res), (int)_spec.numspecs, _spec.global.config.get(), callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
+    SplittingPathWriter(bool resume, std::shared_ptr<ClippingResources> _res, int numtools,     SplittingSubPathWriterCreator &callback, PathSplitterConfigs _splitterconfs, std::string file, bool generic_type = true, bool generic_ntool = true, bool generic_z = true) { setup(resume, std::move(_res), numtools,            NULL,                      callback, std::move(_splitterconfs), std::move(file), generic_type, generic_ntool, generic_z); }
     virtual ~SplittingPathWriter() { close(); }
     virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
@@ -79,7 +80,7 @@ public:
     virtual bool finishAfterClose() { return true; } //this method will get called after closing all subwritters, if everything is OK up to that point
 protected:
     SplittingPathWriter() {} //this constructor is to be used by subclasses
-    bool setup(std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
+    bool setup(bool resume, std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
     std::vector<SplittingPathWriterState> states; //one state for each PathSplitterConfig
     int numtools;
     bool justone;

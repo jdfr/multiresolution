@@ -79,7 +79,7 @@ protected:
 class NanoscribeSplittingPathWriter : public SplittingPathWriter {
 public:
     //either a single PathSplitterConfig, or one for each tool
-    NanoscribeSplittingPathWriter(std::shared_ptr<FileHeader> _header, std::shared_ptr<ClippingResources> _res, MultiSpec &_spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool = true, bool generic_z = true);
+    NanoscribeSplittingPathWriter(bool resume, std::shared_ptr<FileHeader> _header, std::shared_ptr<ClippingResources> _res, MultiSpec &_spec, SimpleNanoscribeConfigs _nanoconfigs, PathSplitterConfigs _splitterconfs, std::string file, bool generic_ntool = true, bool generic_z = true);
     virtual ~NanoscribeSplittingPathWriter() { close(); }
     virtual bool finishAfterClose(); //use this method to write a main script that includes all subscripts
 protected:

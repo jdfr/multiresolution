@@ -17,9 +17,9 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
     std::shared_ptr<DXFAsciiPathWriter> writera;
     std::shared_ptr<DXFBinaryPathWriter> writerb;
     if (ascii) {
-        writer = writera = std::make_shared<DXFAsciiPathWriter>(dxffilename, 1e-9, true, !byn, !byz);
+        writer = writera = std::make_shared<DXFAsciiPathWriter>(false, dxffilename, 1e-9, true, !byn, !byz);
     } else {
-        writer = writerb = std::make_shared<DXFBinaryPathWriter>(dxffilename, 1e-9, true, !byn, !byz);
+        writer = writerb = std::make_shared<DXFBinaryPathWriter>(false, dxffilename, 1e-9, true, !byn, !byz);
     }
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
         std::string err = sliceheader.readFromFile(f);

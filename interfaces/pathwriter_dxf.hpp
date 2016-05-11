@@ -9,7 +9,7 @@ enum DXFWMode { DXFAscii, DXFBinary };
 //TODO: currently, this only works on little-endian machines such as x86. If necessary, modify so it also work in different XXX-endians
 template<DXFWMode mode> class DXFPathWriter : public PathWriterMultiFile<DXFPathWriter<mode>> {
 public:
-    DXFPathWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
+    DXFPathWriter(bool resume, std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
     std::shared_ptr<DXFPathWriter<mode>> createSubWriter(std::string file, double epsilon, bool generic_type, bool _generic_ntool, bool _generic_z);
     bool startWriter();
     bool endWriter();

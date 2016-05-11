@@ -248,7 +248,7 @@ int main(int argc, const char** argv) {
         }
 
         std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(std::shared_ptr<MultiSpec>());
-        NanoscribeSplittingPathWriter pathsplitter(fileheader, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
+        NanoscribeSplittingPathWriter pathsplitter(false, fileheader, clipres, *multispec, std::move(nanoSpec.nanos), std::move(nanoSpec.splits), std::move(nanoSpec.filename), nanoSpec.generic_ntool, nanoSpec.generic_z);
 
         if (!pathsplitter.err.empty()) { fprintf(stderr, "%s\n", pathsplitter.err.c_str()); return -1; }
 
