@@ -219,7 +219,7 @@ public:
     RawSlicerManager(double _epsilon) : epsilon(_epsilon), f(NULL) {}
     virtual ~RawSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
-    virtual bool terminate() { finalize(); }
+    virtual bool terminate() { return finalize(); }
     virtual bool finalize();
     virtual std::string getErrorMessage() { return err; }
     virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz);
