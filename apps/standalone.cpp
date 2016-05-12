@@ -318,7 +318,7 @@ public:
         fprintf(stderr, "BEFORE ITERATION %ld, SAVING STATE TO %s...\n", num, savefile.c_str());
         FILE *f = fopen(savefile.c_str(), "wb");
         if (fwrite("SERIALST", 8, 1, f) != 1) throw std::runtime_error("Serialization error!");
-        sched.serialize(f);
+        serialize(f, sched);
         if (fwrite(&num, sizeof(num), 1, f) != 1) throw std::runtime_error("Serialization error!");
         fclose(f);
         fprintf(stderr, "      ->SAVED!\n");
@@ -328,7 +328,7 @@ public:
         fprintf(stderr, "LOADING STATE FROM %s...\n", loadfile.c_str());
         FILE *f = fopen(loadfile.c_str(), "rb");
         fseek(f, 8, SEEK_CUR); //skip magic
-        sched.deserialize(f);
+        deserialize(f, sched);
         if (fread(&numToSkipInLoad, sizeof(numToSkipInLoad), 1, f) != 1) throw std::runtime_error("Serialization error!");
         fclose(f);
         fprintf(stderr, "      ->SKIPPING TO ITERATION %ld...\n", numToSkipInLoad);

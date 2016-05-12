@@ -680,189 +680,132 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
 
 }
 
+/*VERY BASIC SERIALIZATION FRAMEWORK
+ * it can handle tree-like structures, but not anything more complicated such as DAGs implemented with shared_ptr */
 
-template<typename T> struct has_serialization {
-private:
-    template<typename A, A, typename B, B> class check {};
+///////////////////////////////////////////
+// these templates are handy for declaring list of serialized variables
+template<typename... Args> void   serialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize  (f, args), 0)... }; }
+template<typename... Args> void deserialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize  (f, args), 0)... }; }
 
-    template<typename C> static char f(check<void (C::*)(FILE *), &C::serialize, void (C::*)(FILE *), &C::deserialize> *);
-    template<typename C> static long f(...);
+///////////////////////////////////////////
+// DEFAULT SERIALIZATION (FOR BASIC TYPES)
+// (primitive types and structs containing only primitive types)
+template<typename T> struct has_overloaded_serialization : std::false_type {};
 
-public:
-    static const bool value = (sizeof(f<T>(nullptr)) == sizeof(char));
-};
+template<typename T> void   serialize(FILE *f, T &data) { if (fwrite(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
+template<typename T> void deserialize(FILE *f, T &data) { if (fread (&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
 
-template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type   serialize_data(FILE *f, T &data) {
-    data.serialize(f);
-}
+///////////////////////////////////////////
+// SERIALIZATION FOR std::shared_ptr
+template<typename T> struct has_overloaded_serialization<std::shared_ptr<T>> : std::true_type {};
 
-template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type deserialize_data(FILE *f, T &data) {
-    data.deserialize(f);
-}
+template<typename T> void   serialize(FILE *f, std::shared_ptr<T> &data) {                                 serialize(f, *data); }
+template<typename T> void deserialize(FILE *f, std::shared_ptr<T> &data) { data = std::make_shared<T>(); deserialize(f, *data); }
 
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type   serialize_data(FILE *f, T &data) {
-    if (fwrite(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!");
-}
+///////////////////////////////////////////
+// SERIALIZATION FOR std::vector
+// (optimized vectors of basic types)
+template<typename T> struct has_overloaded_serialization<std::vector<T>> : std::true_type {};
 
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type deserialize_data(FILE *f, T &data) {
-    if (fread(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!");
-}
-
-template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type   serialize_vector(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<has_overloaded_serialization<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
     size_t numdata = data.size();
-    if (fwrite(&numdata, sizeof(size_t), 1, f) != 1) throw std::runtime_error("Serialization error!");
-    for (auto &d : data) d.serialize(f);
+    serialize(f, numdata);
+    for (auto &d : data) serialize(f, d);
 }
 
-template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type deserialize_vector(FILE *f, std::vector<T> &data, T sample = T()) {
+template<typename T> typename std::enable_if<has_overloaded_serialization<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data, T sample = T()) {
     size_t numdata;
-    if (fread(&numdata, sizeof(numdata), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    deserialize(f, numdata);
     data.clear();
     data.reserve(numdata);
     for (size_t i = 0; i < numdata; ++i) {
-        sample.deserialize(f);
+        deserialize(f, sample);
         data.push_back(std::move(sample));
     }
 }
 
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type   serialize_vector(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<!has_overloaded_serialization<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
     size_t numdata = data.size();
-    if (fwrite(&numdata, sizeof(size_t), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    serialize(f, numdata);
     if (numdata>0) if (fwrite(&data.front(), sizeof(T), numdata, f) != numdata) throw std::runtime_error("Serialization error!");
 }
 
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type deserialize_vector(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<!has_overloaded_serialization<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data) {
     size_t numdata;
-    if (fread(&numdata, sizeof(numdata), 1, f) != 1) throw std::runtime_error("Serialization error!");
+    deserialize(f, numdata);
     data.resize(numdata);
     if (numdata>0) if (fread(&data.front(), sizeof(T), numdata, f) != numdata) throw std::runtime_error("Serialization error!");
 }
 
-void   serialize_clipper(IOPaths &iop,             clp::Paths  &paths)  { iop.writeClipperPaths(paths, PathOpen); }
-void deserialize_clipper(IOPaths &iop,             clp::Paths  &paths)  { iop.readClipperPaths (paths); }
-void   serialize_clipper(IOPaths &iop, std::vector<clp::Paths> &pathss) {
-    size_t num = pathss.size();
-    serialize_data(iop.f, num);
-    for (auto &paths : pathss)   serialize_clipper(iop, paths);
-}
-void deserialize_clipper(IOPaths &iop, std::vector<clp::Paths> &pathss) {
-    size_t num;
-    deserialize_data(iop.f, num);
-    pathss.clear();
-    pathss.resize(num);
-    for (auto &paths : pathss) deserialize_clipper(iop, paths);
-}
 
-template<typename... Args> void   serialize_data_all   (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize_data  (f, args), 0)... }; }
-template<typename... Args> void deserialize_data_all   (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize_data  (f, args), 0)... }; }
-template<typename... Args> void   serialize_vector_all (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize_vector(f, args), 0)... }; }
-template<typename... Args> void deserialize_vector_all (FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize_vector(f, args), 0)... }; }
-template<typename... Args> void   serialize_clipper_all(FILE * f, Args&... args) { IOPaths iop(f); int dummy[sizeof...(Args)] = { (  serialize_clipper(iop, args), 0)... }; }
-template<typename... Args> void deserialize_clipper_all(FILE * f, Args&... args) { IOPaths iop(f); int dummy[sizeof...(Args)] = { (deserialize_clipper(iop, args), 0)... }; }
+///////////////////////////////////////////
+// SERIALIZATION FOR std::map
+// WARNING: if you need to serialize a std::vector<std::map<K, V>> you will need to
+//          add the corresponding has_overloaded_serialization declaration for all
+//          fully-specialized std::map types you need
 
+/*this cannot possibly work without doing a separate declaration for each full specialization of std::map,
+because has_overloaded_serialization has one paramater, while std::map has two!*/
+//template<typename T> struct has_overloaded_serialization<std::map<K,V>> : std::true_type {};
 
-void SimpleSlicingScheduler::serialize(FILE *f) {
-    serialize_vector    (f, input);
-    serialize_vector_all(f, output, num_output_by_tool);
-    serialize_data_all  (f, zmin, zmax, input_idx, output_idx, tm, rm);
-}
-
-void SimpleSlicingScheduler::deserialize(FILE *f) {
-    deserialize_vector    (f, input, InputSliceData(0, 0));
-    deserialize_vector_all(f, output, num_output_by_tool);
-    deserialize_data_all  (f, zmin, zmax, input_idx, output_idx, tm, rm);
-}
-
-void RawSlicesManager::serialize(FILE *f) {
-    serialize_vector_all(f, raw, rawZs);
-    serialize_data_all  (f, raw_idx);
-}
-
-void RawSlicesManager::deserialize(FILE *f) {
-    deserialize_vector_all(f, raw, rawZs);
-    deserialize_data_all  (f, raw_idx);
-}
-
-void InputSliceData::serialize(FILE *f) {
-    serialize_vector_all(f, requiredRawSlices);
-    serialize_data_all  (f, z, ntool, mapInputToOutput, mapInputToRaw);
-}
-
-void InputSliceData::deserialize(FILE *f) {
-    deserialize_vector_all(f, requiredRawSlices);
-    deserialize_data_all  (f, z, ntool, mapInputToOutput, mapInputToRaw);
-}
-
-void RawSliceData::serialize(FILE *f) {
-    serialize_clipper_all(f, slice);
-    serialize_vector_all (f, mapRawToInput);
-    serialize_data_all   (f, z, numRemainingUses, inUse, wasUsed);
-}
-
-void RawSliceData::deserialize(FILE *f) {
-    deserialize_clipper_all(f, slice);
-    deserialize_vector_all (f, mapRawToInput);
-    deserialize_data_all   (f, z, numRemainingUses, inUse, wasUsed);
-}
-
-void ResultSingleTool::serialize(FILE *f) {
-    serialize_clipper_all(f, contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours);
-    serialize_data_all   (f, z, ntool, idx, alsoInfillingAreas, used);
-}
-
-void ResultSingleTool::deserialize(FILE *f) {
-    deserialize_clipper_all(f, contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours);
-    deserialize_data_all   (f, z, ntool, idx, alsoInfillingAreas, used);
-}
-
-void ToolpathManager::serialize(FILE *f) {
-    IOPaths iop(f);
-    size_t num;
-    
-    num = additionalAdditiveContours.size();
-    serialize_data(f, num);
-    for (auto &add : additionalAdditiveContours) {
-        serialize_data(f, add.first);
-        serialize_clipper(iop, add.second);
+template<typename K, typename V> void   serialize(FILE *f, std::map<K, V> &data) {
+    size_t numdata = data.size();
+    serialize(f, numdata);
+    for (auto &pair : data) {
+        serialize(f, pair.first);
+        serialize(f, pair.second);
     }
-    
-    num = slicess.size();
-    serialize_data(f, num);
-    for (auto &slices : slicess) {
-        num = slices.size();
-        serialize_data(f, num);
-        for (auto &slice : slices) slice->serialize(f);
-    }
-    
-    serialize_data(f, spec->startState);
 }
 
-void ToolpathManager::deserialize(FILE *f) {
-    IOPaths iop(f);
-    size_t num;
-    double key;
-    clp::Paths value;
-    
-    additionalAdditiveContours.clear();
-    deserialize_data(f, num);
-    for (size_t i = 0; i < num; ++i) {
-        deserialize_data(f, key);
-        value.clear();
-        deserialize_clipper(iop, value);
-        additionalAdditiveContours.emplace(std::move(key), std::move(value));
+template<typename K, typename V> void deserialize(FILE *f, std::map<K, V> &data) {
+    size_t numdata;
+    deserialize(f, numdata);
+    data.clear();
+    for (size_t i = 0; i < numdata; ++i) {
+        K key;
+        V value;
+        deserialize(f, key);
+        deserialize(f, value);
+        data.emplace(std::move(key), std::move(value));
     }
-    
-    deserialize_data(f, num);
-    slicess.clear();
-    slicess.resize(num);
-    for (auto &slices : slicess) {
-        deserialize_data(f, num);
-        slices.resize(num);
-        for (auto &slice : slices) {
-            slice = std::make_shared<ResultSingleTool>();
-            slice->deserialize(f);
-        }
-    }
-    
-    deserialize_data(f, spec->startState);
 }
+
+///////////////////////////////////////////
+// SERIALIZATION FOR SPECIFIC TYPES
+
+///////////////////////////////////////////
+// SERIALIZATION FOR SPECIFIC TYPES
+// WARNING: order is important unless the prototypes are explicitly declared beforehand!!!
+//          i.e., if a struct/class includes another one, the first must be after the second
+
+//handy macro for the boilerplate
+#define DEFINE_SERIALIZATION(TYPE, ...) \
+    template<> struct has_overloaded_serialization<TYPE> : std::true_type {}; \
+    void   serialize(FILE *f, TYPE &d) {   serialize_all(f, __VA_ARGS__); } \
+    void deserialize(FILE *f, TYPE &d) { deserialize_all(f, __VA_ARGS__); }
+
+DEFINE_SERIALIZATION(RawSliceData,
+                     d.slice, d.mapRawToInput, d.z, d.numRemainingUses, d.inUse, d.wasUsed)
+
+DEFINE_SERIALIZATION(RawSlicesManager,
+                     d.raw, d.rawZs, d.raw_idx)
+
+DEFINE_SERIALIZATION(InputSliceData,
+                     d.requiredRawSlices, d.z, d.ntool, d.mapInputToOutput, d.mapInputToRaw)
+
+DEFINE_SERIALIZATION(ResultSingleTool,
+                     d.contours, d.contoursToShow, d.ptoolpaths, d.itoolpaths, d.infillingAreas, d.medialAxisIndependentContours, d.infillingsIndependentContours, d.z, d.ntool, d.idx, d.alsoInfillingAreas, d.used)
+
+DEFINE_SERIALIZATION(ToolpathManager,
+                     d.additionalAdditiveContours, d.slicess, d.spec->startState)
+
+///////////////////////////////////////////
+// SERIALIZATION FOR SimpleSlicingScheduler 
+// (because InputSliceData does not have default constructor, cannot be automated with DEFINE_SERIALIZATION)
+template<> struct has_overloaded_serialization<SimpleSlicingScheduler> : std::true_type {};
+
+#define ARGLIST_SimpleSlicingScheduler d.output, d.num_output_by_tool, d.zmin, d.zmax, d.input_idx, d.output_idx, d.tm, d.rm
+void serialize  (FILE *f, SimpleSlicingScheduler &d) {   serialize(f, d.input);                         serialize_all(f, ARGLIST_SimpleSlicingScheduler); }
+void deserialize(FILE *f, SimpleSlicingScheduler &d) { deserialize(f, d.input, InputSliceData(0, 0)); deserialize_all(f, ARGLIST_SimpleSlicingScheduler); }
+
