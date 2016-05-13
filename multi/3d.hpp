@@ -3,14 +3,15 @@
 
 #include "multislicer.hpp"
 #include "spec.hpp"
-#include <map>
+#include "serialization.hpp"
 
-typedef struct ResultSingleTool : public SingleProcessOutput {
-    double z;
-    int ntool;
-    int idx;
-    bool has_err;
-    bool used;
+typedef struct ResultSingleTool: public SingleProcessOutput {
+            double z;
+            int ntool;
+            int idx;
+            bool has_err;
+            bool used;
+            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours, z, ntool, idx, alsoInfillingAreas, used)
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
@@ -30,9 +31,9 @@ class ToolpathManager {
 public:
     friend class SimpleSlicingScheduler;
     std::string err;
-    //the outer vector has one element for each process. The inner vectors are previous slices with their z values
-    std::vector<std::vector<std::shared_ptr<ResultSingleTool>>> slicess;
-    std::map<double, clp::Paths> additionalAdditiveContours; //this is 
+            std::vector<std::vector<std::shared_ptr<ResultSingleTool>>> slicess; //the outer vector has one element for each process. The inner vectors are previous slices with their z values
+            std::map<double, clp::Paths> additionalAdditiveContours;
+            SERIALIZATION_DEFINITION(additionalAdditiveContours, slicess, spec->startState)
     /*this method is to add feedback to the multislicing process:
       let the system know the contours of the object generated with
       low-res processes, measured with some scanning technology.*/
@@ -49,29 +50,34 @@ public:
 };
 
 typedef struct InputSliceData {
-    double z;
-    int ntool;
-    int mapInputToOutput; //one to one mapping
-    int mapInputToRaw; //many to one mapping
-    std::vector<int> requiredRawSlices; //this is only required if flag avoidVerticalOverwriting is set
+            double z;
+            int ntool;
+            int mapInputToOutput; //one to one mapping
+            int mapInputToRaw;    //many to one mapping
+            std::vector<int>  requiredRawSlices; //this is only required if flag avoidVerticalOverwriting is set
+            SERIALIZATION_DEFINITION(requiredRawSlices, z, ntool, mapInputToOutput, mapInputToRaw)
     InputSliceData(double _z, int _ntool) : z(_z), ntool(_ntool) {}
 } InputSliceData;
 
 typedef struct OutputSliceData {
+    //trivial type, no need to declare serialization list
     double z;
     int ntool;
     int mapOutputToInput; //one to one mapping
     bool computed;
 } OutputSliceData;
 
+
 typedef struct RawSliceData {
-    double z;
-    int numRemainingUses; //to keep track of the number of times each raw slice has to be used (initilized before the slice is in use, so this is the reason we need the flag inUse)
-    bool inUse;           //flag: if set, the raw slice is in use (redudant with previous
-    bool wasUsed;         //flag to catch error conditions
-    clp::Paths slice;
-    std::vector<int> mapRawToInput; //one to many mapping
+            double z;
+            int numRemainingUses; //to keep track of the number of times each raw slice has to be used (initilized before the slice is in use, so this is the reason we need the flag inUse)
+            bool inUse;           //flag: if set, the raw slice is in use (redudant with previous
+            bool wasUsed;         //flag to catch error conditions
+            clp::Paths slice;
+            std::vector<int> mapRawToInput; //one to many mapping
+            SERIALIZATION_DEFINITION(slice, mapRawToInput, z, numRemainingUses, inUse, wasUsed)
 } RawSliceData;
+
 
 /*this class keeps track of raw slices. Its functionality is semantically part of
 the scheduler (it even requires a reference to the scheduler!), but most of it is
@@ -80,9 +86,10 @@ class RawSlicesManager {
     SimpleSlicingScheduler *sched;
 public:
     clp::Paths auxRawSlice, auxaux;
-    int raw_idx;
-    std::vector<RawSliceData> raw;
-    std::vector<double> rawZs; //this is required in computeSlicesZs()
+            int raw_idx;
+            std::vector<RawSliceData> raw;
+            std::vector<double> rawZs; //this is required in computeSlicesZs()
+            SERIALIZATION_DEFINITION(raw, rawZs, raw_idx)
     RawSlicesManager(SimpleSlicingScheduler &s) : sched(&s) {}
     void removeUsedRawSlices();
     void clear() { raw.clear();  rawZs.clear();  auxRawSlice.clear();  auxaux.clear();  raw_idx = 0; }
@@ -132,14 +139,19 @@ public:
     std::string err;
     bool has_err;
     bool removeUnused;
-    double zmin, zmax;
-    ToolpathManager tm;
-    RawSlicesManager rm;
-    size_t input_idx, output_idx;
-    std::vector<InputSliceData> input;
-    std::vector<OutputSliceData> output;
-    std::vector<int> num_output_by_tool;
-
+            std::vector<InputSliceData> input;
+            double zmin;
+            double zmax;
+            ToolpathManager tm;
+            RawSlicesManager rm;
+            size_t input_idx;
+            size_t output_idx;
+            std::vector<OutputSliceData> output;
+            std::vector<int> num_output_by_tool;
+            SERIALIZATION_CUSTOM_DEFINITION(
+                { serialize(f, input); },
+                { deserialize(f, input, InputSliceData(0, 0)); },
+                output, num_output_by_tool, zmin, zmax, input_idx, output_idx, tm, rm);
     void clear() { input.clear(); output.clear(); err = std::string(); has_err = false; input_idx = output_idx = 0; zmin = zmax = 0.0; rm.clear(); }
 
     SimpleSlicingScheduler(bool _removeUnused, std::shared_ptr<ClippingResources> _res) : removeUnused(_removeUnused), has_err(false), tm(std::move(_res)), rm(*this) {}
@@ -148,10 +160,6 @@ public:
     void computeNextInputSlices();
     std::shared_ptr<ResultSingleTool> giveNextOutputSlice(); //this method will return slices in the correct order
 };
-
-void   serialize(FILE *f, SimpleSlicingScheduler &sched);
-void deserialize(FILE *f, SimpleSlicingScheduler &sched);
-
 
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs);
 

@@ -200,6 +200,7 @@ set(CORESOURCES
   ${iopaths_header}
   ${iopaths_source}
   ${common_header}
+  multi/serialization.hpp
   multi/3d.hpp
   multi/3d.cpp
   multi/auxgeom.hpp
