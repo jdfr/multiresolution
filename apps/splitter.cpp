@@ -1,6 +1,7 @@
 #include "multislicer.hpp"
 #include "pathwriter.hpp"
 #include "simpleparsing.hpp"
+#include "measureTime.hpp"
 #include <iomanip>
 
 bool getPaths(const char *pathsfilename, int currentRecord, SliceHeader &sliceheader, IOPaths &iop, clp::Paths &output, std::string &err) {
@@ -202,6 +203,9 @@ int main(int argc, const char** argv) {
     std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(std::shared_ptr<MultiSpec>());
     
     if (modeSplit) {
+        TimeMeasurements tm;
+        tm.measureTime();
+        
         std::shared_ptr<FileHeader> header = std::make_shared<FileHeader>();
         int numtools, numrecords;
         double scaling;
@@ -232,6 +236,9 @@ int main(int argc, const char** argv) {
 
         err = processFile(pathsfilename, writer);
         if (!err.empty()) { fprintf(stderr, err.c_str()); return -1; }
+        
+        tm.measureTime();
+        tm.printLastMeasurement(stdout, "TOTAL TIME: CPU %f, WALL TIME %f\n");
     } else if (modeCubes) {
         double scaling = 1e-6;
         conf[0].displacement.X = conf[0].displacement.Y = (clp::cInt)(displacement / scaling);

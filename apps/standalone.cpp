@@ -5,31 +5,13 @@
 #include "3d.hpp"
 #include "pathwriter_dxf.hpp"
 #include "pathwriter_nanoscribe.hpp"
+#include "measureTime.hpp"
 #include <iostream>
-#include <time.h>
 
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in
 #ifdef STANDALONE_USEPYTHON
 #    include "showcontours.hpp"
 #    include "sliceviewer.hpp"
-#endif
-
-
-#ifdef _WIN32
-#   include <Windows.h>
-    double getWallTime(){
-        LARGE_INTEGER time,freq;
-        if (!QueryPerformanceFrequency(&freq)) return 0; // error
-        if (!QueryPerformanceCounter(&time))   return 0; // error
-        return (double)time.QuadPart / freq.QuadPart;
-    }
-#else //POSIX
-#   include <sys/time.h>
-    double getWallTime(){
-        struct timeval time;
-        if (gettimeofday(&time,NULL)) return 0; // error
-        return (double)time.tv_sec + (double)time.tv_usec * .000001;
-    }
 #endif
 
 //this class handles the *save-in-grid options, which must be coordinated acroos global and per-process options
@@ -1002,10 +984,8 @@ int Main(int argc, const char** argv) {
 }
 
 int main(int argc, const char** argv) {
-    clock_t start, finish;
-    double wstart, wfinish;
-    start  = clock();
-    wstart = getWallTime();
+    TimeMeasurements tm;
+    tm.measureTime();
     int ret = -1;
     try {
         ret = Main(argc, argv);
@@ -1014,8 +994,8 @@ int main(int argc, const char** argv) {
     } catch (std::string &e) {
         fprintf(stderr, "Unhandled exception NOT while computing the output (string literal): %s\n", e.c_str());
     }
-    finish  = clock();
-    wfinish = getWallTime();
-    fprintf(stdout, "TOTAL TIME%s: CPU %f, WALL TIME %f\n", ret==0? "" : " UNTIL ERROR", ((double)(finish - start) / CLOCKS_PER_SEC), wfinish - wstart);
+    tm.measureTime();
+    std::string format = str("TOTAL TIME", ret==0? "" : " UNTIL ERROR", ": CPU %f, WALL TIME %f\n");
+    tm.printLastMeasurement(stdout, format.c_str());
     return ret;
 }

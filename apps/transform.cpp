@@ -1,5 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
+#include "measureTime.hpp"
 
 //some examples of transformations for debugging:
 //just translation: 1 0 0 5 0 1 0 -10 0 0 1 3
@@ -148,6 +149,8 @@ void printError(ParamReader &rd) {
 }
 
 int main(int argc, const char** argv) {
+    TimeMeasurements tm;
+    tm.measureTime();
     ParamReader rd = ParamReader::getParamReaderWithOptionalResponseFile(argc, argv);
 
     if (!rd.err.empty()) {
@@ -178,6 +181,8 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    tm.measureTime();
+    tm.printLastMeasurement(stdout, "TOTAL TIME: CPU %f, WALL TIME %f\n");
     return 0;
 }
 

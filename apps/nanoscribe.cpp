@@ -1,5 +1,6 @@
 #include "pathwriter_nanoscribe.hpp"
 #include "parsing.hpp"
+#include "measureTime.hpp"
 #include <iostream>
 #include <iomanip>
 #include <limits>
@@ -136,6 +137,8 @@ void MainSpec::usage() {
 }
 
 int main(int argc, const char** argv) {
+    TimeMeasurements tm;
+    tm.measureTime();
     std::shared_ptr<Configuration> config = std::make_shared<Configuration>();
     MetricFactors factors;
     NanoscribeSpec nanoSpec;
@@ -275,6 +278,8 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    tm.measureTime();
+    tm.printLastMeasurement(stdout, "TOTAL TIME: CPU %f, WALL TIME %f\n");
     return 0;
 }
 
