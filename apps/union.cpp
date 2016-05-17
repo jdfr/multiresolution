@@ -1,4 +1,5 @@
 #include "pathsfile.hpp"
+#include "measureTime.hpp"
 
 void closeAll(std::vector<FILE *> &is, FILE * o) {
     if (o != NULL) fclose(o);
@@ -84,6 +85,8 @@ void printError(ParamReader &rd) {
 }
 
 int main(int argc, const char** argv) {
+    TimeMeasurements tm;
+    tm.measureTime();
     --argc; ++argv;
     if (argc < 3) {
         fprintf(stderr, "At least two input files and one output file must be provided.\n%s", ERR);
@@ -99,6 +102,8 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    tm.measureTime();
+    tm.printLastMeasurement(stdout, "TOTAL TIME: CPU %f, WALL TIME %f\n");
     return 0;
 }
 

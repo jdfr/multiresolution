@@ -1,5 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
+#include "measureTime.hpp"
 
 typedef struct Data {
     int k;
@@ -110,6 +111,8 @@ void printError(ParamReader &rd) {
 }
 
 int main(int argc, const char** argv) {
+    TimeMeasurements tm;
+    tm.measureTime();
     ParamReader rd = ParamReader::getParamReaderWithOptionalResponseFile(argc, argv);
 
     if (!rd.err.empty()) {
@@ -176,6 +179,8 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    tm.measureTime();
+    tm.printLastMeasurement(stdout, "TOTAL TIME: CPU %f, WALL TIME %f\n");
     return 0;
 }
 
