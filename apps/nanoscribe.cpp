@@ -193,7 +193,8 @@ int main(int argc, const char** argv) {
         multispec = std::make_shared<MultiSpec>(config);
         multispec->global.z_epsilon = mainOpts["z-epsilon"].as<double>();
         {
-            ParserNanoLocalAndGlobal parser(*config, factors, nanoSpec, mainSpec.opts[mainSpec.globalOptsIdx], mainSpec.opts[mainSpec.perProcOptsIdx]);
+            const bool applyMotionPlanner = true;
+            ParserNanoLocalAndGlobal parser(applyMotionPlanner, *config, factors, nanoSpec, mainSpec.opts[mainSpec.globalOptsIdx], mainSpec.opts[mainSpec.perProcOptsIdx]);
             parser.setParsedOptions(mainSpec.optsBySystem[mainSpec.globalOptsIdx], mainSpec.optsBySystem[mainSpec.perProcOptsIdx]);
             if (!nanoSpec.useSpec) { fprintf(stderr, "Error: --nanoscribe parameter was not specified"); return -1; }
             multispec->numspecs = parser.ntools;

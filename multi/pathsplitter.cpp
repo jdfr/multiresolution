@@ -114,7 +114,10 @@ bool PathSplitter::setup() {
                 clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement.X + config.origin.X;
             for (int y = 0; y < numy; ++y) {
                 clp::cInt shifty  = ((clp::cInt)(y + sqminy)) * config.displacement.Y + config.origin.Y;
-                clp::Path &square = buffer.at(x,y).originalSquare;
+                auto &enclosed    = buffer.at(x,y);
+                enclosed.motionPlanningState.start_near.X = enclosed.motionPlanningState.start_near.Y = 0;
+                enclosed.motionPlanningState.notinitialized = true;
+                clp::Path &square = enclosed.originalSquare;
                 square.reserve(4);
                 square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
                 square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
@@ -140,7 +143,10 @@ bool PathSplitter::setup() {
                 clp::cInt shiftx  = config.min.X + (clp::cInt)(x*dispX);
             for (int y = 0; y < numy; ++y) {
                 clp::cInt shifty  = config.min.Y + (clp::cInt)(y*dispY);
-                clp::Path &square = buffer.at(x, y).originalSquare;
+                auto &enclosed    = buffer.at(x,y);
+                enclosed.motionPlanningState.start_near.X = enclosed.motionPlanningState.start_near.Y = 0;
+                enclosed.motionPlanningState.notinitialized = true;
+                clp::Path &square = enclosed.originalSquare;
                 square.reserve(4);
                 square.emplace_back(shiftx + sqdmin,  shifty + sqdmin);
                 square.emplace_back(shiftx + sqdmaxX, shifty + sqdmin);
@@ -211,6 +217,18 @@ void generateGridCubePoints(std::vector<TriangleMesh::Point> &ps, clp::Path &squ
     ps.emplace_back(xmax, ymin, zmax);
     ps.emplace_back(xmin, ymax, zmax);
     ps.emplace_back(xmax, ymax, zmax);
+}
+
+//helper method for processPaths()
+void PathSplitter::applyMotionPlanning() {
+    for (int x = 0; x < buffer.numx; ++x) {
+        for (int y = 0; y < buffer.numy; ++y) {
+            int idx = buffer.idx(x, y);
+            if (!buffer.data[idx].paths.empty()) {
+                verySimpleMotionPlanner(buffer.data[idx].motionPlanningState, PathOpen, buffer.data[idx].paths);
+            }
+        }
+    }
 }
 
 Matrix<TriangleMesh> PathSplitter::generateGridCubes(double scaling, double zmin, double zmax) {
@@ -405,6 +423,10 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
             }
         }
     }
+
+    //clipping messes with path ordering, so reapply motionPlanning
+    if (config.applyMotionPlanning) applyMotionPlanning();
+
     return true;
 }
 

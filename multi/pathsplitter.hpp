@@ -7,13 +7,14 @@
 we must divide it in small blocks. The blocks are cuboids, placed in a
 checkerboard pattern, such that the walls are angled*/
 typedef struct PathSplitterConfig {
-    bool useOrigin;               //if true, the checkerboard pattern is rigid. If false, distribute the space defined by the min/max values evenly among squares, with an effective displacement possibly lower than specified
     clp::IntPoint origin;         //origin of coordinates for the checkerboard pattern (marks the bottom-left corner of the first square)
     clp::IntPoint displacement;   //size of each chekerboard square
     clp::cInt margin;             //this is added to each square, so the window is a square of size displacement+2*margin
     clp::IntPoint min, max;       //min/max XY values (to set up the grid)
     double zmin;                  //min Z value (to set the groud)
     double wallAngle;             //angle of the walls with respect to the normal, in degrees
+    bool useOrigin;               //if true, the checkerboard pattern is rigid. If false, distribute the space defined by the min/max values evenly among squares, with an effective displacement possibly lower than specified
+    bool applyMotionPlanning;
 } PathSplitterConfig;
 
 //wrapper to use a vector as a matrix
@@ -37,6 +38,7 @@ public:
         clp::Paths paths;         //this is generated in processPaths(): it can be manipulated by callers
         clp::Path actualSquare;   //this is generated in processPaths(): it can be manipulated by callers
         clp::Path originalSquare; //this is generated in setup():: it should not be overwritten by callers
+        StartState motionPlanningState;
     } EnclosedPaths;
     clp::IntPoint originalSize;
     std::string err;
@@ -58,6 +60,7 @@ protected:
     bool setup_done;
     bool simpler_snap;
     bool singlex, singley, justone;
+    void applyMotionPlanning();
 };
 
 #endif

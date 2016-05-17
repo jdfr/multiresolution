@@ -118,6 +118,7 @@ void ParserStandaloneLocalAndGlobal::parseSaveInGridOption(po::variables_map &vm
     conf.displacement.Y = (clp::cInt)(vals[0] * scale);
     conf.margin         = (clp::cInt)(vals[1] * scale);
     conf.useOrigin      = s==4;
+    conf.applyMotionPlanning = spec.global.applyMotionPlanner;
     if (conf.useOrigin) {
         conf.origin.X   = (clp::cInt)(vals[2] * scale);
         conf.origin.Y   = (clp::cInt)(vals[3] * scale);

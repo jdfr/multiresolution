@@ -196,6 +196,8 @@ int main(int argc, const char** argv) {
     PathSplitterConfigs conf(1);
     conf[0].wallAngle      = 90; //no need to set conf[0].zmin
     conf[0].useOrigin      = use_origin;
+    
+    conf[0].applyMotionPlanning = true;
 
     std::shared_ptr<ClippingResources> clipres = std::make_shared<ClippingResources>(std::shared_ptr<MultiSpec>());
     

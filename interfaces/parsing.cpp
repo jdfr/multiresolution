@@ -334,7 +334,8 @@ struct ContextToParseNanoOptions {
     MetricFactors &factors;
     po::variables_map &nanoGlobal;
     NanoscribeSpec &spec;
-    ContextToParseNanoOptions(Configuration &c, MetricFactors &f, po::variables_map &ng, NanoscribeSpec &s) : config(c), factors(f), nanoGlobal(ng), spec(s) {}
+    bool applyMotionPlanner;
+    ContextToParseNanoOptions(Configuration &c, MetricFactors &f, po::variables_map &ng, NanoscribeSpec &s, bool a) : config(c), factors(f), nanoGlobal(ng), spec(s), applyMotionPlanner(a) {}
 };
 
 //helper method for parseNano()
@@ -493,6 +494,8 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
         PREFIXNANONAME("nano-galvocenter"), GalvoAlwaysCenter, "always", GalvoMinimizeMovements, "minimize")) {
         context->spec.nanos[idx]->galvomode = galvomode;
     }
+    
+    context->spec.splits[idx].applyMotionPlanning = context->applyMotionPlanner;
 
     if (GLOBAL) context->spec.splits[idx].wallAngle = 90.0;
     if (current.count(PREFIXNANONAME("nano-angle"))) {
@@ -928,7 +931,7 @@ void ParserAllLocalAndGlobal::globalCallback() {
     parseGlobal(spec.global, globalOptions, factors);
     spec.initializeVectors(perProcessOptions.maxProcess + 1);
     if (nanoSpec != NULL) {
-        nanoContext = std::make_shared<ContextToParseNanoOptions>(*spec.global.config, factors, globalOptions, *nanoSpec);
+        nanoContext = std::make_shared<ContextToParseNanoOptions>(*spec.global.config, factors, globalOptions, *nanoSpec, spec.global.applyMotionPlanner);
         parseNano<true>(0, 0, globalOptions, nanoContext.get());
     }
 }
@@ -945,15 +948,16 @@ void ParserAllLocalAndGlobal::finishCallback() {
     if (!err.empty()) throw po::error(std::move(err));
 }
 
-ParserNanoLocalAndGlobal::ParserNanoLocalAndGlobal(Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) :
+ParserNanoLocalAndGlobal::ParserNanoLocalAndGlobal(bool _applyMotionPlanner, Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) :
 factors(f),
 nanoSpec(n),
 config(c),
+applyMotionPlanner(_applyMotionPlanner),
 ParserLocalAndGlobal(std::move(g), std::move(l)) {}
 
 void ParserNanoLocalAndGlobal::globalCallback() {
     ntools = perProcessOptions.maxProcess + 1;
-    nanoContext = std::make_shared<ContextToParseNanoOptions>(config, factors, globalOptions, nanoSpec);
+    nanoContext = std::make_shared<ContextToParseNanoOptions>(config, factors, globalOptions, nanoSpec, applyMotionPlanner);
     parseNano<true>(0, 0, globalOptions, nanoContext.get());
 }
 

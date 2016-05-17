@@ -83,12 +83,13 @@ public:
     MetricFactors  &factors;
     NanoscribeSpec &nanoSpec;
     Configuration  &config;
-    ParserNanoLocalAndGlobal(Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l);
+    ParserNanoLocalAndGlobal(bool _applyMotionPlanner, Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l);
     virtual void globalCallback();
     virtual void perProcessCallback(int k, po::variables_map &processOptions);
     int ntools;
 protected:
     std::shared_ptr<ContextToParseNanoOptions> nanoContext;
+    bool applyMotionPlanner;
 };
 
 void addResponseFileOption(po::options_description &opts);
