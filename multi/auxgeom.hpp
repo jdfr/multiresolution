@@ -190,6 +190,14 @@ inline double applyTransform2DCompatibleZ(double z, TransformationMatrix matrix)
     return z*matrix[10] + matrix[11];
 }
 
+inline bool transform2DIsIdentityInXY(TransformationMatrix matrix) {
+    return (matrix[0] == 1.0) && (matrix[1] == 1.0) && (matrix[4] == 1.0) && (matrix[5] == 1.0) && (matrix[3] == 0.0) && (matrix[7] == 0.0);
+}
+
+inline bool transform2DIsIdentityInZ(TransformationMatrix matrix) {
+    return (matrix[10] == 1.0) && (matrix[11] == 0.0);
+}
+
 inline Point3D applyTransformFull3D(clp::DoublePoint &p, double iz, TransformationMatrix matrix) {
     double x = (matrix[0] * p.X) + (matrix[1] * p.Y) + (matrix[2] * iz) + matrix[3];
     double y = (matrix[4] * p.X) + (matrix[5] * p.Y) + (matrix[6] * iz) + matrix[7];
