@@ -33,7 +33,7 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2
         }
 
         sliceheader.saveFormat = PATHFORMAT_DOUBLE_3D;
-        sliceheader.totalSize = getPathsSerializedSize(paths3, PathOpen);
+        sliceheader.totalSize = getPathsSerializedSize(paths3, PathOpen) + sliceheader.headerSize;
         sliceheader.setBuffer();
         std::string err = sliceheader.writeToFile(iop.f);
         if (!err.empty()) { return err; }
