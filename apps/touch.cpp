@@ -2,13 +2,6 @@
 #include "simpleparsing.hpp"
 #include "measureTime.hpp"
 
-typedef struct Data {
-    int k;
-    SliceHeader header;
-    std::vector<int64> data;
-    Data(int _k, SliceHeader _header, int datasize) : k(_k), header(std::move(_header)), data(datasize) {}
-} Data;
-
 typedef std::pair<bool, T64> Add;
 
 typedef struct Spec {
@@ -21,17 +14,21 @@ std::string touchFile(const char * filename, const char *outputname, std::vector
     FILE * f = fopen(filename, "rb");
     if (f == NULL) { return str("Could not open file ", filename); }
 
+    FILE * o = fopen(outputname, "wb");
+    if (o == NULL) { return str("Could not open output file ", outputname); }
+    
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
-    std::vector<Data> data;
-    data.reserve(fileheader.numRecords);
+    std::string err = fileheader.readFromFile(f);    if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file header for ", filename, ": ", err); }
 
+    std::string e = fileheader.writeToFile(o, true); if (!e.empty())   { fclose(f); fclose(o); return str("error writing file ", outputname, ": ", e); }
+    
     SliceHeader sliceheader;
+    std::vector<T64> data;
+
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string e = sliceheader.readFromFile(f);
-        if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header: ", e); break; }
-        if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header: header is too short!"); break;  }
+        e = sliceheader.readFromFile(f);
+        if (!e.empty())                     { fclose(f); fclose(o); return str("Error reading ", currentRecord, "-th slice header: ", e); }
+        if (sliceheader.alldata.size() < 7) { fclose(f); fclose(o); return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
 
         for (auto &spec : specs) {
             if (spec.filterspec.matchesHeader(sliceheader)) {
@@ -53,41 +50,19 @@ std::string touchFile(const char * filename, const char *outputname, std::vector
             }
         }
 
-        int numRecords = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64));
-        data.push_back(Data(currentRecord, sliceheader, numRecords));
-        if (fread(&(data.back().data[0]), sizeof(int64), numRecords, f) != numRecords) {
-            err = str("error trying to read ", currentRecord, "-th slice payload in ", filename);
-            break;
-        }
+        e = sliceheader.writeToFile(o);
+        if (!e.empty()) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice of ", filename, " in ", outputname, ": ", e); }
+        
+        int64 sizeT64 = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(T64));
+        data.resize(sizeT64);
+        if (fread (&(data.front()), sizeof(int64), sizeT64, f) != sizeT64) { fclose(f); fclose(o); return str("error trying to read ", currentRecord, "-th slice payload in ", filename); }
+        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o) != sizeT64) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
 
     }
 
     fclose(f);
-
-    if (!err.empty()) { return err; }
-
-    FILE * o = fopen(outputname, "wb");
-    if (o == NULL) { return str("Could not open output file ", outputname); }
-
-    std::string e = fileheader.writeToFile(o, true);
-    if (!e.empty()) {
-        err = str("error writing file ", outputname, ": ", e);
-    } else {
-        err = std::string();
-        for (auto d = data.begin(); d != data.end(); ++d) {
-            e = d->header.writeToFile(o);
-            if (!e.empty()) {
-                err = str("error trying to write ", d->k, "-th slice of ", filename, " in ", outputname, ": ", e);
-                break;
-            }
-            if (fwrite(&(d->data[0]), sizeof(int64), d->data.size(), o) != d->data.size()) {
-                err = str("error trying to write ", d->k, "-th slice payload of ", filename, " in ", outputname);
-                break;
-            }
-        }
-    }
-
     fclose(o);
+
     return std::string();
 }
 

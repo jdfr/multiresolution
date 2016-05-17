@@ -2,66 +2,53 @@
 #include "simpleparsing.hpp"
 #include "measureTime.hpp"
 
-typedef struct Data {
-    int k;
-    SliceHeader header;
-    std::vector<int64> data;
-    Data(int _k, SliceHeader _header, int datasize) : k(_k), header(std::move(_header)), data(datasize) {}
-} Data;
-
 std::string filterMatchesFromFile(const char * filename, const char *outputname, PathInFileSpec spec) {
     FILE * f = fopen(filename, "rb");
     if (f == NULL) { return str("Could not open file ", filename); }
 
-
-    FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
-    std::vector<Data> data;
-    data.reserve(fileheader.numRecords);
-
-    SliceHeader sliceheader;
-    for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
-        if (!err.empty()) { fclose(f); return str("Error reading file ", filename, ": ", err); }
-        if (currentRecord >= fileheader.numRecords) break;
-
-        int numRecords = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64));
-        data.push_back(Data(currentRecord, sliceheader, numRecords));
-        if (fread(&(data.back().data[0]), sizeof(int64), numRecords, f) != numRecords) {
-            fclose(f); return str("error trying to read ", currentRecord, "-th slice payload in ", filename);
-        }
-    }
-    fclose(f);
-
-    if (data.empty()) {
-        return str("could not match any results to the specification for file ", filename);
-    }
-
     FILE * o = fopen(outputname, "wb");
     if (o == NULL) { return str("Could not open output file ", outputname); }
 
-    fileheader.numRecords = data.size();
-    std::string e = fileheader.writeToFile(o, true);
-    if (!e.empty()) {
-        err = str("error writing file ", outputname, ": ", e);
-    } else {
-        err = std::string();
-        for (auto d = data.begin(); d != data.end(); ++d) {
-            e = d->header.writeToFile(o);
-            if (!e.empty()) {
-                err = str("error trying to write ", d->k, "-th slice of ", filename, " in ", outputname, ": ", e);
-                break;
-            }
-            if (fwrite(&(d->data[0]), sizeof(int64), d->data.size(), o) != d->data.size()) {
-                err = str("error trying to write ", d->k, "-th slice payload of ", filename, " in ", outputname);
-                break;
-            }
-        }
+    printf("XKCD 0\n");
+    FileHeader fileheader;
+    std::string err = fileheader.readFromFile(f);    if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file header for ", filename, ": ", err); }
+    printf("XKCD 1\n");
+
+    int64 inputNumRecords  = fileheader.numRecords;
+    int64 outputNumRecords = 0;
+    
+    std::string e = fileheader.writeToFile(o, true); if (!e.empty())   { fclose(f); fclose(o); return str("error writing file ", outputname, ": ", e); }
+    printf("XKCD 2\n");
+    
+    SliceHeader sliceheader;
+    std::vector<T64> data;
+    
+    for (int currentRecord = 0; currentRecord < inputNumRecords; ++currentRecord) {
+        err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
+        if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file ", filename, ": ", err); }
+        if (currentRecord >= inputNumRecords) break;
+
+        e = sliceheader.writeToFile(o);
+        if (!e.empty())                                                    { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice header of ", filename, " in ", outputname, ": ", e); }
+        
+        int64 sizeT64 = (sliceheader.totalSize - sliceheader.headerSize) / sizeof(T64);
+        data.resize(sizeT64);
+        
+        if (fread (&(data.front()), sizeof(int64), sizeT64, f) != sizeT64) { fclose(f); fclose(o); return str("error trying to read ", currentRecord, "-th slice payload in ", filename); }
+        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o) != sizeT64) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
+        ++outputNumRecords;
+    }
+    fclose(f);
+    
+    int numToSkip = fileheader.numRecordsOffset();
+    if (fseek(o, numToSkip, SEEK_SET) != 0)                                { fclose(o); return str( "fseek failed: could not write numRecords to file ", filename); }
+    if (fwrite(&outputNumRecords, sizeof(outputNumRecords), 1, o) != 1)    { fclose(o); return str("fwrite failed: could not write numRecords to file ", filename); }
+    fclose(o);
+
+    if (outputNumRecords == 0) {
+        return str("could not match any results to the specification for file ", filename);
     }
 
-
-    fclose(o);
     return err;
 }
 
