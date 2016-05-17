@@ -296,9 +296,15 @@ void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Pa
             throw std::runtime_error("NEVER HAPPEN in verySimpleMotionPlanner()");
         }
         valid[idx] = false;
-        output.push_back(std::move(paths[idx]));
-        if (!isfront) {
-            clp::ReversePath(output.back());
+        bool add   = true;
+        clp::Path &path = paths[idx];
+        if (!isfront)        clp::ReversePath(path);
+        if (!output.empty()) add = output.back().back() != path.front();
+        if (add) {
+            output.push_back(std::move(path));
+        } else {
+            output.back().reserve(output.back().size()+path.size());
+            std::move(path.begin()+1, path.end(), std::back_inserter(output.back()));
         }
         startState.start_near = output.back().back();
     }
@@ -306,6 +312,6 @@ void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Pa
     SHOWBENCHMARK("TIME IN MOTION PLANNER LOOP: %f\n", t[0], t[1]);
     WAIT;
 
-    std::swap(paths, output);
+    paths = std::move(output);
 }
 
