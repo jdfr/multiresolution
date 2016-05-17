@@ -240,10 +240,10 @@ int main(int argc, const char** argv) {
             conf[0].origin.X   = (clp::cInt)(origin_x / scaling);
             conf[0].origin.Y   = (clp::cInt)(origin_y / scaling);
         }
-        conf[0].min.X   = minx / scaling;
-        conf[0].min.Y   = miny / scaling;
-        conf[0].max.X   = maxx / scaling;
-        conf[0].max.Y   = maxy / scaling;
+        conf[0].min.X   = (ClipperLib::cInt)(minx / scaling);
+        conf[0].min.Y   = (ClipperLib::cInt)(miny / scaling);
+        conf[0].max.X   = (ClipperLib::cInt)(maxx / scaling);
+        conf[0].max.Y   = (ClipperLib::cInt)(maxy / scaling);
         createCubesFromGrid(outputPattern, conf, clipres, scaling, minz, maxz);
     }
 
