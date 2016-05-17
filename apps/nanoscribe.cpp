@@ -51,7 +51,7 @@ template<typename Function> std::string processToolpaths(std::string &pathsfilen
             break;
         }
 
-        err = function(currentRecord, sliceheader, output);
+        err = function(fileheader, currentRecord, sliceheader, output);
         output.clear();
         if (!err.empty()) break;
     }
@@ -227,7 +227,7 @@ int main(int argc, const char** argv) {
             //have to read the whole input file to find the BB!
             bb.minx = bb.miny = std::numeric_limits<clp::cInt>::max();
             bb.maxx = bb.maxy = std::numeric_limits<clp::cInt>::min();
-            auto getBB = [&bb, &ntoolpaths](int idx, SliceHeader &header, clp::Paths &paths) {
+            auto getBB = [&bb, &ntoolpaths](FileHeader &fileheader, int idx, SliceHeader &header, clp::Paths &paths) {
                 if (!paths.empty()) ++ntoolpaths;
                 for (auto &path : paths) {
                     for (auto &point : path) {
@@ -258,7 +258,8 @@ int main(int argc, const char** argv) {
 
         int numtools = (int)multispec->numspecs;
 
-        auto saveToolpaths = [&pathsplitter, numtools](int idx, SliceHeader &header, clp::Paths &paths) {
+        auto saveToolpaths = [&pathsplitter, numtools](FileHeader &fileheader, int idx, SliceHeader &header, clp::Paths &paths) {
+            fprintf(stdout, "  -> reading record %d/%ld...\n", idx, fileheader.numRecords);
             if (header.ntool < 0)         return str("Error: toolpath ", idx, " has negative ntool!\n");
             if (header.ntool >= numtools) return str("Error: toolpath ", idx, " has ntool ", header.ntool, "-th but command line arguments specified numtools=", numtools, "\n");
             if (!pathsplitter.writePaths(paths, (int)header.type, 0.0, (int)header.ntool, header.z, header.scaling, false)) return pathsplitter.err;
