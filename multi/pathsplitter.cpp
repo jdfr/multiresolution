@@ -17,66 +17,13 @@ void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool
     ClipperEndOperation(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
 }
 
-void clipPaths(clp::Clipper &clipper, bool pathsClosed, clp::Paths &paths, Matrix<PathSplitter::EnclosedPaths> &buffer) {
-    clp::PolyTree pt;
+void clipPaths(clp::Clipper &clipper, bool pathsClosed, clp::Paths &paths, Matrix<PathSplitter::EnclosedPaths> &buffer, clp::PolyTree &pt) {
     for (int x = 0; x < buffer.numx; ++x) {
         for (int y = 0; y < buffer.numy; ++y) {
             auto &enclosed = buffer.at(x, y);
             clipPaths(clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
         }
     }
-}
-
-bool intersectSegmentAndHLine(const clp::IntPoint a, const clp::IntPoint ab, const clp::cInt abminy, const clp::cInt abmaxy, clp::cInt y, const clp::cInt minxl, const clp::cInt maxxl, clp::IntPoint &result) {
-
-    if (ab.Y == 0) return false;
-
-    if (!((y >= abminy) && (y <= abmaxy))) return false;
-
-    result.Y = y;
-    result.X = a.X + ab.X*(y - a.Y) / (ab.Y);
-
-    return (result.X >= minxl) && (result.X <= maxxl);
-}
-
-bool intersectSegmentAndVLine(const clp::IntPoint a, const clp::IntPoint ab, const clp::cInt abminx, const clp::cInt abmaxx, clp::cInt x, const clp::cInt minyl, const clp::cInt maxyl, clp::IntPoint &result) {
-
-    if (ab.X == 0) return false;
-
-    if (!((x >= abminx) && (x <= abmaxx))) return false;
-
-    result.X = x;
-    result.Y = a.Y + ab.Y*(x - a.X) / (ab.X);
-
-    return (result.Y >= minyl) && (result.Y <= maxyl);
-}
-
-bool intersectSegmentAndSquare(const clp::IntPoint a, const clp::IntPoint b, const clp::Path &square, clp::IntPoint &result) {
-    /*square layout from the splitter:
-
-        3****2
-        *    *
-        *    *
-        *    *
-        0****1
-    */
-
-    clp::IntPoint ab(b.X - a.X, b.Y - a.Y);
-
-    clp::cInt abminx = std::min(a.X, b.X);
-    clp::cInt abmaxx = std::max(a.X, b.X);
-    if (intersectSegmentAndVLine(a, ab, abminx, abmaxx, square[1].X, square[1].Y, square[2].Y, result))
-        return true;
-    if (intersectSegmentAndVLine(a, ab, abminx, abmaxx, square[3].X, square[0].Y, square[3].Y, result))
-        return true;
-
-    clp::cInt abminy = std::min(a.Y, b.Y);
-    clp::cInt abmaxy = std::max(a.Y, b.Y);
-    if (intersectSegmentAndHLine(a, ab, abminy, abmaxy, square[0].Y, square[0].X, square[1].X, result))
-        return true;
-    if (intersectSegmentAndHLine(a, ab, abminy, abmaxy, square[2].Y, square[3].X, square[2].X, result))
-        return true;
-    return false;
 }
 
 
@@ -110,6 +57,7 @@ bool PathSplitter::setup() {
         numx                = sqmaxx - sqminx;
         numy                = sqmaxy - sqminy;
         buffer.reset(numx, numy);
+        states.reset(numx, numy);
         for (int x = 0; x < numx; ++x) {
                 clp::cInt shiftx  = ((clp::cInt)(x + sqminx)) * config.displacement.X + config.origin.X;
             for (int y = 0; y < numy; ++y) {
@@ -139,6 +87,7 @@ bool PathSplitter::setup() {
         originalSize.X    = sqdmaxX - sqdmin;
         originalSize.Y    = sqdmaxY - sqdmin;
         buffer.reset(numx, numy);
+        states.reset(numx, numy);
         for (int x = 0; x < numx; ++x) {
                 clp::cInt shiftx  = config.min.X + (clp::cInt)(x*dispX);
             for (int y = 0; y < numy; ++y) {
@@ -155,8 +104,6 @@ bool PathSplitter::setup() {
             }
         }
     }
-    insideSquare.reset(numx, numy);
-    positionsToTest.reserve(5 * 5);
     if (cfg != NULL) {
         clp::Paths squares;
         for (auto &encl : buffer.data) {
@@ -181,7 +128,6 @@ bool PathSplitter::setup() {
         snapspec.shiftX    = config.min.X + dispX / 2;
         snapspec.shiftY    = config.min.Y + dispY / 2;
     }
-    simpler_snap = angle90 && (config.margin == 0);
     setup_done   = true;
     return true;
 }
@@ -219,6 +165,17 @@ void generateGridCubePoints(std::vector<TriangleMesh::Point> &ps, clp::Path &squ
     ps.emplace_back(xmax, ymax, zmax);
 }
 
+Matrix<TriangleMesh> PathSplitter::generateGridCubes(double scaling, double zmin, double zmax) {
+    Matrix<TriangleMesh> result(numx, numy);
+    auto trs = generateGridCubeTriangles();
+    auto output = result.data.begin();
+    for (auto encl = buffer.data.begin(); encl != buffer.data.end(); ++encl, ++output) {
+       output->triangles = trs;
+       generateGridCubePoints(output->points, encl->originalSquare, scaling, zmin, zmax);
+    }
+    return result;
+}
+
 //helper method for processPaths()
 void PathSplitter::applyMotionPlanning() {
     for (int x = 0; x < buffer.numx; ++x) {
@@ -231,29 +188,19 @@ void PathSplitter::applyMotionPlanning() {
     }
 }
 
-Matrix<TriangleMesh> PathSplitter::generateGridCubes(double scaling, double zmin, double zmax) {
-    Matrix<TriangleMesh> result(numx, numy);
-    auto trs = generateGridCubeTriangles();
-    auto output = result.data.begin();
-    for (auto encl = buffer.data.begin(); encl != buffer.data.end(); ++encl, ++output) {
-       output->triangles = trs;
-       generateGridCubePoints(output->points, encl->originalSquare, scaling, zmin, zmax);
-    }
-    return result;
+//helper method for processPaths()
+void PathSplitter::SquareState::reset() {
+    no_lines = true;
+    create_new = currentPointIsInside = previousPointIsInside = pointadded = false;
 }
 
-
-bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling) {
+//helper method for processPaths()
+bool PathSplitter::setupSquares(double z, double scaling) {
+    clp::IntPoint shiftBecauseAngle;
     if ((z < config.zmin) && !angle90) {
         err = str("Error while splitting toolpaths: z=%g < zmin=%g (this is illegal because the configuration specifies a non-right angle)");
         return false;
     }
-    if (justone) {
-        buffer.data[0].actualSquare = buffer.data[0].originalSquare;
-        buffer.data[0].paths = paths;
-        return true;
-    }
-    clp::IntPoint shiftBecauseAngle;
     if (!angle90) {
         clp::cInt shiftBecauseAngle_value = (clp::cInt) (sinangle * ((z - config.zmin) / scaling));
         if (shiftBecauseAngle_value >= config.displacement.X) {
@@ -289,139 +236,203 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
             }
         }
     }
+    return true;
+}
+
+//helper method for processPaths()
+void PathSplitter::applyClipping(std::vector<clp::Paths> &toClip, bool pathsClosed) {
+    clp::Paths tmp;
+    for (int x = 0; x < buffer.numx; ++x) {
+        for (int y = 0; y < buffer.numy; ++y) {
+            int idx = buffer.idx(x, y);
+            if (!toClip[idx].empty()) {
+                auto &enclosed = buffer.at(x, y);
+                clipPaths(res->clipper, enclosed.actualSquare, toClip[idx], pathsClosed, pt, tmp);
+                if (!tmp.empty()) MOVETO(tmp, enclosed.paths);
+                toClip[idx].clear();
+            }
+        }
+    }
+}
+
+//helper method for processPaths()
+void keepWithinBounds(clp::Paths &snappeds, int numx, int numy) {
+    for (auto &positions : snappeds) {
+        for (auto &position : positions) {
+            if (position.X < 0) {
+                position.X = 0;
+                fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->X < 0)\n");
+            }
+            if (position.Y < 0) {
+                position.Y = 0;
+                fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->Y < 0)\n");
+            }
+            if (position.X >= numx) {
+                position.X = numx - 1;
+                fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->X >= numx)\n");
+            }
+            if (position.Y >= numy) {
+                position.Y = numy - 1;
+                fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->Y >= numy)\n");
+            }
+        }
+    }
+
+}
+
+bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling) {
+    if (justone) {
+        buffer.data[0].actualSquare = buffer.data[0].originalSquare;
+        buffer.data[0].paths = paths;
+        return true;
+    }
+
+    if (!setupSquares(z, scaling)) return false;
 
     if (pathsClosed) {
-       //for closed paths, we need to use full-blown clipping. Downside: very slow!!!
-        clipPaths(res->clipper, pathsClosed, paths, buffer);
+
+       //for closed paths, it is far easier to use full-blown clipping. Downside: very slow!!!
+        clipPaths(res->clipper, pathsClosed, paths, buffer, pt);
+
     } else {
-        //for open paths, clipping can be greatly accelerated
+
+        //for open paths, clipping can be accelerated
         clp::Paths snappeds(paths);
-        clp::IntPoint previousPosition;
+        std::vector<clp::Paths> toClip(buffer.data.size());
         verySimpleGetSnapIndex(snappeds, snapspec);
-        clp::IntPoint currentposition;
-        auto path       = paths.begin();
+        keepWithinBounds(snappeds, numx, numy);
+        clp::IntPoint currentpoint, prevpoint, prevposition;
+        clp::Path segment(2);
+        bool no_segment_already_added = true;
+        bool no_segment_is_going_to_be_added = true;
+        clp::Path::iterator point, position;
+        int nx = numx - 1;
+        int ny = numy - 1;
+        int minx, maxx, miny, maxy;
+
+        //this logic is used more than once in the inner loops, so it is put here as a lambda
+        auto define_range = [&minx, &maxx, &miny, &maxy, nx, ny](int mnx, int mxx, int mny, int mxy) {
+            minx = std::max(std::min(mnx - 2, nx), 0);
+            maxx = std::max(std::min(mxx + 2, nx), 0);
+            miny = std::max(std::min(mny - 2, ny), 0);
+            maxy = std::max(std::min(mxy + 2, ny), 0);
+        };
+        
+        //this logic is used more than once in the inner loops, so it is put here as a lambda
+        auto reset_line_keeping = [&no_segment_already_added, &no_segment_is_going_to_be_added, &toClip, &segment, &point, &position, this](int minx, int maxx, int miny, int maxy) {
+            no_segment_already_added = true;
+            no_segment_is_going_to_be_added = true;
+            for (int x = minx; x <= maxx; ++x) {
+                for (int y = miny; y <= maxy; ++y) {
+                    int markidx = buffer.idx(x, y);
+                    //add segment to be clipped, EXCEPT if it has been already added (to avoid duplications)
+                    if (!states.data[markidx].pointadded) {
+                        toClip[markidx].push_back(segment);
+                    }
+                }
+            }
+            //reset state in ALL squares
+            auto state = states.data.begin();
+            for (auto toclipp = toClip.begin(); toclipp != toClip.end(); ++state, ++toclipp) {
+                state->reset();
+            }
+            //roll back iterators, because we must take into account the
+            //current point again, as the initial point for a new line
+            --point;
+            --position;
+        };
+
+        //first, separate the easy cases, and store apart the lines that cross across boundaries
+        auto path = paths.begin();
         for (auto snapped = snappeds.begin(); snapped != snappeds.end(); ++snapped, ++path) {
-            auto point = path->begin();
-            bool start_line = true;
-            insideSquare.assign(false);
-            bool simpler_snap_valid = simpler_snap;
-            for (auto position = snapped->begin(); position != snapped->end(); ++position, ++point) {
-                if (position->X < 0) {
-                    position->X = 0;
-                    fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->X < 0)\n");
-                }
-                if (position->Y < 0) {
-                    position->Y = 0;
-                    fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->Y < 0)\n");
-                }
-                if (position->X >= numx) {
-                    position->X = numx - 1;
-                    fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->X >= numx)\n");
-                }
-                if (position->Y >= numy) {
-                    position->Y = numy - 1;
-                    fprintf(stderr, "Warning: unexpected geometric condition (point was outside the splitting grid, branch (position->Y >= numy)\n");
-                }
-                simpler_snap_valid = simpler_snap_valid && testInsideSquare(*point, buffer.at((int)position->X, (int)position->Y).actualSquare);
-                positionsToTest.clear();
-                if (simpler_snap_valid) {
-                    //in this case, there can be only one current position, and possibly a previous position
-                    positionsToTest.emplace_back((int)position->X, (int)position->Y);
-                    if (!start_line && (previousPosition != *position)) {
-                        positionsToTest.emplace_back((int)previousPosition.X, (int)previousPosition.Y);
-                    }
-                    previousPosition = *position;
+            point = path->begin();
+            for (auto &state : states.data) state.reset();
+            no_segment_already_added = true;
+            no_segment_is_going_to_be_added = true;
+            for (position = snapped->begin(); position != snapped->end(); ++position, ++point) {
+                /*this is somewhat complex: we must sweep for squares where current and previous points might reside.
+                If no square boundaries are crossed, we can add the lines to several squares concurrently.
+                However, as soon as there is any crossing, we bail out and mark the segment to be clipped in all nerby squares*/
+                currentpoint = *point;
+                if (no_segment_is_going_to_be_added) {
+                    define_range((int)position->X,
+                                 (int)position->X,
+                                 (int)position->Y,
+                                 (int)position->Y);
                 } else {
-                    //in this case, we must sweep all nearby squares to make sure we do the partitioning correctly
-                    int minx, maxx, miny, maxy;
-                    minx = (int)position->X - 2;
-                    maxx = (int)position->X + 2;
-                    miny = (int)position->Y - 2;
-                    maxy = (int)position->Y + 2;
-                    for (int x = minx; x <= maxx; ++x) {
-                        if (x < 0)     continue;
-                        if (x >= numx) continue;
-                        for (int y = miny; y <= maxy; ++y) {
-                            if (y < 0)     continue;
-                            if (y >= numy) continue;
-                            positionsToTest.emplace_back(x, y);
-                        }
-                    }
+                    segment[0] = prevpoint;
+                    segment[1] = currentpoint;
+                    define_range((int)std::min(position->X, prevposition.X),
+                                 (int)std::max(position->X, prevposition.X),
+                                 (int)std::min(position->Y, prevposition.Y),
+                                 (int)std::max(position->Y, prevposition.Y));
                 }
-                /*//test all squares
-                positionsToTest.clear();
-                for (int x = 0; x < numx; ++x) {
-                    for (int y = 0; y < numy; ++y) {
-                        positionsToTest.emplace_back(x, y);
-                    }
-                }*/
-                for (auto &positionToTest : positionsToTest) {
-                    int x                  = (int)positionToTest.first;
-                    int y                  = (int)positionToTest.second;
-                    auto &enclosed         = buffer.at(x, y);
-                    //if simpler_snap_valid is set (meaning that margin==0 and the point was really inside the square), the condition currentlyInside can be simplified
-                    bool currentlyInside   = simpler_snap_valid ? ((x == position->X) && (y == position->Y)) :
-                                                                  testInsideSquare(*point, enclosed.actualSquare);
-                    char &previouslyInside = insideSquare.at(x, y);
-                    if (start_line) {
-                        //first time, inconditionally initialize grid elements if the point is inside themw
-                        if (currentlyInside) {
-                            enclosed.paths.emplace_back(1, *point);
-                            previouslyInside = true;
-                        }
-                    } else {
-                        if (currentlyInside) {
-                            if (previouslyInside) {
-                                //point is inside, and there were previous points: add point to square
-                                enclosed.paths.back().push_back(*point);
-                            } else {
-                                clp::IntPoint p;
-                                if (intersectSegmentAndSquare(*(point - 1), *point, enclosed.actualSquare, p)) {
-                                    /*clp::Paths seg1(1, clp::Path(2)); seg1.back()[0] = p; seg1.back()[1] = *point;
-                                    clp::Paths seg2(1, clp::Path(2)); seg2.back()[0] = *(point - 1); seg2.back()[1] = p;
-                                    clp::Paths sq(1, enclosed.actualSquare); sq.back().push_back(sq.back().front());
-                                    SHOWCONTOURS(*cfg, "currentlyInside && !previouslyInside", &sq, &enclosed.paths, &seg1, &seg2);*/
-                                    //first point inside this square: initialize with the intersection, then add the point
-                                    enclosed.paths.emplace_back(1, p);
-                                    enclosed.paths.back().push_back(*point);
-                                    previouslyInside = true;
+                for (int x = minx; x <= maxx; ++x) {
+                    for (int y = miny; y <= maxy; ++y) {
+                        //for each reachable square:
+                        int currentidx = buffer.idx(x, y);
+                        auto &sqstate = states.data[currentidx];
+                        sqstate.currentPointIsInside = testInsideSquare(currentpoint, buffer.data[currentidx].actualSquare);
+
+                        if (sqstate.currentPointIsInside) {
+                            if (sqstate.no_lines) {
+                                //segments can be primed only if no other segment has already been created.
+                                //rationale: if a segment lives in the margin shared by several squares, we want to add it to all of them at once,
+                                //           but we want to reset everything if lines were already being added in other places
+                                if (no_segment_already_added) {
+                                    no_segment_is_going_to_be_added = false;
+                                    sqstate.no_lines = false; 
+                                    sqstate.create_new = true;
                                 } else {
-                                    //the intersection could not be computed: this should never happen.
-                                    //fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (currentlyInside && !previouslyInside): could not compute intersection between segment and square\n");
-                                  
-                                    //this state may be reached sometimes, but we do not have time to debug it. Abort current operation and trade speed of execution for speed of development...
-                                    clipPaths(res->clipper, pathsClosed, paths, buffer);
-                                    return true;
+                                    reset_line_keeping(minx, maxx, miny, maxy); //mark the segment to be clipped for all squares
+                                    goto end_of_position_loop; //ATTENTION: GOTO USED TO EXIT NESTED LOOPS (STATE IS CLEAN)
+                                }
+                            } else {
+                                //the logic prevents this branch from being run if no_segment_already_added is true (when segment is undefined)
+                                if (sqstate.previousPointIsInside) {
+                                    if (sqstate.create_new) {
+                                        //initial action: add prev and current point
+                                        buffer.data[currentidx].paths.push_back(segment);
+                                        sqstate.create_new = false;
+                                    } else {
+                                        //subsquent actions: add the point
+                                        buffer.data[currentidx].paths.back().push_back(currentpoint);
+                                    }
+                                    sqstate.pointadded = true; //mark this segment as added for this square (to avoid duplications if reset_line_keeping() is triggered)
+                                    no_segment_already_added = false; //signal that we cannot start new segments
+                                } else {
+                                    reset_line_keeping(minx, maxx, miny, maxy); //mark the segment to be clipped for all squares
+                                    goto end_of_position_loop; //ATTENTION: GOTO USED TO EXIT NESTED LOOPS (STATE IS CLEAN)
                                 }
                             }
                         } else {
-                            if (previouslyInside) {
-                                //point is not inside, but the square contained points: find intersection point and add it
-                                previouslyInside = false;
-                                clp::IntPoint p;
-                                if (intersectSegmentAndSquare(*(point - 1), *point, enclosed.actualSquare, p)) {
-                                    /*clp::Paths seg1(1, clp::Path(2)); seg1.back()[0] = enclosed.paths.back().back(); seg1.back()[1] = p;
-                                    clp::Paths seg2(1, clp::Path(2)); seg2.back()[0] = p; seg2.back()[1] = *point;
-                                    clp::Paths sq(1, enclosed.actualSquare); sq.back().push_back(sq.back().front());
-                                    SHOWCONTOURS(*cfg, "!currentlyInside && previouslyInside", &sq, &enclosed.paths, &seg1, &seg2);*/
-                                    enclosed.paths.back().push_back(p);
-                                } else {
-                                    //the intersection could not be computed: this should never happen.
-                                    //fprintf(stderr, "Warning: unexpected geometric constraint violation in intersectSegmentAndSquare in branch (!currentlyInside && previouslyInside): could not compute intersection between segment and square\n");
-                                  
-                                    //this state may be reached sometimes, but we do not have time to debug it. Abort current operation and trade speed of execution for speed of development...
-                                    clipPaths(res->clipper, pathsClosed, paths, buffer);
-                                    return true;
-                                }
-                            } else {
-                                //point is not inside, and the square contained no points: do nothing
+                            //this is not strictly necessary (the reset_line_keeping() will eventually be
+                            //triggered in the other IF branch), but let's have it for completeness
+                            if (sqstate.previousPointIsInside) {
+                                reset_line_keeping(minx, maxx, miny, maxy); //mark the segment to be clipped for all squares
+                                goto end_of_position_loop; //ATTENTION: GOTO USED TO EXIT NESTED LOOPS (STATE IS CLEAN)
                             }
                         }
                     }
                 }
-                start_line = false;
+                //update squares' states
+                for (auto &state : states.data) {
+                    state.previousPointIsInside = state.currentPointIsInside;
+                    state.pointadded = false;
+                }
+                //set previous point state
+                prevpoint    = *point;
+                prevposition = *position;
+                //no need to update square states nor set previous point state if we come from one of the GOTOs,
+                //since the square states have been reset and the previous point will not be used
+            end_of_position_loop:
+                ;
             }
         }
+
+        //now, clip the lines that go across boundaries
+        applyClipping(toClip, pathsClosed);
+
     }
 
     //clipping messes with path ordering, so reapply motionPlanning

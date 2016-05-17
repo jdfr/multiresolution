@@ -27,7 +27,8 @@ public:
     void clear() { numx = numy = 0; data.clear(); }
     void reset(int _numx, int _numy) { numx = _numx; numy = _numy; data.clear(); data.resize(numx*numy); }
     void assign(T d) { data.assign(data.size(), std::move(d)); }
-    T& at(int x, int y) { return data[x*numy + y]; }
+    int idx(int x, int y) { return x*numy + y; }
+    T& at(int x, int y) { return data[idx(x, y)]; }
 };
 
 typedef std::vector<PathSplitterConfig> PathSplitterConfigs;
@@ -52,15 +53,24 @@ public:
     Matrix<TriangleMesh> generateGridCubes(double scaling, double zmin, double zmax);
     bool processPaths(clp::Paths &paths, bool pathsClosed, double z, double scaling);
 protected:
-    Matrix<char> insideSquare; //we want Matrix<bool>, but that does not play nice with references inside the container...
-    std::vector<std::pair<int, int>> positionsToTest;
+    void applyMotionPlanning();
+    bool setupSquares(double z, double scaling);
+    void applyClipping(std::vector<clp::Paths> &toClip, bool pathsClosed);
+    typedef struct SquareState {
+        bool no_lines;              //this flag means that no line is intended to be added in this square
+        bool create_new;            //this flag means that a new line must be created
+        bool currentPointIsInside;  //this flag is a buffer whose content is transfered every loop to the flag previousPointIsInside
+        bool previousPointIsInside; //this flag means that the previous point was inside this square
+        bool pointadded;            //this flag means that no point has been added to this square during this loop
+        void reset();               //default state: all flags are false, except no_lines, which is true
+    } SquareState;
+    Matrix<SquareState> states;
     Configuration *cfg;
     SnapToGridSpec snapspec;
+    clp::PolyTree pt;
     double sinangle;
     bool setup_done;
-    bool simpler_snap;
     bool singlex, singley, justone;
-    void applyMotionPlanning();
 };
 
 #endif
