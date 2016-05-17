@@ -28,6 +28,9 @@ typedef struct SingleProcessOutput {
 #ifndef INITIAL_ARENA_SIZE
 #  define INITIAL_ARENA_SIZE (50*1024*1024)
 #endif
+#ifndef BIGCHUNK_ARENA_SIZE
+#  define BIGCHUNK_ARENA_SIZE (5*1024*1024)
+#endif
 
 
 //Common resources for all multislicing subsystems
@@ -43,9 +46,9 @@ public:
     std::string *err; //this is a temp. pointer which is set up by applyXXX() methods in MultiSlicer
     std::shared_ptr<MultiSpec> spec;
     template<typename MS = MultiSpec> ClippingResources(typename std::enable_if< CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) : 
-        manager_offset  ("OFFSET",   MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
-        manager_clipper ("CLIPPER",  MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
-        manager_clipper2("CLIPPER2", MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE),
+        manager_offset  ("OFFSET",   MemoryManagerPrintDebugMessages, BIGCHUNK_ARENA_SIZE, INITIAL_ARENA_SIZE),
+        manager_clipper ("CLIPPER",  MemoryManagerPrintDebugMessages, BIGCHUNK_ARENA_SIZE, INITIAL_ARENA_SIZE),
+        manager_clipper2("CLIPPER2", MemoryManagerPrintDebugMessages, BIGCHUNK_ARENA_SIZE, INITIAL_ARENA_SIZE),
         offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}
     template<typename MS = MultiSpec> ClippingResources(typename std::enable_if<!CLIPPER_MMANAGER::isArena, std::shared_ptr<MS> >::type _spec) :
         offset(manager_offset), clipper(manager_clipper), clipper2(manager_clipper2), spec(std::move(_spec)), err(NULL) {}

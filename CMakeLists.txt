@@ -21,6 +21,8 @@ option(GENERATE_FILETOUCH    "generate slice header setter for paths files"  ON)
 
 option(CLIPPER_USE_ARENA       "enable ArenaMemoryManager for ClipperLib" ON)
 set(INITIAL_ARENA_SIZE "52428800" CACHE STRING "Initial size for ArenaMemoryManager")
+#1-5 MB: 1048576 2097152 3145728 4194304 5242880
+set(BIGCHUNK_ARENA_SIZE "2097152" CACHE STRING "Initial size for ArenaMemoryManager")
 
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 if(GENERATE_LIBRARY OR GENERATE_EXECUTABLE)
@@ -119,7 +121,7 @@ if("${Boost_INCLUDE_DIR}" STREQUAL "")
 endif()
 
 if (CLIPPER_USE_ARENA)
-  ADD_DEFINITIONS(-DCLIPPER_USE_ARENA -DINITIAL_ARENA_SIZE=${INITIAL_ARENA_SIZE})
+  ADD_DEFINITIONS(-DCLIPPER_USE_ARENA -DINITIAL_ARENA_SIZE=${INITIAL_ARENA_SIZE} -DBIGCHUNK_ARENA_SIZE=${BIGCHUNK_ARENA_SIZE})
 endif()
 
 set(clipper_include_dir ${CLIPPER_BASE_DIR}/clipper)

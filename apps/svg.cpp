@@ -71,10 +71,13 @@ void writeSVG(const char * filename, HoledPolygons &hps, bool insideIsBlack, dou
 #ifndef INITIAL_ARENA_SIZE
 #  define INITIAL_ARENA_SIZE (50*1024*1024)
 #endif
+#ifndef BIGCHUNK_ARENA_SIZE
+#  define BIGCHUNK_ARENA_SIZE (5*1024*1024)
+#endif
 
 const bool MemoryManagerPrintDebugMessages = false;
 
-template<typename CM = CLIPPER_MMANAGER> typename std::enable_if< CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER("SVG", MemoryManagerPrintDebugMessages, INITIAL_ARENA_SIZE); }
+template<typename CM = CLIPPER_MMANAGER> typename std::enable_if< CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER("SVG", MemoryManagerPrintDebugMessages, BIGCHUNK_ARENA_SIZE, INITIAL_ARENA_SIZE); }
 template<typename CM = CLIPPER_MMANAGER> typename std::enable_if<!CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER(); }
 
 std::string processMatches(const char * filename, const char * svgfilename, PathInFileSpec spec, bool matchFirst, bool insideIsBlack) {
