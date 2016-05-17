@@ -225,8 +225,8 @@ int main(int argc, const char** argv) {
         if (!specified_bb) {
             int ntoolpaths = 0;
             //have to read the whole input file to find the BB!
-            bb.minx = bb.miny = std::numeric_limits<clp::cInt>::max();
-            bb.maxx = bb.maxy = std::numeric_limits<clp::cInt>::min();
+            bb.minx = bb.miny = (std::numeric_limits<clp::cInt>::max)();
+            bb.maxx = bb.maxy = (std::numeric_limits<clp::cInt>::min)();
             auto getBB = [&bb, &ntoolpaths](FileHeader &fileheader, int idx, SliceHeader &header, clp::Paths &paths) {
                 if (!paths.empty()) ++ntoolpaths;
                 for (auto &path : paths) {
