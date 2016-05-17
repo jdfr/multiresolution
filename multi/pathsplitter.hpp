@@ -55,16 +55,6 @@ public:
 protected:
     void applyMotionPlanning();
     bool setupSquares(double z, double scaling);
-    void applyClipping(std::vector<clp::Paths> &toClip, bool pathsClosed);
-    typedef struct SquareState {
-        bool no_lines;              //this flag means that no line is intended to be added in this square
-        bool create_new;            //this flag means that a new line must be created
-        bool currentPointIsInside;  //this flag is a buffer whose content is transfered every loop to the flag previousPointIsInside
-        bool previousPointIsInside; //this flag means that the previous point was inside this square
-        bool pointadded;            //this flag means that no point has been added to this square during this loop
-        void reset();               //default state: all flags are false, except no_lines, which is true
-    } SquareState;
-    Matrix<SquareState> states;
     Configuration *cfg;
     SnapToGridSpec snapspec;
     clp::PolyTree pt;
