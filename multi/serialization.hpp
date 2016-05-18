@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include <type_traits>
 
 
 /*VERY BASIC SERIALIZATION FRAMEWORK
@@ -10,8 +11,8 @@
 
 ///////////////////////////////////////////
 // these templates are handy for declaring list of serialized variables
-template<typename... Args> void   serialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize  (f, args), 0)... }; }
-template<typename... Args> void deserialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize  (f, args), 0)... }; }
+template<typename... Args> void   serialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize(f, args), 0)... }; }
+template<typename... Args> void deserialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize(f, args), 0)... }; }
 
 ///////////////////////////////////////////
 // detect if an object has a serialization_object() method
@@ -29,37 +30,31 @@ public:
 ///////////////////////////////////////////
 // DEFAULT SERIALIZATION (FOR BASIC TYPES)
 // (primitive types and structs containing only primitive types)
-template<typename T, typename SerializableHack = void> struct has_overloaded_serialization : std::false_type {};
-
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type   serialize(FILE *f, T &data) { if (fwrite(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
-template<typename T> typename std::enable_if<!has_serialization<T>::value, void>::type deserialize(FILE *f, T &data) { if (fread (&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
+// in a previous implementation, we used a explicitly defined has_overloaded_serialization for each type.
+// This approach is simpler, but will fail silently if we try to serialize trivial structs with raw pointers or arrays!
+template<typename T> typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type   serialize(FILE *f, T &data) { if (fwrite(&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
+template<typename T> typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type deserialize(FILE *f, T &data) { if (fread (&data, sizeof(data), 1, f) != 1) throw std::runtime_error("Serialization error!"); }
 
 ///////////////////////////////////////////
 // SERIALIZATION FOR OBJECTS THAT IMPLEMENT serialize_object()
-template<typename T> struct has_overloaded_serialization<T, typename std::enable_if<has_serialization<T>::value>::type > : std::true_type {};
-
 template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type   serialize(FILE *f, T &data) { data.  serialize_object(f); }
 template<typename T> typename std::enable_if<has_serialization<T>::value, void>::type deserialize(FILE *f, T &data) { data.deserialize_object(f); }
 
 ///////////////////////////////////////////
 // SERIALIZATION FOR std::shared_ptr
-template<typename T> struct has_overloaded_serialization<std::shared_ptr<T>> : std::true_type {};
-
 template<typename T> void   serialize(FILE *f, std::shared_ptr<T> &data) {                                 serialize(f, *data); }
 template<typename T> void deserialize(FILE *f, std::shared_ptr<T> &data) { data = std::make_shared<T>(); deserialize(f, *data); }
 
 ///////////////////////////////////////////
 // SERIALIZATION FOR std::vector
 // (optimized vectors of basic types)
-template<typename T> struct has_overloaded_serialization<std::vector<T>> : std::true_type {};
-
-template<typename T> typename std::enable_if<has_overloaded_serialization<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<!std::is_trivially_copyable<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
     size_t numdata = data.size();
     serialize(f, numdata);
     for (auto &d : data) serialize(f, d);
 }
 
-template<typename T> typename std::enable_if<has_overloaded_serialization<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data, T sample = T()) {
+template<typename T> typename std::enable_if<!std::is_trivially_copyable<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data, T sample = T()) {
     size_t numdata;
     deserialize(f, numdata);
     data.clear();
@@ -70,13 +65,13 @@ template<typename T> typename std::enable_if<has_overloaded_serialization<T>::va
     }
 }
 
-template<typename T> typename std::enable_if<!has_overloaded_serialization<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type   serialize(FILE *f, std::vector<T> &data) {
     size_t numdata = data.size();
     serialize(f, numdata);
     if (numdata>0) if (fwrite(&data.front(), sizeof(T), numdata, f) != numdata) throw std::runtime_error("Serialization error!");
 }
 
-template<typename T> typename std::enable_if<!has_overloaded_serialization<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data) {
+template<typename T> typename std::enable_if<std::is_trivially_copyable<T>::value, void>::type deserialize(FILE *f, std::vector<T> &data) {
     size_t numdata;
     deserialize(f, numdata);
     data.resize(numdata);
@@ -86,8 +81,6 @@ template<typename T> typename std::enable_if<!has_overloaded_serialization<T>::v
 
 ///////////////////////////////////////////
 // SERIALIZATION FOR std::map
-template<typename K, typename V> struct has_overloaded_serialization<std::map<K,V>> : std::true_type {};
-
 template<typename K, typename V> void   serialize(FILE *f, std::map<K, V> &data) {
     size_t numdata = data.size();
     serialize(f, numdata);
