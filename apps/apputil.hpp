@@ -1,5 +1,5 @@
-#ifndef MEASURETIME_HEADER
-#define MEASURETIME_HEADER
+#ifndef APPUTIL_HEADER
+#define APPUTIL_HEADER
 
 #include <stdio.h>
 #include <time.h>

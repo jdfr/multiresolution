@@ -1,5 +1,5 @@
 #include "pathsfile.hpp"
-#include "measureTime.hpp"
+#include "apputil.hpp"
 
 void closeAll(std::vector<FILE *> &is, FILE * o) {
     if (o != NULL) fclose(o);

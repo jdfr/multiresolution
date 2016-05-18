@@ -1,6 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
-#include "measureTime.hpp"
+#include "apputil.hpp"
 
 std::string filterMatchesFromFile(const char * filename, const char *outputname, PathInFileSpec spec) {
     FILE * f = fopen(filename, "rb");

@@ -5,7 +5,7 @@
 #include "3d.hpp"
 #include "pathwriter_dxf.hpp"
 #include "pathwriter_nanoscribe.hpp"
-#include "measureTime.hpp"
+#include "apputil.hpp"
 #include <iostream>
 
 //if macro STANDALONE_USEPYTHON is defined, SHOWCONTOUR support is baked in

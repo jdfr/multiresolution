@@ -1,7 +1,7 @@
 #include "multislicer.hpp"
 #include "pathwriter.hpp"
 #include "simpleparsing.hpp"
-#include "measureTime.hpp"
+#include "apputil.hpp"
 #include <iomanip>
 
 bool getPaths(const char *pathsfilename, int currentRecord, SliceHeader &sliceheader, IOPaths &iop, clp::Paths &output, std::string &err) {
