@@ -284,8 +284,8 @@ void SimpleSlicingScheduler::recursiveSimpleInputScheduler(int process_spec, std
         input.push_back(InputSliceData(z, process));
         if (nextpok) {
             double next_zend = sliceUpwards ?
-                std::min(zbase[process], zend) :
-                std::max(zbase[process], zend);
+                (std::min)(zbase[process], zend) :
+                (std::max)(zbase[process], zend);
             recursiveSimpleInputScheduler(nextp, zbase, next_zend);
         }
         zbase[process] += sliceHeight;
