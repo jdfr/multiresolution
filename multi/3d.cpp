@@ -4,6 +4,7 @@
 #include "pathsfile.hpp"
 #include "slicermanager.hpp"
 #include "showcontours.hpp"
+#include "apputil.hpp"
 #include <numeric>
 #include <algorithm>
 
@@ -636,17 +637,17 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
         return std::string();
     } else {
 
-        FILE * f = fopen(sched.tm.spec->global.fb.feedbackFile.c_str(), "rb");
-        if (f == NULL) { return str("Could not open input file ", sched.tm.spec->global.fb.feedbackFile); }
-        IOPaths iop_f(f);
+        FILEOwner i(sched.tm.spec->global.fb.feedbackFile.c_str(), "rb");
+        if (!i.isopen()) { return str("Could not open input file ", sched.tm.spec->global.fb.feedbackFile); }
+        IOPaths iop_f(i.f);
 
         FileHeader fileheader;
-        std::string err = fileheader.readFromFile(f);
-        if (!err.empty()) { fclose(f); return str("Error reading file header for ", sched.tm.spec->global.fb.feedbackFile, ": ", err); }
+        std::string err = fileheader.readFromFile(i.f);
+        if (!err.empty()) { return str("Error reading file header for ", sched.tm.spec->global.fb.feedbackFile, ": ", err); }
 
         SliceHeader sliceheader;
         for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-            std::string e = sliceheader.readFromFile(f);
+            std::string e = sliceheader.readFromFile(i.f);
             if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": ", err); break; }
             if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": header is too short!"); break; }
             if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
@@ -670,11 +671,10 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
                 }
                 sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
             } else {
-                fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+                fseek(i.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             }
         }
 
-        fclose(f);
         return err;
     }
 

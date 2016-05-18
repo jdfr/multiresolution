@@ -1,15 +1,16 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
+#include "apputil.hpp"
 #include <limits>
 
 std::string printPathInfo(const char * filename, bool verbose) {
-    FILE * f = fopen(filename, "rb");
-    if (f == NULL) { return str("Could not open input file ", filename); }
-    IOPaths iop_f(f);
+    FILEOwner i(filename, "rb");
+    if (!i.isopen()) { return str("Could not open input file ", filename); }
+    IOPaths iop_f(i.f);
 
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", filename, ": ", err); }
     bool useSched = fileheader.useSched != 0;
 
 
@@ -44,10 +45,10 @@ std::string printPathInfo(const char * filename, bool verbose) {
 
     SliceHeader sliceheader;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
-        if (!err.empty())                       { fclose(f); return str("Error reading ", currentRecord, "-th slice header: ", err); }
+        std::string err = sliceheader.readFromFile(i.f);
+        if (!err.empty())                       { return str("Error reading ", currentRecord, "-th slice header: ", err); }
         const int usual = 7;
-        if (sliceheader.alldata.size() < usual) { fclose(f); return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
+        if (sliceheader.alldata.size() < usual) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
 
         if (verbose) {
             fprintf(stdout, "Record %d\n", currentRecord);
@@ -90,7 +91,6 @@ std::string printPathInfo(const char * filename, bool verbose) {
             if (sliceheader.saveFormat == PATHFORMAT_INT64) {
                 clp::Paths paths;
                 if (!iop_f.readClipperPaths(paths)) {
-                    fclose(f);
                     return str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
                 }
                 numpaths = (int)paths.size();
@@ -101,7 +101,6 @@ std::string printPathInfo(const char * filename, bool verbose) {
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
                 DPaths paths;
                 if (!iop_f.readDoublePaths(paths)) {
-                    fclose(f);
                     return str("Error reading ", currentRecord, "-th double clipperpaths: could not read record ", currentRecord, " data!");
                 }
                 numpaths = (int)paths.size();
@@ -123,7 +122,6 @@ std::string printPathInfo(const char * filename, bool verbose) {
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
                 Paths3D paths;
                 if (!read3DPaths(iop_f, paths)) {
-                    fclose(f);
                     return str("Error reading ", currentRecord, "-th 3d clipperpaths: could not read record ", currentRecord, " data!");
                 }
                 numpaths = (int)paths.size();
@@ -140,11 +138,9 @@ std::string printPathInfo(const char * filename, bool verbose) {
             */
             fprintf(stdout, "\n\n");
         } else {
-            fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+            fseek(i.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
         }
     }
-
-    fclose(f);
 
     return std::string();
 }

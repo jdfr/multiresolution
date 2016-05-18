@@ -64,19 +64,19 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, SliceHea
 }
 
 std::string transformPaths(const char * filename, const char *outputname, TransformationMatrix matrix) {
-    FILE * f = fopen(filename, "rb");
-    if (f == NULL) { return str("Could not open input file ", filename); }
-    IOPaths iop_f(f);
+    FILEOwner i(filename, "rb");
+    if (!i.isopen()) { return str("Could not open input file ", filename); }
+    IOPaths iop_f(i.f);
 
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", filename, ": ", err); }
 
-    FILE * o = fopen(outputname, "wb");
-    if (o == NULL) { return str("Could not open output file ", outputname); }
-    IOPaths iop_o(o);
+    FILEOwner o(outputname, "wb");
+    if (!o.isopen()) { return str("Could not open output file ", outputname); }
+    IOPaths iop_o(o.f);
 
-    fileheader.writeToFile(o, true);
+    fileheader.writeToFile(o.f, true);
 
     bool is2DCompatible = transformationIs2DCOmpatible(matrix);
     bool identityInZ, identityInXY;
@@ -87,7 +87,7 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
 
     SliceHeader sliceheader;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
+        std::string err = sliceheader.readFromFile(i.f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
         if (sliceheader.alldata.size() < 7) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
         if (sliceheader.saveFormat == PATHFORMAT_INT64) {
@@ -125,14 +125,9 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
             err = transformAndSave(iop_o, matrix, sliceheader, paths);
             if (!err.empty()) return err;
         } else {
-            fclose(f);
-            fclose(o);
             return str("error: ", currentRecord, "-th path in ", filename, " has an unknown save format type: ", sliceheader.saveFormat);
         }
     }
-
-    fclose(f);
-    fclose(o);
 
     return std::string();
 }

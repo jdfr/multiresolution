@@ -1,17 +1,18 @@
 #include "pathwriter_dxf.hpp"
 #include "simpleparsing.hpp"
+#include "apputil.hpp"
 #include <iomanip>
 
 std::string processFile(const char *pathsfilename, const char *dxffilename, bool toolpaths, bool ascii, bool byz, bool byn, bool use_square, double square_len, double square_x, double square_y) {
-    FILE * f = fopen(pathsfilename, "rb");
-    if (f == NULL) { return str("Could not open file ", pathsfilename); }
+    FILEOwner i(pathsfilename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", pathsfilename); }
 
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", pathsfilename, ": ", err); }
 
     SliceHeader sliceheader;
-    IOPaths iop(f);
+    IOPaths iop(i.f);
     clp::Paths output;
     std::shared_ptr<PathWriter> writer;
     std::shared_ptr<DXFAsciiPathWriter> writera;
@@ -22,13 +23,13 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
         writer = writerb = std::make_shared<DXFBinaryPathWriter>(false, dxffilename, 1e-9, true, !byn, !byz);
     }
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
+        std::string err = sliceheader.readFromFile(i.f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
         bool doProcess = ( toolpaths && ((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) ||
                          (!toolpaths &&  (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR));
         if (!doProcess) {
-            fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+            fseek(i.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             continue;
         }
 
@@ -58,7 +59,7 @@ std::string processFile(const char *pathsfilename, const char *dxffilename, bool
         }
         output.clear();
     }
-    fclose(f);
+    i.close();
     if (err.empty() && use_square) {
         double my_scaling = 1e-6;
         clp::cInt len     = (clp::cInt) (square_len / my_scaling);

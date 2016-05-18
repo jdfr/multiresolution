@@ -1,5 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
+#include "apputil.hpp"
 #include <fstream>
 
 #include <boost/tokenizer.hpp>
@@ -88,22 +89,21 @@ const int mlen = 12; //do not care about the last row of the transformation matr
 typedef double TransformationMatrix[mlen];
 
 std::string transformAndSave(const char *input, const char *output, TransformationMatrix matrix) {
-    FILE * o = fopen(output, "w");
-    if (o == NULL) { return str("Could not open output file ", output); }
+    FILEOwner o(output, "w");
+    if (!o.isopen()) { return str("Could not open output file ", output); }
 
-    auto doTransform = [matrix, o](std::vector<double> &xyz) {
+    auto doTransform = [matrix, &o](std::vector<double> &xyz) {
         double x = (matrix[0] * xyz[0]) + (matrix[1] * xyz[1]) + (matrix[2] * xyz[2]) + matrix[3];
         double y = (matrix[4] * xyz[0]) + (matrix[5] * xyz[1]) + (matrix[6] * xyz[2]) + matrix[7];
         double z = (matrix[8] * xyz[0]) + (matrix[9] * xyz[1]) + (matrix[10] * xyz[2]) + matrix[11];
 
-        fprintf(o, "%.20g %.20g %.20g\n", x, y, z);
+        fprintf(o.f, "%.20g %.20g %.20g\n", x, y, z);
     };
 
     int nline;
 
     std::string res = withXYZDo(input, nline, doTransform);
 
-    fclose(o);
     return res;
 }
 

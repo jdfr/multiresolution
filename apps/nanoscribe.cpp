@@ -5,30 +5,29 @@
 #include <iomanip>
 #include <limits>
 
-std::string openFile(std::string &pathsfilename, FILE * &f, FileHeader &header) {
-    f = fopen(pathsfilename.c_str(), "rb");
-    if (f == NULL) { return str("Could not open file ", pathsfilename); }
+std::string openFile(std::string &pathsfilename, FILEOwner &f, FileHeader &header) {
+    if (!f.open(pathsfilename.c_str(), "rb")) { return str("Could not open file ", pathsfilename); }
 
-    std::string err = header.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
+    std::string err = header.readFromFile(f.f);
+    if (!err.empty()) { return str("Error reading file header for ", pathsfilename, ": ", err); }
     return std::string();
 }
 
 template<typename Function> std::string processToolpaths(std::string &pathsfilename, Function function) {
-    FILE * f;
+    FILEOwner f;
     FileHeader fileheader;
     std::string err = openFile(pathsfilename, f, fileheader);
     if (!err.empty()) return err;
 
     SliceHeader sliceheader;
-    IOPaths iop(f);
+    IOPaths iop(f.f);
     clp::Paths output;
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
-        if (!err.empty()) { fclose(f); return str("Error reading ", currentRecord, "-th slice header: ", err); }
+        std::string err = sliceheader.readFromFile(f.f);
+        if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
         if (!((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) {
-            fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+            fseek(f.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             continue;
         }
 
@@ -55,7 +54,6 @@ template<typename Function> std::string processToolpaths(std::string &pathsfilen
         output.clear();
         if (!err.empty()) break;
     }
-    fclose(f);
     return err;
 }
 
@@ -173,13 +171,12 @@ int main(int argc, const char** argv) {
         const bool doDebug = false;
         if (doDebug) {
             fileheader = std::make_shared<FileHeader>();
-            FILE * f;
+            FILEOwner f;
             std::string err = openFile(pathsfile, f, *fileheader);
             if (!err.empty()) {
                 fprintf(stderr, err.c_str());
                 return -1;
             }
-            fclose(f);
         }
 
         std::string configfilename = std::move(mainOpts["config"].as<std::string>());

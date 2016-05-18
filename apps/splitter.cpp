@@ -26,23 +26,23 @@ bool getPaths(const char *pathsfilename, int currentRecord, SliceHeader &slicehe
 }
 
 std::string firstPass(const char *pathsfilename, std::shared_ptr<FileHeader> &fileheader, int &numRecords, double &scaling, BBox &bb) {
-    FILE * f = fopen(pathsfilename, "rb");
-    if (f == NULL) { return str("Could not open file ", pathsfilename); }
+    FILEOwner i(pathsfilename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", pathsfilename); }
 
-    std::string err = fileheader->readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
+    std::string err = fileheader->readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", pathsfilename, ": ", err); }
 
     SliceHeader sliceheader;
-    IOPaths iop(f);
+    IOPaths iop(i.f);
     clp::Paths output;
     numRecords = (int)fileheader->numRecords;
 
     bool firstTime = true;
 
-    if (numRecords <= 0) { fclose(f); return str("Nothing was done: the file has ", numRecords, "records!"); }
+    if (numRecords <= 0) { return str("Nothing was done: the file has ", numRecords, "records!"); }
 
     for (int currentRecord = 0; currentRecord < numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
+        std::string err = sliceheader.readFromFile(i.f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
         if (!getPaths(pathsfilename, currentRecord, sliceheader, iop, output, err)) {
@@ -55,7 +55,7 @@ std::string firstPass(const char *pathsfilename, std::shared_ptr<FileHeader> &fi
             bb = getBB(output);
         } else {
             if (std::abs((scaling - sliceheader.scaling) / scaling) > 1e-3) {
-                fclose(f); return str("Error: the records inside file ", pathsfilename, ", have different scales: ", scaling, ", for record ", currentRecord - 1, ", ", sliceheader.scaling, " for record ", currentRecord);
+                return str("Error: the records inside file ", pathsfilename, ", have different scales: ", scaling, ", for record ", currentRecord - 1, ", ", sliceheader.scaling, " for record ", currentRecord);
             }
             BBox second = getBB(output);
             bb.merge(second);
@@ -64,25 +64,24 @@ std::string firstPass(const char *pathsfilename, std::shared_ptr<FileHeader> &fi
         output.clear();
     }
 
-    fclose(f);
     return std::string();
 }
 
 
 std::string processFile(const char *pathsfilename, SplittingPathWriter &writer) {
-    FILE * f = fopen(pathsfilename, "rb");
-    if (f == NULL) { return str("Could not open file ", pathsfilename); }
+    FILEOwner i(pathsfilename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", pathsfilename); }
 
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", pathsfilename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", pathsfilename, ": ", err); }
 
     SliceHeader sliceheader;
-    IOPaths iop(f);
+    IOPaths iop(i.f);
     clp::Paths output;
 
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string err = sliceheader.readFromFile(f);
+        std::string err = sliceheader.readFromFile(i.f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
         if (!getPaths(pathsfilename, currentRecord, sliceheader, iop, output, err)) {
@@ -95,7 +94,6 @@ std::string processFile(const char *pathsfilename, SplittingPathWriter &writer) 
         output.clear();
     }
 
-    fclose(f);
     return std::string();
 }
 
@@ -117,10 +115,9 @@ void createCubesFromGrid(const char *cubeNameTemplate, PathSplitterConfigs &save
             for (int j=0; j<cubes.numy; ++j) {
                 std::string prefixB = str(prefixA, '.', std::setw(num0x), std::setfill('0'), i, '.', std::setw(num0y), std::setfill('0'), j);
                 std::string name = str(prefixB, ".off");
-                FILE *f = fopen(name.c_str(), "wt");
-                writeTriangleMeshToOFF(f, "%03.017f", cubes.at(i, j));
-                fclose(f);
                 prefixes.push_back(std::move(prefixB));
+                FILEOwner off(name.c_str(), "wt");
+                writeTriangleMeshToOFF(off.f, "%03.017f", cubes.at(i, j));
             }
         }
         ++ntool;

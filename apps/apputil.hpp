@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include <vector>
 
 #ifdef _WIN32
 #   include <Windows.h>
@@ -50,5 +51,27 @@ public:
         printMeasurement(f, format, (int)cputimes.size()-1);
     }
 };
+
+//simple type for using RAII with FILE*
+typedef struct FILEOwner {
+    FILE *f;
+    FILEOwner() : f(NULL) {}
+    FILEOwner(const char *fname, const char *mode) : f(fopen(fname, mode)) {}
+    ~FILEOwner()  { close(); }
+    bool isopen() { return f!=NULL; }
+    bool open(const char *fname, const char *mode) {
+        if (!close()) return false;
+        f = fopen(fname, mode);
+        return isopen();
+    }
+    bool close()   {
+        bool ret = true;
+        if (f != NULL) {
+            ret = fclose(f)==0;
+            f = NULL;
+        }
+        return ret;
+    }
+} FILEOwner;
 
 #endif

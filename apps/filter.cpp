@@ -3,47 +3,44 @@
 #include "apputil.hpp"
 
 std::string filterMatchesFromFile(const char * filename, const char *outputname, PathInFileSpec spec) {
-    FILE * f = fopen(filename, "rb");
-    if (f == NULL) { return str("Could not open file ", filename); }
+    FILEOwner i(filename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", filename); }
 
-    FILE * o = fopen(outputname, "wb");
-    if (o == NULL) { return str("Could not open output file ", outputname); }
+    FILEOwner o(outputname, "wb");
+    if (!o.isopen()) { return str("Could not open output file ", outputname); }
 
-    printf("XKCD 0\n");
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);    if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file header for ", filename, ": ", err); }
-    printf("XKCD 1\n");
+    std::string err = fileheader.readFromFile(i.f);    if (!err.empty()) { return str("Error reading file header for ", filename, ": ", err); }
 
     int64 inputNumRecords  = fileheader.numRecords;
     int64 outputNumRecords = 0;
     
-    std::string e = fileheader.writeToFile(o, true); if (!e.empty())   { fclose(f); fclose(o); return str("error writing file ", outputname, ": ", e); }
-    printf("XKCD 2\n");
+    std::string e = fileheader.writeToFile(o.f, true); if (!e.empty())   { return str("error writing file ", outputname, ": ", e); }
     
     SliceHeader sliceheader;
     std::vector<T64> data;
     
     for (int currentRecord = 0; currentRecord < inputNumRecords; ++currentRecord) {
-        err = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
-        if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file ", filename, ": ", err); }
+        err = seekNextMatchingPathsFromFile(i.f, fileheader, currentRecord, spec, sliceheader);
+        if (!err.empty()) { return str("Error reading file ", filename, ": ", err); }
         if (currentRecord >= inputNumRecords) break;
 
-        e = sliceheader.writeToFile(o);
-        if (!e.empty())                                                    { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice header of ", filename, " in ", outputname, ": ", e); }
+        e = sliceheader.writeToFile(o.f);
+        if (!e.empty())                                                    { return str("error trying to write ", currentRecord, "-th slice header of ", filename, " in ", outputname, ": ", e); }
         
         int64 sizeT64 = (sliceheader.totalSize - sliceheader.headerSize) / sizeof(T64);
         data.resize(sizeT64);
         
-        if (fread (&(data.front()), sizeof(int64), sizeT64, f) != sizeT64) { fclose(f); fclose(o); return str("error trying to read ", currentRecord, "-th slice payload in ", filename); }
-        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o) != sizeT64) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
+        if (fread (&(data.front()), sizeof(int64), sizeT64, i.f) != sizeT64) { return str("error trying to read ",  currentRecord, "-th slice payload in ", filename); }
+        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o.f) != sizeT64) { return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
         ++outputNumRecords;
     }
-    fclose(f);
+    i.close();
     
     int numToSkip = fileheader.numRecordsOffset();
-    if (fseek(o, numToSkip, SEEK_SET) != 0)                                { fclose(o); return str( "fseek failed: could not write numRecords to file ", filename); }
-    if (fwrite(&outputNumRecords, sizeof(outputNumRecords), 1, o) != 1)    { fclose(o); return str("fwrite failed: could not write numRecords to file ", filename); }
-    fclose(o);
+    if (fseek(o.f, numToSkip, SEEK_SET) != 0)                                { return str( "fseek failed: could not write numRecords to file ", filename); }
+    if (fwrite(&outputNumRecords, sizeof(outputNumRecords), 1, o.f) != 1)    { return str("fwrite failed: could not write numRecords to file ", filename); }
+    o.close();
 
     if (outputNumRecords == 0) {
         return str("could not match any results to the specification for file ", filename);

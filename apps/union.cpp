@@ -1,21 +1,8 @@
 #include "pathsfile.hpp"
 #include "apputil.hpp"
 
-void closeAll(std::vector<FILE *> &is, FILE * o) {
-    if (o != NULL) fclose(o);
-    for (auto &i : is) {
-        if (i != NULL) fclose(i);
-    }
-}
-
 std::string pathUnion(const char ** inputs, int numinputs, const char * output) {
-    for (int i = 0; i < numinputs; ++i) {
-        if (!fileExists(inputs[i])) {
-            return str("Error: input file <", inputs[i], "> does not exist!");
-        }
-    }
-
-    std::vector<FILE *> is(numinputs, NULL);
+    std::vector<FILEOwner> is(numinputs);
     std::vector<FileHeader> fileheaders_i(numinputs);
     FileHeader fileheader_o;
     fileheader_o.version  = 1; //this must be kept in sync with FileHeader read/write code in pathsfile.cpp
@@ -23,10 +10,12 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
     fileheader_o.useSched = false;
     fileheader_o.numRecords = 0;
     for (int i = 0; i < numinputs; ++i) {
-        is[i] = fopen(inputs[i], "rb");
-        if (is[i] == NULL) { closeAll(is, NULL); return str("Could not open input file ", inputs[i]); }
-        std::string err = fileheaders_i[i].readFromFile(is[i]);
-        if (!err.empty()) { closeAll(is, NULL); return str("Error reading file header for ", inputs[i], ": ", err); }
+        if (!fileExists(inputs[i])) {
+            return str("Error: input file <", inputs[i], "> does not exist!");
+        }
+        if (!is[i].open(inputs[i], "rb")) { return str("Could not open input file ", inputs[i]); }
+        std::string err = fileheaders_i[i].readFromFile(is[i].f);
+        if (!err.empty()) { return str("Error reading file header for ", inputs[i], ": ", err); }
         fileheader_o.numRecords += fileheaders_i[i].numRecords;
         if (fileheader_o.numtools < fileheaders_i[i].numtools) {
             fileheader_o.numtools = fileheaders_i[i].numtools;
@@ -40,36 +29,33 @@ std::string pathUnion(const char ** inputs, int numinputs, const char * output) 
         }
     }
 
-    FILE * o = fopen(output, "wb");
-    if (o == NULL) { closeAll(is, NULL); return str("Could not open output file ", output); }
-    std::string err = fileheader_o.writeToFile(o, true);
-    if (!err.empty()) { closeAll(is, o); return str("Error writing file header for ", output, ": ", err); }
+    FILEOwner o(output, "wb");
+    if (!o.isopen()) { return str("Could not open output file ", output); }
+    std::string err = fileheader_o.writeToFile(o.f, true);
+    if (!err.empty()) { return str("Error writing file header for ", output, ": ", err); }
 
     SliceHeader sliceheader;
     std::vector<int64> data;
     for (int i = 0; i < numinputs; ++i) {
         for (int currentRecord = 0; currentRecord < fileheaders_i[i].numRecords; ++currentRecord) {
-            std::string err = sliceheader.readFromFile(is[i]);
-            if (!err.empty()) { closeAll(is, o); return str("Error reading ", currentRecord, "-th slice header in file ", inputs[i], ": ", err); }
-            err = sliceheader.writeToFile(o);
-            if (!err.empty()) { closeAll(is, o); return str("Error writing ", currentRecord, "-th slice header in file ", inputs[i], " to file ", output, ": ", err); }
+            std::string err = sliceheader.readFromFile(is[i].f);
+            if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header in file ", inputs[i], ": ", err); }
+            err = sliceheader.writeToFile(o.f);
+            if (!err.empty()) { return str("Error writing ", currentRecord, "-th slice header in file ", inputs[i], " to file ", output, ": ", err); }
 
             int numPackets = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(int64));
             data.resize(numPackets);
-            size_t numread = fread(&(data[0]), sizeof(int64), numPackets, is[i]);
+            size_t numread = fread(&(data[0]), sizeof(int64), numPackets, is[i].f);
             if (numread != numPackets) {
-                closeAll(is, o);
                 return str("error trying to read ", currentRecord, "-th slice payload (size: ", numPackets, " but read ", numread, ") in ", inputs[i]);
             }
-            size_t numwrite = fwrite(&(data[0]), sizeof(int64), numPackets, o);
+            size_t numwrite = fwrite(&(data[0]), sizeof(int64), numPackets, o.f);
             if (numwrite != numPackets) {
-                closeAll(is, o);
                 return str("error trying to write ", currentRecord, "-th slice payload (size: ", numPackets, " but write ", numwrite, ") to ", output);
             }
         }
     }
 
-    closeAll(is, o);
     return std::string();
 }
 

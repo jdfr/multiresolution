@@ -11,24 +11,24 @@ typedef struct Spec {
 } Spec;
 
 std::string touchFile(const char * filename, const char *outputname, std::vector<Spec> &specs) {
-    FILE * f = fopen(filename, "rb");
-    if (f == NULL) { return str("Could not open file ", filename); }
+    FILEOwner i(filename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", filename); }
 
-    FILE * o = fopen(outputname, "wb");
-    if (o == NULL) { return str("Could not open output file ", outputname); }
+    FILEOwner o(outputname, "wb");
+    if (!o.isopen()) { return str("Could not open output file ", outputname); }
     
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);    if (!err.empty()) { fclose(f); fclose(o); return str("Error reading file header for ", filename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);    if (!err.empty()) { return str("Error reading file header for ", filename, ": ", err); }
 
-    std::string e = fileheader.writeToFile(o, true); if (!e.empty())   { fclose(f); fclose(o); return str("error writing file ", outputname, ": ", e); }
+    std::string e = fileheader.writeToFile(o.f, true); if (!e.empty())   { return str("error writing file ", outputname, ": ", e); }
     
     SliceHeader sliceheader;
     std::vector<T64> data;
 
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        e = sliceheader.readFromFile(f);
-        if (!e.empty())                     { fclose(f); fclose(o); return str("Error reading ", currentRecord, "-th slice header: ", e); }
-        if (sliceheader.alldata.size() < 7) { fclose(f); fclose(o); return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
+        e = sliceheader.readFromFile(i.f);
+        if (!e.empty())                     { return str("Error reading ", currentRecord, "-th slice header: ", e); }
+        if (sliceheader.alldata.size() < 7) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
 
         for (auto &spec : specs) {
             if (spec.filterspec.matchesHeader(sliceheader)) {
@@ -50,18 +50,15 @@ std::string touchFile(const char * filename, const char *outputname, std::vector
             }
         }
 
-        e = sliceheader.writeToFile(o);
-        if (!e.empty()) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice of ", filename, " in ", outputname, ": ", e); }
+        e = sliceheader.writeToFile(o.f);
+        if (!e.empty()) { return str("error trying to write ", currentRecord, "-th slice of ", filename, " in ", outputname, ": ", e); }
         
         int64 sizeT64 = (int)((sliceheader.totalSize - sliceheader.headerSize) / sizeof(T64));
         data.resize(sizeT64);
-        if (fread (&(data.front()), sizeof(int64), sizeT64, f) != sizeT64) { fclose(f); fclose(o); return str("error trying to read ", currentRecord, "-th slice payload in ", filename); }
-        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o) != sizeT64) { fclose(f); fclose(o); return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
+        if (fread (&(data.front()), sizeof(int64), sizeT64, i.f) != sizeT64) { return str("error trying to read ", currentRecord, "-th slice payload in ", filename); }
+        if (fwrite(&(data.front()), sizeof(int64), sizeT64, o.f) != sizeT64) { return str("error trying to write ", currentRecord, "-th slice payload of ", filename, " in ", outputname); }
 
     }
-
-    fclose(f);
-    fclose(o);
 
     return std::string();
 }

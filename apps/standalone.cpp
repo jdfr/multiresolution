@@ -299,21 +299,22 @@ public:
     void doSave(SimpleSlicingScheduler &sched, int i) {
         int64 num = i;
         fprintf(stderr, "BEFORE ITERATION %ld, SAVING STATE TO %s...\n", num, savefile.c_str());
-        FILE *f = fopen(savefile.c_str(), "wb");
-        if (fwrite("SERIALST", 8, 1, f) != 1) throw std::runtime_error("Serialization error!");
-        serialize(f, sched);
-        if (fwrite(&num, sizeof(num), 1, f) != 1) throw std::runtime_error("Serialization error!");
-        fclose(f);
+        FILEOwner o(savefile.c_str(), "wb");
+        if (!o.isopen()) throw std::runtime_error("Could not open serialization file for writing!");
+        if (fwrite("SERIALST", 8, 1, o.f) != 1) throw std::runtime_error("Serialization error!");
+        serialize(o.f, sched);
+        if (fwrite(&num, sizeof(num), 1, o.f) != 1) throw std::runtime_error("Serialization error!");
         fprintf(stderr, "      ->SAVED!\n");
     }
     
     void doLoad(SimpleSlicingScheduler &sched, std::vector<std::shared_ptr<SlicerManager>> &slicers) {
         fprintf(stderr, "LOADING STATE FROM %s...\n", loadfile.c_str());
-        FILE *f = fopen(loadfile.c_str(), "rb");
-        fseek(f, 8, SEEK_CUR); //skip magic
-        deserialize(f, sched);
-        if (fread(&numToSkipInLoad, sizeof(numToSkipInLoad), 1, f) != 1) throw std::runtime_error("Serialization error!");
-        fclose(f);
+        FILEOwner i(loadfile.c_str(), "rb");
+        if (!i.isopen()) throw std::runtime_error("Could not open serialization file for reading!");
+        fseek(i.f, 8, SEEK_CUR); //skip magic
+        deserialize(i.f, sched);
+        if (fread(&numToSkipInLoad, sizeof(numToSkipInLoad), 1, i.f) != 1) throw std::runtime_error("Serialization error!");
+        i.close();
         fprintf(stderr, "      ->SKIPPING TO ITERATION %ld...\n", numToSkipInLoad);
         for (auto &slicer : slicers) if (!slicer->skipNextSlices((int)numToSkipInLoad)) throw std::runtime_error("Error while skipping slices!!!");
     }

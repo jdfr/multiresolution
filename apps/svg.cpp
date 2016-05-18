@@ -1,5 +1,6 @@
 #include "pathsfile.hpp"
 #include "simpleparsing.hpp"
+#include "apputil.hpp"
 #include <iomanip>
 
 
@@ -49,22 +50,22 @@ void writeSVG(const char * filename, HoledPolygons &hps, bool insideIsBlack, dou
     polOffset.X     = bb.minx * scalingFactor + viewBox1.X;
     polOffset.Y     = bb.miny * scalingFactor + viewBox1.Y;
 
-    FILE * f = fopen(filename, "wt");
-    if (f == NULL) {
+    FILEOwner o(filename, "wt");
+    if (!o.isopen()) {
         fprintf(stderr, "Could not open output file %s\n", filename);
+        return;
     }
-    fprintf(f,
+    fprintf(o.f,
         R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>)" "\n"
         R"(<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">)" "\n"
         R"(<svg width="%.20g%s" height="%.20g%s" viewBox="%g %g %.20g %.20g" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:slicer="http://slicer.org/namespaces/slicer">)" "\n"
         R"(  <g id="only_one_slice">)" "\n",
         viewBoxSize.X, units, viewBoxSize.Y, units, 0.0, 0.0, viewBoxSize.X, viewBoxSize.Y);
     if (!insideIsBlack) {
-        fprintf(f, R"(    <rect width="%.20g" height="%.20g" style="fill:black"/>)" "\n", viewBoxSize.X, viewBoxSize.Y);
+        fprintf(o.f, R"(    <rect width="%.20g" height="%.20g" style="fill:black"/>)" "\n", viewBoxSize.X, viewBoxSize.Y);
     }
-    writePolygonSVG(f, hps, insideIsBlack, scalingFactor, polOffset.X, polOffset.Y);
-    fputs("  </g>\n</svg>", f);
-    fclose(f);
+    writePolygonSVG(o.f, hps, insideIsBlack, scalingFactor, polOffset.X, polOffset.Y);
+    fputs("  </g>\n</svg>", o.f);
 }
 
 //this is a failsafe to avoid compiler errors, but users should set a default arena chunk size accordingly to the expected usage patterns
@@ -81,21 +82,21 @@ template<typename CM = CLIPPER_MMANAGER> typename std::enable_if< CLIPPER_MMANAG
 template<typename CM = CLIPPER_MMANAGER> typename std::enable_if<!CLIPPER_MMANAGER::isArena, CM>::type getManager() { return CLIPPER_MMANAGER(); }
 
 std::string processMatches(const char * filename, const char * svgfilename, PathInFileSpec spec, bool matchFirst, bool insideIsBlack) {
-    FILE * f = fopen(filename, "rb");
-    if (f == NULL) { return str("Could not open file ", filename); }
+    FILEOwner i(filename, "rb");
+    if (!i.isopen()) { return str("Could not open file ", filename); }
 
     FileHeader fileheader;
-    std::string err = fileheader.readFromFile(f);
-    if (!err.empty()) { fclose(f); return str("Error reading file header for ", filename, ": ", err); }
+    std::string err = fileheader.readFromFile(i.f);
+    if (!err.empty()) { return str("Error reading file header for ", filename, ": ", err); }
 
     SliceHeader sliceheader;
     int index = 0;
-    IOPaths iop(f);
+    IOPaths iop(i.f);
     clp::Paths output;
     CLIPPER_MMANAGER manager = getManager();
     clp::Clipper clipper(manager);
     for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-        std::string e = seekNextMatchingPathsFromFile(f, fileheader, currentRecord, spec, sliceheader);
+        std::string e = seekNextMatchingPathsFromFile(i.f, fileheader, currentRecord, spec, sliceheader);
         if (!e.empty()) { err = str("Error reading file ", filename, ": ", e); break; }
         if (currentRecord >= fileheader.numRecords) break;
 
@@ -140,7 +141,6 @@ std::string processMatches(const char * filename, const char * svgfilename, Path
             break;
         }
     }
-    fclose(f);
 
     return err;
 }

@@ -1,5 +1,6 @@
 #include "pathwriter_nanoscribe.hpp"
 #include "pathwriter_multifile.tpp"
+#include "apputil.hpp"
 
 template class PathWriterMultiFile<SimpleNanoscribePathWriter>;
 
@@ -426,24 +427,23 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
         std::string &fname_debug = debugnames[n];
         addExtension(fname, GWLEXTENSION);
         addExtension(fname_debug, GWLEXTENSION);
-        FILE *main = fopen(fname.c_str(), "wt");
-        if (main == NULL) {
+        FILEOwner main(fname.c_str(), "wt");
+        if (!main.isopen()) {
             err = str("main GWL output file <", fname, ">: file could not be open");
             return false;
         }
-        FILE *debug = fopen(fname_debug.c_str(), "wt");
-        if (debug == NULL) {
+        FILEOwner debug(fname_debug.c_str(), "wt");
+        if (!debug.isopen()) {
             err = str("main debug GWL output file <", fname_debug, ">: file could not be open");
-            fclose(main);
             return false;
         }
         std::string &globalBegin = nanoconfigs[n]->beginGlobalScript;
         if (!globalBegin.empty()) {
-            if (fputs(globalBegin.c_str(), main) < 0) {
+            if (fputs(globalBegin.c_str(), main.f) < 0) {
                 err = str("error: cannot write global script beggining for file ", fname);
                 ok = false;
             }
-            if (fputs(globalBegin.c_str(), debug) < 0) {
+            if (fputs(globalBegin.c_str(), debug.f) < 0) {
                 err = str("error: cannot write global script beggining for file ", fname_debug);
                 ok = false;
             }
@@ -452,24 +452,24 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
             auto &subwriters = state->subwriters;
             auto &splitter = state->splitter;
             double factor = nanoconfigs[n]->factor_internal_to_nanoscribe;
-            auto includeNanoscribeSubscript = [main, debug, factor](SimpleNanoscribePathWriter* writer, clp::Path &square) {
+            auto includeNanoscribeSubscript = [&main, &debug, factor](SimpleNanoscribePathWriter* writer, clp::Path &square) {
                 bool ok = true;
                 if (!writer->firstTime) {
                     clp::DoublePoint center((square[0].X + square[2].X) / 2 * factor, (square[0].Y + square[2].Y) / 2 * factor);
-                    ok = ok && fprintf(debug, "StageScanMode\n") >= 0;
-                    ok = ok && writeSquare(debug, square, factor);
-                    ok = ok && fprintf(debug, "Write\nTextPositionX %f\nTextPositionY %f\nWriteText \"%s\"\n", center.X, center.Y, writer->filename.c_str()) >= 0;
-                    ok = ok && fprintf(debug, "include %s\n", writer->filename.c_str()) >= 0;
-                    ok = ok && fprintf(main, "include %s\n", writer->filename.c_str()) >= 0;
+                    ok = ok && fprintf(debug.f, "StageScanMode\n") >= 0;
+                    ok = ok && writeSquare(debug.f, square, factor);
+                    ok = ok && fprintf(debug.f, "Write\nTextPositionX %f\nTextPositionY %f\nWriteText \"%s\"\n", center.X, center.Y, writer->filename.c_str()) >= 0;
+                    ok = ok && fprintf(debug.f, "include %s\n", writer->filename.c_str()) >= 0;
+                    ok = ok && fprintf(main.f, "include %s\n", writer->filename.c_str()) >= 0;
                     if (writer->current_z_block != 0) {
                         double dz = -writer->current_z_block*NanoscribePiezoRange;
-                        ok = fprintf(main, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0;
-                        ok = ok && (fprintf(debug, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0);
+                        ok = fprintf(main.f, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0;
+                        ok = ok && (fprintf(debug.f, writer->config->addzdriveFormatting.c_str(), dz, writer->current_z_block, 0, -dz) >= 0);
                     }
                     if (writer->lastZ != 0) {
                         double dz = -writer->lastZ*writer->config->factor_input_to_nanoscribe - writer->current_z_block*NanoscribePiezoRange;
-                        ok = fprintf(main, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
-                        ok = ok && fprintf(debug, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
+                        ok = fprintf(main.f, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
+                        ok = ok && fprintf(debug.f, writer->config->zoffsetFormatting.c_str(), dz) >= 0;
                     }
                 }
                 return ok;
@@ -535,21 +535,21 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
         if (ok) {
             std::string &globalEnd = nanoconfigs[n]->endGlobalScript;
             if (!globalEnd.empty()) {
-                if (fputs(globalEnd.c_str(), main) < 0) {
+                if (fputs(globalEnd.c_str(), main.f) < 0) {
                     err = str("error: cannot write global script ending for file ", fname);
                     ok = false;
                 }
-                if (fputs(globalEnd.c_str(), debug) < 0) {
+                if (fputs(globalEnd.c_str(), debug.f) < 0) {
                     err = str("error: cannot write global script ending for file ", fname_debug);
                     ok = false;
                 }
             }
         }
-        if (fclose(main) != 0) {
+        if (!main.close()) {
             err = str("GWL output file <", fname, ">: could not be closed!!!");
             ok = false;
         }
-        if (fclose(debug) != 0) {
+        if (!debug.close()) {
             err = str("GWL output file <", fname_debug, ">: could not be closed!!!");
             ok = false;
         }
@@ -558,19 +558,19 @@ bool NanoscribeSplittingPathWriter::finishAfterClose() {
     if (ok && (states.size() > 1)) {
         std::string fname_debug = filename + ".debug";
         addExtension(fname_debug, GWLEXTENSION);
-        FILE *debug = fopen(fname_debug.c_str(), "wt");
-        if (debug == NULL) {
+        FILEOwner debug(fname_debug.c_str(), "wt");
+        if (!debug.isopen()) {
             err = str("main overall debug GWL output file <", fname_debug, ">: file could not be open");
             return false;
         }
         for (auto &debugname : debugnames) {
-            if (fprintf(debug, "FindInterfaceAt 0\ninclude %s\n", debugname.c_str()) < 0) {
+            if (fprintf(debug.f, "FindInterfaceAt 0\ninclude %s\n", debugname.c_str()) < 0) {
                 err = str("error including file ", debugname.c_str(), " in file ", fname_debug);
                 ok = false;
                 break;
             }
         }
-        if (fclose(debug) != 0) {
+        if (!debug.close()) {
             err = str("GWL output file <", fname_debug, ">: could not be closed!!!");
             return false;
         }
