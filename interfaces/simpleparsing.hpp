@@ -38,7 +38,7 @@ public:
     //these methods are templated in order to laziy generate a error message from several arguments if there is a problem
     template<typename... Args> void writeError(Args... args) {
         fmt << "error reading ";
-        int dummy[sizeof...(Args)] = { (fmt << args, 0)... };
+        char dummy[sizeof...(Args)] = { (fmt << args, (char)0)... };
         fmt << " (arg.number " << (argidx + 1) << " / " << argc << ")";
     }
 

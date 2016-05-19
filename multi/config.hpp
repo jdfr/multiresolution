@@ -47,10 +47,21 @@ typedef struct MetricFactors {
     void loadNanoscribeFactors(Configuration &config);
 } MetricFactors;
 
-//this is a hack to convert a series of things to a string
+/*this is a hack to convert a series of things to a string, for convenience
+ 
+NOTE: this takes arguments by value (would negate the convenience if the arguments were passed by reference),
+so it is inefficient if arguments are objects such as std::string
+
+THEREFORE: DO NOT USE FOR PERFORMANCE CRITICAL SECTIONS!!!!
+
+Posible workaround for regaining performance (that nonetheless kills convenience):
+    when printing objects like std::string, wrap them in std::ref, and replace below the code "fmt << args"
+    by a templated function that does the same for general types, but is overloaded for std::reference_wrapper<T>
+    in order to correctly print the reference to T.
+*/
 template<typename... Args> std::string str(Args... args) {
     std::ostringstream fmt;
-    int dummy[sizeof...(Args)] = { (fmt << args, 0)... };
+    char dummy[sizeof...(Args)] = { (fmt << args, (char)0)... };
     return std::string(fmt.str());
 }
 

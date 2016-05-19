@@ -11,8 +11,8 @@
 
 ///////////////////////////////////////////
 // these templates are handy for declaring list of serialized variables
-template<typename... Args> void   serialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (  serialize(f, args), 0)... }; }
-template<typename... Args> void deserialize_all(FILE * f, Args&... args) { int dummy[sizeof...(Args)] = { (deserialize(f, args), 0)... }; }
+template<typename... Args> void   serialize_all(FILE * f, Args&... args) { char dummy[sizeof...(Args)] = { (  serialize(f, args), (char)0)... }; }
+template<typename... Args> void deserialize_all(FILE * f, Args&... args) { char dummy[sizeof...(Args)] = { (deserialize(f, args), (char)0)... }; }
 
 ///////////////////////////////////////////
 // detect if an object has a serialization_object() method
@@ -106,6 +106,21 @@ template<typename K, typename V> void deserialize(FILE *f, std::map<K, V> &data)
 //Variadic macro wizardry can be used to automate the declaration of serialized variables,
 //but MSVC does not accept it, so we are stuck with horrible, error-prone, explicit, hand-made lists.
 //On the other hand, automating the declaration of serialization lists was ugly as hell, so whatever...
+
+/*NOTE: ideally, we should not need to explicitly mention all member variables while serializing a class,
+ * but we should be able to serialize all at once, and only handle explicitly complex cases:
+ * 
+ *      void Class::serialize_object(FILE *f) {
+ *          fwrite(this, sizeof(Class), 1, f); //write everything at once
+ *          serialize_all(f, this->member_vector, this->member_object);
+ *     }
+ * 
+ * The problem here is that in general, custom objects and STL containers may contain pointers to allocated subobjects,
+ * thus making this break apart in deserialization: when doing the corresponding fread(this, sizeof(Class), 1),
+ * the STL containers / objects will end up in an inconsistent state, that will certainly provoke a segfault in
+ * the subsequent deserialize_all(). That objects and STL containers may have different sizes in Debug and Release modes
+ * is just the icing on the cake.
+ */
 
 #define SERIALIZATION_DEFINITION(...) \
     void   serialize_object(FILE *f) {   serialize_all(f, __VA_ARGS__); } \
