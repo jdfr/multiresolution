@@ -71,17 +71,8 @@ template<typename T, typename INFLATEDACCUM> void ClippingResources::operateInfl
     operateInflatedLinesAndContoursInClipper(mode, res, lines, radius, aux, inflated_acumulator);
 }
 
-template<typename Output, typename Input> inline void ClippingResources::unitePaths(Output &output, Input &subject) {
-    AddPaths(subject, clp::ptSubject, true);
-    //maybe clp::pftPositive is better?
-    clipper.Execute(clp::ctUnion, output, clp::pftNonZero, clp::pftNonZero);
-    clipper.Clear();
-    if (!std::is_same<Output, clp::PolyTree>::value) ClipperEndOperation(clipper);
-}
-
-template<typename Output, typename Input1, typename Input2> void ClippingResources::unitePaths(Output &output, Input1 &subject, Input2 &clip) {
-    AddPaths(subject, clp::ptSubject, true);
-    AddPaths(clip, clp::ptClip, true);
+template<typename Output, typename... Inputs> inline void ClippingResources::unitePaths(Output &output, Inputs&... inputs) {
+    char dummy[sizeof...(Inputs)] = { (AddPaths(inputs, clp::ptSubject, true), (char)0)... };
     //maybe clp::pftPositive is better?
     clipper.Execute(clp::ctUnion, output, clp::pftNonZero, clp::pftNonZero);
     clipper.Clear();
@@ -326,8 +317,9 @@ bool ClippingResources::generateToolPath(size_t k, bool nextProcessSameKind, clp
             REMOVE ALL MEDIAL AXES FROM HOLEDPOLYGON
     CONVERT HOLEDPOLYGONS TO shapes
 */
-void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<double> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator) {
-    if (medialAxisFactors.size() == 0) return;
+bool ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<double> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator) {
+    bool linesHaveBeenComputed = false;
+    if (medialAxisFactors.size() == 0) return linesHaveBeenComputed;
     auto &ppspec = spec->pp[k];
 
     //convert the eroded remaining contours to HoledPolygons, treat each one separately
@@ -378,6 +370,7 @@ void ClippingResources::applyMedialAxisNotAggregated(size_t k, std::vector<doubl
             operateInflatedLinesAndContoursInClipper(clp::ctDifference, pt, accum_medialaxis, (double)ppspec.radius, &aux, inflated_acumulator);
             AddPolyTreeToHPs(pt, *newhps);
             ClipperEndOperation(clipper, &pt);
+            linesHaveBeenComputed = linesHaveBeenComputed || (!accum_medialaxis.empty());
             MOVETO(accum_medialaxis, medialaxis_accumulator);
         }
         std::swap(hps, newhps);
@@ -546,8 +539,18 @@ bool Infiller::processInfillingsConcentricRecursive(HoledPolygon &hp) {
 //MULTISLICING LOGIC
 /////////////////////////////////////////////////
 
-bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
+void setupAddsubFlags(GlobalSpec &global, int k, bool &nextProcessSameKind, bool &previousProcessSameKind) {
+    if (k == 0) {
+        nextProcessSameKind = !global.addsub.addsubWorkflowMode;
+        previousProcessSameKind = true;
+    } else {
+        nextProcessSameKind = true;
+        previousProcessSameKind = !global.addsub.addsubWorkflowMode;
+    }
+}
 
+//applyProcess first phase: determine perimeters; start computing perimeter toolpaths (if specified)
+bool Multislicer::applyProcessPhase1(SingleProcessOutput &output, clp::Paths &contours_tofill, int k) {
     //start boilerplate
 
     auto spec    = res->spec.get();
@@ -558,26 +561,18 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
 
     //INTERIM HACK FOR add/sub
     bool nextProcessSameKind, previousProcessSameKind;
-    if (k == 0) {
-        nextProcessSameKind = !global.addsub.addsubWorkflowMode;
-        previousProcessSameKind = true;
-    } else {
-        nextProcessSameKind = true;
-        previousProcessSameKind = !global.addsub.addsubWorkflowMode;
-    }
-
-    bool CUSTOMINFILLINGS = (ppspec.infillingMode == InfillingConcentric)   ||
-                            (ppspec.infillingMode == InfillingRectilinearH) ||
-                            (ppspec.infillingMode == InfillingRectilinearV);
-
-    clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
-    infillingAreas->clear();
-    clp::Paths *intermediate_medialaxis_perimeter, *intermediate_medialaxis_infilling;
-
+    setupAddsubFlags(global, k, nextProcessSameKind, previousProcessSameKind);
+    
     clp::Paths &lowres = AUX2;
-    clp::Paths *contourToProcess;
+    clp::Paths *contourToProcess = &lowres;
 
     bool notthelast = (k + 1) < spec->numspecs;
+    
+    output.perimeterMedialAxesHaveBeenAdded      =
+    output.infillingMedialAxesHaveBeenAdded      =
+    output.contours_withexternal_medialaxis_used =
+    output.phase1complete                        =
+    output.phase2complete                        = false;
 
     //this only makes sense if there is a tool with higher resolution down the line
     if (ppspec.doPreprocessing) {
@@ -590,40 +585,93 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
                     res->offset.ArcTolerance = (double)ppspec.arctolG;
                     res->offsetDo2(lowres, -(double)ppspec.dilatestep, (double)ppspec.dilatestep, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
                 } else {
-                    lowres = contours_tofill;
+                    //lowres = contours_tofill; //this was needed only for doing a SHOWCONTOURS with &lowres after the big if statement
+                    contourToProcess = &contours_tofill;
                 }
             }
         } else {
             //with the current setup, this is triggered only in add/sub mode for the first process
             res->overwriteHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
         }
-        contourToProcess = &lowres;
     } else {
         if (ppspec.noPreprocessingOffset == 0.0) {
             contourToProcess = &contours_tofill;
         } else {
             res->offset.ArcTolerance = (double)ppspec.arctolG;
             res->offsetDo2(lowres, -ppspec.noPreprocessingOffset, ppspec.noPreprocessingOffset, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
-            contourToProcess = &lowres;
         }
     }
-
-    if (!ppspec.computeToolpaths) {
-        output.contours = *contourToProcess; //TODO: do not use deep copy if possible
-        AUX4.clear();
-        intermediate_medialaxis_infilling = &AUX4; //this may be needed to avoid errors when computing the medial axis
+    
+    if (contourToProcess == &lowres) {
+        output.contours = std::move(*contourToProcess);
     } else {
-        clp::Paths &unprocessedToolPaths = AUX3;
-        if (!res->generateToolPath(k, nextProcessSameKind, *contourToProcess, output.ptoolpaths, unprocessedToolPaths, AUX4)) {
+        output.contours = *contourToProcess;
+    }
+    
+    if (ppspec.computeToolpaths) {
+        if (!res->generateToolPath(k, nextProcessSameKind, output.contours, output.ptoolpaths, output.unprocessedToolPaths, AUX4)) {
             this->clear();
             return false;
         }
 
-        //SHOWCONTOURS(*spec->global.config, "just_after_generating_toolpath", &contours_tofill, &lowres, &unprocessedToolPaths);
+        //SHOWCONTOURS(*spec->global.config, "just_after_generating_toolpath", &contours_tofill, &unprocessedToolPaths);
 
         //compute the contours from the toolpath (sadly, it cannot be optimized away, in any of the code paths)
-        res->offsetDo(output.contours, (double)ppspec.radius, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+        res->offsetDo(output.contours, (double)ppspec.radius, output.unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+    }
 
+    if (!ppspec.medialAxisFactors.empty()) {
+
+        //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
+        clp::Paths *intermediate_paths = &AUX3;
+
+        res->clipperDo(*intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
+        //SHOWCONTOURS(*spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
+
+        //but now, apply the medial axis algorithm!!!!
+        output.perimeterMedialAxesHaveBeenAdded = res->applyMedialAxisNotAggregated(k, ppspec.medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, output.medialAxis_toolpaths);
+        if (!ppspec.computeToolpaths) output.medialAxis_toolpaths = clp::Paths();
+        
+        if (output.perimeterMedialAxesHaveBeenAdded) {
+            //this will be needed only to be used by the 3D scheduling code of a (not-yet implemented) option is specified
+            output.contours_withexternal_medialaxis_used = true;
+            res->unitePaths(output.contours_withexternal_medialaxis, output.medialAxisIndependentContours, output.contours);
+        }
+    }
+  
+    this->clear();
+    output.phase1complete = true;
+    return true;
+}
+
+//applyProcess second phase: finish computing perimter toolpaths and compute infilling toolpaths,
+//apply motion planning, and arrange results in the output struct in the format expected by callers
+bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
+    //start boilerplate
+
+    auto spec    = res->spec.get();
+    auto &global = spec->global;
+    auto &ppspec = spec->pp[k];
+    res->err = &output.err;
+    this->clear();
+
+    //INTERIM HACK FOR add/sub
+    bool nextProcessSameKind, previousProcessSameKind;
+    setupAddsubFlags(global, k, nextProcessSameKind, previousProcessSameKind);
+
+    bool CUSTOMINFILLINGS = (ppspec.infillingMode == InfillingConcentric)   ||
+                            (ppspec.infillingMode == InfillingRectilinearH) ||
+                            (ppspec.infillingMode == InfillingRectilinearV);
+
+    clp::Paths *infillingAreas = CUSTOMINFILLINGS ? &AUX1 : &output.infillingAreas;
+    infillingAreas->clear();
+    clp::Paths *intermediate_medialaxis_infilling;
+    std::vector<clp::Paths> infillings_medialAxisIndependentContours;
+
+    if (!ppspec.computeToolpaths) {
+        AUX4.clear();
+        intermediate_medialaxis_infilling = &AUX4; //this may be needed to avoid errors when computing the medial axis
+    } else {
         //if required, discard common toolpaths.
         bool discardCommonToolpaths = spec->useContoursAlreadyFilled(k);
 
@@ -649,19 +697,20 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             } else {
                 //0.99: cannot be 1.0, clipping / round-off errors crop up
                 double shrinkFactor = (ppspec.addInternalClearance) ? 0.99 : (1-ppspec.infillingPerimeterOverlap);
-                res->offsetDo(*infillingAreas, -(double)ppspec.radius * shrinkFactor, unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
+                res->offsetDo(*infillingAreas, -(double)ppspec.radius * shrinkFactor, output.unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
             }
         }
 
         if (CUSTOMINFILLINGS) {
             AUX2.clear();
-            //NOTE: using unprocessedToolPaths here is semantically dubious. REVISIT LATER!
-            if (!infiller.processInfillings(k, &output.infillingsIndependentContours, *infillingAreas, accumInfillingsHolder, unprocessedToolPaths)) {
+            //NOTE: using output.unprocessedToolPaths here is semantically dubious. REVISIT LATER!
+            if (!infiller.processInfillings(k, &output.infillingsIndependentContours, *infillingAreas, accumInfillingsHolder, output.unprocessedToolPaths)) {
                 this->clear();
                 return false;
             }
         }
 
+        output.unprocessedToolPaths = clp::Paths();
         AUX4.clear();
         intermediate_medialaxis_infilling = &AUX4;
 
@@ -674,34 +723,29 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
             //elsewhere in the code we use !infillingsIndependentContours.empty() as a test to see if we are doing recursive infillings, so we clear it to make sure we do not break that logic
             if (!ppspec.infillingRecursive) output.infillingsIndependentContours.clear();
             //SHOWCONTOURS(*spec->global.config, "accumNonConveredByInfillings", &accumNonCoveredByInfillings);
-            res->applyMedialAxisNotAggregated(k, ppspec.medialAxisFactorsForInfillings, output.medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis_infilling);
+            //the output in infillings_medialAxisIndependentContours should really be in the end be placed in output.medialAxisIndependentContours
+            //however, we put it in a temporal variable infillings_medialAxisIndependentContours in order to be able to handle some special cases
+            output.infillingMedialAxesHaveBeenAdded = res->applyMedialAxisNotAggregated(k, ppspec.medialAxisFactorsForInfillings, infillings_medialAxisIndependentContours, accumNonCoveredByInfillings, *intermediate_medialaxis_infilling);
         }
 
     }
 
     AUX2.clear();
-    intermediate_medialaxis_perimeter = &AUX2;
-
-    if (!ppspec.medialAxisFactors.empty()) {
-
-        //clp::Paths *intermediate_paths = nextProcessSameKind ? &contours_tofill : &AUX3;
-        clp::Paths *intermediate_paths = &AUX3;
-
-        res->clipperDo(*intermediate_paths, clp::ctDifference, contours_tofill, output.contours, clp::pftEvenOdd, clp::pftEvenOdd);
-        //SHOWCONTOURS(*spec->global.config, "just_before_applying_medialaxis", &contours_tofill, &unprocessedToolPaths, &output.contours, intermediate_paths);
-
-        //but now, apply the medial axis algorithm!!!!
-        res->applyMedialAxisNotAggregated(k, ppspec.medialAxisFactors, output.medialAxisIndependentContours, *intermediate_paths, *intermediate_medialaxis_perimeter);
-        if (!ppspec.computeToolpaths) intermediate_medialaxis_perimeter->clear();
-    }
 
     if (output.infillingsIndependentContours.empty() && nextProcessSameKind) {
         //in this case, we are not interested in having the medial axis contours as a separated set of contours
-        res->unitePaths(output.contours, output.medialAxisIndependentContours, output.contours);
+        if (output.contours_withexternal_medialaxis_used) {
+            //in this case, part of the work was already done in the first phase
+            res->unitePaths(output.contours, infillings_medialAxisIndependentContours, output.contours_withexternal_medialaxis);
+        } else {
+            //in this case, all of the work must be done now
+            res->unitePaths(output.contours, infillings_medialAxisIndependentContours, output.medialAxisIndependentContours, output.contours);
+        }
         if (global.alsoContours) {
             COPYTO(output.contours, output.contoursToShow);
         }
         output.medialAxisIndependentContours.clear();
+        infillings_medialAxisIndependentContours.clear();
     } else {
         /*in this case, artificial holes may be generated as artifacts
         (either from overprints if !nextProcessSameKind, or from non-filled
@@ -710,9 +754,21 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         as for holes in contours.*/
         res->unitePaths(output.contours, output.contours);
         if (global.alsoContours) {
-            COPYTO(output.contours, output.contoursToShow);
-            COPYTO(output.medialAxisIndependentContours, output.contoursToShow);
-            COPYTO(output.infillingsIndependentContours, output.contoursToShow);
+            /*COPYTO(output.contours,                          output.contoursToShow);
+            COPYTO(infillings_medialAxisIndependentContours, output.contoursToShow);
+            COPYTO(output.medialAxisIndependentContours,     output.contoursToShow);
+            COPYTO(output.infillingsIndependentContours,     output.contoursToShow);*/
+            if (output.contours_withexternal_medialaxis_used) {
+                //in this case, part of the work was already done in the first phase
+                res->unitePaths(output.contoursToShow, output.infillingsIndependentContours, infillings_medialAxisIndependentContours, output.contours_withexternal_medialaxis);
+            } else {
+                //in this case, all of the work must be done now
+                res->unitePaths(output.contoursToShow, output.infillingsIndependentContours, infillings_medialAxisIndependentContours, output.contours, output.medialAxisIndependentContours);
+            }
+        }
+        //put the contents of infillings_medialAxisIndependentContours where they are required by the 3d scheduling code: output.medialAxisIndependentContours
+        if (!infillings_medialAxisIndependentContours.empty()) {
+            MOVETO(infillings_medialAxisIndependentContours, output.medialAxisIndependentContours);
         }
     }
 
@@ -728,9 +784,9 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
         it would also require to modify the motion planner to use the combination of HoledPolygons and infillings
         separated by HoledPolygon. Right now this is the workflow:
         */
-        if (!intermediate_medialaxis_perimeter->empty()) {
-            MOVETO(*intermediate_medialaxis_perimeter, output.ptoolpaths);
-            intermediate_medialaxis_perimeter->clear();
+        if (!output.medialAxis_toolpaths.empty()) {
+            MOVETO(output.medialAxis_toolpaths, output.ptoolpaths);
+            output.medialAxis_toolpaths.clear();
         }
 
         bool dolump = ppspec.lumpToolpathsTogether;
@@ -763,7 +819,14 @@ bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours
     }
 
     this->clear();
+    output.phase2complete = true;
     return true;
+}
+
+bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
+    if (!applyProcessPhase1(output, contours_tofill, k)) return false;
+    
+    return applyProcessPhase2(output, contours_tofill, contours_alreadyfilled, k);
 }
 
 

@@ -14,9 +14,17 @@ typedef struct SingleProcessOutput {
     clp::Paths contoursToShow;
     clp::Paths ptoolpaths, itoolpaths;
     clp::Paths infillingAreas;
+    clp::Paths medialAxis_toolpaths;
+    clp::Paths contours_withexternal_medialaxis;
+    clp::Paths unprocessedToolPaths;
     std::vector<clp::Paths> medialAxisIndependentContours;
     std::vector<clp::Paths> infillingsIndependentContours;
     bool alsoInfillingAreas;
+    bool phase1complete;
+    bool phase2complete;
+    bool perimeterMedialAxesHaveBeenAdded;
+    bool infillingMedialAxesHaveBeenAdded;
+    bool contours_withexternal_medialaxis_used;
     SingleProcessOutput() = default;
 #ifdef __GNUC__ //avoid annoying GCC warning about "defaulted move assignment for ResultSingleTool calls a non-trivial move assignment operator for virtual base "SingleProcessOutput" 
     SingleProcessOutput(SingleProcessOutput &&x) = default;
@@ -56,8 +64,7 @@ public:
     //// STATELESS, LOW LEVEL HELPER TEMPLATES ////
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContoursInClipper(clp::ClipType mode, T &res, clp::Paths &lines,                       double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
     template<typename T, typename INFLATEDACCUM> void operateInflatedLinesAndContours(         clp::ClipType mode, T &res, clp::Paths &contours, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator);
-    template<typename Output, typename Input>                   void unitePaths(Output &output,                          Input  &subject);
-    template<typename Output, typename Input1, typename Input2> void unitePaths(Output &output,                          Input1 &subject, Input2 &clip);
+    template<typename Output, typename... Inputs>               void unitePaths(Output &output, Inputs&... inputs);
     template<typename Output, typename Input1, typename Input2> void clipperDo( Output &output, clp::ClipType operation, Input1 &subject, Input2 &clip, clp::PolyFillType subjectFillType, clp::PolyFillType clipFillType);
     template<typename Output, typename Input>                   void offsetDo(  Output &output, double delta,                 Input &input,                  clp::JoinType jointype, clp::EndType endtype);
     template<typename Output, typename Input>                   void offsetDo2( Output &output, double delta1, double delta2, Input &input, clp::Paths &aux, clp::JoinType jointype, clp::EndType endtype);
@@ -73,7 +80,7 @@ public:
     void overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1, clp::Paths &aux2);
     void doDiscardCommonToolPaths(size_t k, clp::Paths &toolpaths, clp::Paths &contours_alreadyfilled, clp::Paths &aux1);
     bool generateToolPath(size_t k, bool nextProcessSameKind, clp::Paths &contour, clp::Paths &toolpaths, clp::Paths &temp_toolpath, clp::Paths &aux1);
-    void applyMedialAxisNotAggregated(size_t k, std::vector<double> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator);
+    bool applyMedialAxisNotAggregated(size_t k, std::vector<double> &medialAxisFactors, std::vector<clp::Paths> &accumContours, clp::Paths &shapes, clp::Paths &medialaxis_accumulator);
 };
 
 //here, we include only the templates and functions that are used elsewhere
@@ -138,6 +145,10 @@ public:
     std::shared_ptr<ClippingResources> res;
     Multislicer(std::shared_ptr<ClippingResources> _res) : infiller(_res), res(std::move(_res)) { }
     void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear(); infiller.clear(); }
+    //first half of applyProcess()
+    bool applyProcessPhase1(SingleProcessOutput &output, clp::Paths &contours_tofill, int k);
+    //second half of applyProcess()
+    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the contours left 
     //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm
     bool applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);

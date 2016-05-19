@@ -11,7 +11,8 @@ typedef struct ResultSingleTool: public SingleProcessOutput {
             int idx;
             bool has_err;
             bool used;
-            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxisIndependentContours, infillingsIndependentContours, z, ntool, idx, alsoInfillingAreas, used)
+            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxis_toolpaths, contours_withexternal_medialaxis, unprocessedToolPaths, medialAxisIndependentContours, infillingsIndependentContours,
+                                     z, ntool, idx, alsoInfillingAreas, phase1complete, phase2complete, perimeterMedialAxesHaveBeenAdded, infillingMedialAxesHaveBeenAdded, contours_withexternal_medialaxis_used, used)
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
