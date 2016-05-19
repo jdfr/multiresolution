@@ -197,7 +197,7 @@ typedef struct MultiSpec {
 
     void initializeVectors(size_t n) { numspecs = n; pp.resize(n); }
     bool validate();
-    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsub.addsubWorkflowMode) && (pp[k].useRadiusRemoveCommon); }
+    bool inline useContoursAlreadyFilled(int k) { return (k > 0) && (!global.addsub.addsubWorkflowMode) && (pp[k].useRadiusRemoveCommon) && pp[k].computeToolpaths; }
     std::string populateParameters();
 } MultiSpec;
 
