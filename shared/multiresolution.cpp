@@ -347,13 +347,13 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
     if (state->spec->global.fb.feedback) {
         double internal_to_input = state->factors->internal_to_input;
 
-        //un-scale the z values for raw slices, since they are needed by applyFeedback()
+        //un-scale the z values for raw slices, since they are needed by applyFeedbackFromFile()
         std::vector<double> rawZs = state->sched->rm.rawZs;
         for (auto z = rawZs.begin(); z != rawZs.end(); ++z) {
             *z *= internal_to_input;
         }
 
-        std::string err = applyFeedback(*state->spec->global.config, *state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
+        std::string err = applyFeedbackFromFile(*state->spec->global.config, *state->factors, *state->sched, rawZs, state->sched->rm.rawZs);
         if (!err.empty()) {
             state->err = err;
             voidSlices3DSpecInfo(ret);

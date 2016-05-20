@@ -16,12 +16,14 @@ class ExternalSlicerManager : public SlicerManager {
     std::string execpath;
     std::string workdir;
     std::string err;
-    bool repair, incremental;
+    std::vector<double> values;
     double scaled;
     double scalingFactor;
-    long scale;
-    bool useIntegerScale;
-    int numSlice;
+    double z_for_last_slice;
+    long   scale;
+    int    numSlice;
+    bool   useIntegerScale;
+    bool   repair, incremental;
 public:
     ExternalSlicerManager(
 #ifdef SLICER_USE_DEBUG_FILE
@@ -39,8 +41,10 @@ public:
     virtual std::string getErrorMessage() { return err; }
     virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz);
     virtual double getScalingFactor();
-    virtual bool sendZs(double *values, int numvalues);
+    virtual bool sendZs(std::vector<double> _values);
     virtual bool readNextSlice(clp::Paths &nextSlice);
+    virtual double getZForPreviousSlice() { return z_for_last_slice; }
+    virtual bool reachedEnd() { return numSlice >= values.size(); }
     virtual bool skipNextSlices(int numSkip);
 };
 
@@ -110,13 +114,14 @@ double ExternalSlicerManager::getScalingFactor() {
     return scalingFactor;
 }
 
-bool ExternalSlicerManager::sendZs(double *values, int numvalues) {
-    int64 num = numvalues;
+bool ExternalSlicerManager::sendZs(std::vector<double> _values) {
+    values    = std::move(_values);
+    int64 num = (int64)values.size();
     if (!iopIN.writeInt64(num)) {
         err = "could not write number of Z values to the slicer!!!";
         return false;
     }
-    if (!iopIN.writeDoubleP(values, num)) {
+    if (!iopIN.writeDoubleP(&values.front(), values.size())) {
         err = "could not write Z values to the slicer!!!";
         return false;
     }
@@ -149,7 +154,7 @@ std::vector<double> prepareSTLSimple(double zmin, double zmax, double zstep) {
 }
 
 bool ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
-    ++numSlice;
+    z_for_last_slice = values[numSlice];
     if (!iopOUT.readClipperPaths(nextSlice)) {
         err = "Could not read slice from slicer!!!";
         return false;
@@ -167,13 +172,14 @@ bool ExternalSlicerManager::readNextSlice(clp::Paths &nextSlice) {
             }
         }
     }
+    ++numSlice;
     return true;
 }
 
 bool ExternalSlicerManager::skipNextSlices(int numSkip) {
     for (int i = 0; i < numSkip; ++i) {
         clp::Paths dummy;
-        readNextSlice(dummy);
+        if (!readNextSlice(dummy)) return false;
     }
     return true;
 }
@@ -221,10 +227,15 @@ class RawSlicerManager : public SlicerManager {
     IOPaths iop_f;
     std::vector<double> expectedzs;
     double epsilon, scalingFactor, minx, maxx, miny, maxy, minz, maxz;
+    double z_for_last_slice;
+    int64 pathTypeValue;
     std::string err;
-    int numSlice;
+    int numSlice, numRead, numRecords;
+    bool metadataRequired;
+    bool zsHaveBeenSent;
+    bool filterByPathType;
 public:
-    RawSlicerManager(double _epsilon) : epsilon(_epsilon), f(NULL) {}
+    RawSlicerManager(double _epsilon, bool _metadataRequired, bool _filterByPathType, int64 _pathTypeValue) : f(NULL), epsilon(_epsilon), pathTypeValue(_pathTypeValue), metadataRequired(_metadataRequired), filterByPathType(_filterByPathType) {}
     virtual ~RawSlicerManager() { finalize(); }
     virtual bool start(const char * stlfilename);
     virtual bool terminate() { return finalize(); }
@@ -232,13 +243,16 @@ public:
     virtual std::string getErrorMessage() { return err; }
     virtual void getLimits(double *minx, double *maxx, double *miny, double *maxy, double *minz, double *maxz);
     virtual double getScalingFactor() { return scalingFactor; }
-    virtual bool sendZs(double *values, int numvalues);
+    virtual bool sendZs(std::vector<double> values);
     virtual bool readNextSlice(clp::Paths &nextSlice);
+    virtual double getZForPreviousSlice() { return z_for_last_slice; }
+    virtual bool reachedEnd() { return numRead >= numRecords; }
     virtual bool skipNextSlices(int numSkip);
 };
 
 bool RawSlicerManager::start(const char * fname) {
-    numSlice = 0;
+    numSlice = numRead = 0;
+    zsHaveBeenSent = false;
     
     filename = fname;
     
@@ -257,23 +271,29 @@ bool RawSlicerManager::start(const char * fname) {
         return false;
     }
     
-    if ((fileheader.additional.size()<8) || (fileheader.additional[0].i != RAW_MAGIC_NUMBER)) {
-        fclose(f);
-        f = NULL;
-        err = str("Error, incorrect metadata's magic number in file ", fname);
-        return false;
-    }
-    
-    scalingFactor = fileheader.additional[1].d;
-    minx          = fileheader.additional[2].d;
-    maxx          = fileheader.additional[3].d;
-    miny          = fileheader.additional[4].d;
-    maxy          = fileheader.additional[5].d;
-    minz          = fileheader.additional[6].d;
-    maxz          = fileheader.additional[7].d;
+    numRecords = fileheader.numRecords;
 
     iop_f = IOPaths(f);
-    
+
+    if (metadataRequired) {
+        if ((fileheader.additional.size()<8) || (fileheader.additional[0].i != RAW_MAGIC_NUMBER)) {
+            fclose(f);
+            f = NULL;
+            err = str("Error, incorrect metadata's magic number in file ", fname);
+            return false;
+        }
+        
+        scalingFactor = fileheader.additional[1].d;
+        minx          = fileheader.additional[2].d;
+        maxx          = fileheader.additional[3].d;
+        miny          = fileheader.additional[4].d;
+        maxy          = fileheader.additional[5].d;
+        minz          = fileheader.additional[6].d;
+        maxz          = fileheader.additional[7].d;
+    } else {
+        minx = maxx = miny = maxy = minz = maxz = scalingFactor = 0.0;
+    }
+
     return err.empty();
 }
 
@@ -294,27 +314,36 @@ void RawSlicerManager::getLimits(double *minx, double *maxx, double *miny, doubl
     *maxz = this->maxz;
 }
 
-bool RawSlicerManager::sendZs(double *values, int numvalues) {
-    expectedzs.resize(numvalues);
-    auto expected = &expectedzs.front();
-    for (int i = 0; i < numvalues; ++i) {
-        *expected = *values;
-        ++expected;
-        ++values;
-    }
+bool RawSlicerManager::sendZs(std::vector<double> values) {
+    expectedzs     = std::move(values);
+    zsHaveBeenSent = true;
     return true;
 }
 
 bool RawSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     SliceHeader sliceheader;
-    std::string e = sliceheader.readFromFile(f);
     
-    if (!e.empty())                     { err = str("Error reading ", numSlice, "-th slice header from ", filename, ": ", err); return false; }
-    if (sliceheader.alldata.size() < 7) { err = str("Error reading ", numSlice, "-th slice header from ", filename, ": header is too short!"); return false; }
-    if (std::fabs(sliceheader.z - expectedzs[numSlice]) > epsilon) {
-        err = str("Error reading ", numSlice, "-th slice header from ", filename, ": z is ", sliceheader.z, "but it was expected to be ", expectedzs[numSlice]);
-        return false;
+    while (true) {
+        std::string e = sliceheader.readFromFile(f);
+        
+        if (numRead >= numRecords)          { err = str("Error: trying to read more records than the file declared to have"); return false; }
+        if (!e.empty())                     { err = str("Error reading ", numSlice, "-th slice header from ", filename, ": ", err); return false; }
+        if (sliceheader.alldata.size() < 7) { err = str("Error reading ", numSlice, "-th slice header from ", filename, ": header is too short!"); return false; }
+        if (zsHaveBeenSent) {
+            if (std::fabs(sliceheader.z - expectedzs[numSlice]) > epsilon) {
+                err = str("Error reading ", numSlice, "-th slice header from ", filename, ": z is ", sliceheader.z, "but it was expected to be ", expectedzs[numSlice]);
+                return false;
+            }
+        }
+        
+        if (!filterByPathType || (sliceheader.type == pathTypeValue)) {
+            break;
+        }
+        fseek(f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
+        ++numRead;
     }
+    
+    z_for_last_slice = sliceheader.z;
     
     nextSlice.clear();
     if (sliceheader.saveFormat == PATHFORMAT_INT64) {
@@ -336,6 +365,7 @@ bool RawSlicerManager::readNextSlice(clp::Paths &nextSlice) {
     for (auto &path : nextSlice) if (!path.empty()) path.resize(path.size()-1);
     
     ++numSlice;
+    ++numRead;
     return true;
 }
 
@@ -349,6 +379,6 @@ bool RawSlicerManager::skipNextSlices(int numSkip) {
     return true;
 }
 
-std::shared_ptr<SlicerManager> getRawSlicerManager(double z_epsilon) {
-    return std::make_shared<RawSlicerManager>(z_epsilon);
+std::shared_ptr<SlicerManager> getRawSlicerManager(double z_epsilon, bool metadataRequired, bool filterByPathType, int64 pathTypeValue) {
+    return std::make_shared<RawSlicerManager>(z_epsilon, metadataRequired, filterByPathType, pathTypeValue);
 }

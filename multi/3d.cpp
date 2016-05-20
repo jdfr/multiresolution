@@ -748,12 +748,14 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
     return std::shared_ptr<ResultSingleTool>();
 }
 
-//this method should be refactored to remove the branch for !sched.tm.spec->global.fb.feedbackMesh
-//because that case should be handled with a RawSlicerManager
-std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
-    if (sched.tm.spec->global.fb.feedbackMesh) {
-
-        std::shared_ptr<SlicerManager> feedbackSlicer = getExternalSlicerManager(config, factors, config.getValue("SLICER_DEBUGFILE_FEEDBACK"), "");
+std::string applyFeedbackFromFile(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
+    
+    std::shared_ptr<SlicerManager> feedbackSlicer;
+    
+    bool useMesh = sched.tm.spec->global.fb.feedbackMesh;
+    
+    if (useMesh) {
+        feedbackSlicer = getExternalSlicerManager(config, factors, config.getValue("SLICER_DEBUGFILE_FEEDBACK"), "");
 
         char *meshfullpath = fullPath(sched.tm.spec->global.fb.feedbackFile.c_str());
         if (meshfullpath == NULL) {
@@ -776,76 +778,45 @@ std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleS
             return str("Error: the scalingFactor from the slicer is ", feedbackSlicer->getScalingFactor(), " while the factor from the configuration is different: ", slicer_to_input, "!!!\n");
         }
 
-        if (!feedbackSlicer->sendZs(&(zs[0]), (int)zs.size())) {
+        if (!feedbackSlicer->sendZs(std::move(zs))) {
                 std::string err = feedbackSlicer->getErrorMessage();
                 feedbackSlicer->terminate();
                 return str("Error while trying to send Z values to the feedback slicer manager: ", err, "!!!\n");
         }
-
-        clp::Paths rawslice;
-
-        for (int k = 0; k < zs.size(); ++k) {
-            rawslice.clear();
-
-            if (!feedbackSlicer->readNextSlice(rawslice)) {
-                std::string err = feedbackSlicer->getErrorMessage();
-                feedbackSlicer->terminate();
-                return str("Error while trying to read the ", k, "-th slice from the feedback slicer manager: ", err, "!!!\n");
-            }
-
-            sched.tm.takeAdditionalAdditiveContours(scaled_zs[k], rawslice);
-
-        }
-
-        if (!feedbackSlicer->finalize()) {
-            std::string err = feedbackSlicer->getErrorMessage();
-            return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
-        }
-
-        return std::string();
     } else {
-
-        FILEOwner i(sched.tm.spec->global.fb.feedbackFile.c_str(), "rb");
-        if (!i.isopen()) { return str("Could not open input file ", sched.tm.spec->global.fb.feedbackFile); }
-        IOPaths iop_f(i.f);
-
-        FileHeader fileheader;
-        std::string err = fileheader.readFromFile(i.f);
-        if (!err.empty()) { return str("Error reading file header for ", sched.tm.spec->global.fb.feedbackFile, ": ", err); }
-
-        SliceHeader sliceheader;
-        for (int currentRecord = 0; currentRecord < fileheader.numRecords; ++currentRecord) {
-            std::string e = sliceheader.readFromFile(i.f);
-            if (!e.empty())                     { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": ", err); break; }
-            if (sliceheader.alldata.size() < 7) { err = str("Error reading ", currentRecord, "-th slice header from ", sched.tm.spec->global.fb.feedbackFile, ": header is too short!"); break; }
-            if (sliceheader.type == PATHTYPE_PROCESSED_CONTOUR) {
-                clp::Paths paths;
-                if (sliceheader.saveFormat == PATHFORMAT_INT64) {
-                    if (!iop_f.readClipperPaths(paths)) {
-                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
-                        break;
-                    }
-                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
-                    if (!iop_f.readDoublePaths(paths, 1 / sliceheader.scaling)) {
-                        err = str("Error reading ", currentRecord, "-th integer clipperpaths: could not read record ", currentRecord, " data!");
-                        break;
-                    }
-                } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
-                    err = str("Error reading feedback from pathsfile ", sched.tm.spec->global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format cannot be 3D!!!!");
-                    break;
-                } else {
-                    err = str("Error reading feedback from pathsfile ", sched.tm.spec->global.fb.feedbackFile, ", ", currentRecord, "-th record: unknown path save format ", sliceheader.saveFormat, " for processed contour!!!!");
-                    break;
-                }
-                sched.tm.takeAdditionalAdditiveContours(sliceheader.z * factors.input_to_internal, paths);
-            } else {
-                fseek(i.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
-            }
+        const bool  metadataRequired = false;
+        const bool  filterByPathType = true;
+        const int64 pathTypeValue    = PATHTYPE_PROCESSED_CONTOUR;
+        feedbackSlicer = getRawSlicerManager(sched.tm.spec->global.z_epsilon, metadataRequired, filterByPathType, pathTypeValue);
+        
+        if (!feedbackSlicer->start(sched.tm.spec->global.fb.feedbackFile.c_str())) {
+            std::string err = feedbackSlicer->getErrorMessage();
+            return str("Error while trying to start the slicer manager: ", err, "!!!\n");
         }
-
-        return err;
     }
 
-}
 
+    clp::Paths rawslice;
+
+    for (int k = 0; !feedbackSlicer->reachedEnd(); ++k) {
+        rawslice.clear();
+
+        if (!feedbackSlicer->readNextSlice(rawslice)) {
+            std::string err = feedbackSlicer->getErrorMessage();
+            feedbackSlicer->terminate();
+            return str("Error while trying to read the ", k, "-th slice from the feedback slicer manager: ", err, "!!!\n");
+        }
+
+        double z = useMesh ? scaled_zs[k] : feedbackSlicer->getZForPreviousSlice() * factors.input_to_internal;
+        sched.tm.takeAdditionalAdditiveContours(z, rawslice);
+
+    }
+
+    if (!feedbackSlicer->finalize()) {
+        std::string err = feedbackSlicer->getErrorMessage();
+        return str("Error while finalizing the feedback slicer manager: ", err, "!!!!");
+    }
+
+    return std::string();
+}
 

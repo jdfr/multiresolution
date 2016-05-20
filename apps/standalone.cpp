@@ -255,13 +255,13 @@ bool getMeshFullPath(std::string &meshfilename) {
     return true;
 }
 
-void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shared_ptr<SlicerManager>> &slicers, std::vector<clp::Paths> &rawslices, clp::Paths &rawslice) {
+std::string readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shared_ptr<SlicerManager>> &slicers, std::vector<clp::Paths> &rawslices, clp::Paths &rawslice) {
     auto rawsl = rawslices.begin();
     for (auto slicer = slicers.begin(); slicer!= slicers.end(); ++slicer, ++rawsl) {
         rawsl->clear();
         if (!(*slicer)->readNextSlice(*rawsl)) {
             std::string err = (*slicer)->getErrorMessage();
-            fprintf(stderr, "Error while trying to read the %d-th slice from the %ld-th slicer manager: %s!!!\n", nslice, slicer-slicers.begin(), err.c_str());
+            return str("Error while trying to read the ", nslice, "-th slice from the ", slicer-slicers.begin(), "-th slicer manager: ", err.c_str(), "!!!\n");
         }
     }
 
@@ -276,6 +276,7 @@ void readNextSlice(int nslice, ClippingResources &clipres, std::vector<std::shar
         clipres.clipper.Clear();
         ClipperEndOperation(clipres.clipper);
     }
+    return std::string();
 }
 
 //this class encapsulates the boilerplate logic for saving/loading checkpoints
@@ -764,7 +765,7 @@ int Main(int argc, const char** argv) {
             }
 
             if (multispec->global.fb.feedback) {
-                std::string err = applyFeedback(*config, factors, sched, rawZs, sched.rm.rawZs);
+                std::string err = applyFeedbackFromFile(*config, factors, sched, rawZs, sched.rm.rawZs);
                 if (!err.empty()) {
                     fprintf(stderr, err.c_str());
                     return -1;
@@ -772,7 +773,7 @@ int Main(int argc, const char** argv) {
             }
 
             for (auto &slicer : slicers) {
-                if (!slicer->sendZs(&(rawZs.front()), schednuminputslices)) {
+                if (!slicer->sendZs(rawZs)) {
                     std::string err = slicer->getErrorMessage();
                     fprintf(stderr, "Error sending Z values to slicer manager: %s", err.c_str());
                 }
@@ -798,7 +799,11 @@ int Main(int argc, const char** argv) {
 
                 printf("reading raw slice %d/%d\n", i, schednuminputslices - 1);
 
-                readNextSlice(i, *clipres, slicers, rawslices, rawslice);
+                std::string err = readNextSlice(i, *clipres, slicers, rawslices, rawslice);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
+                    return -1;
+                }
                 
                 for (auto &w : pathwriters_raw) {
                     if (!w->writePaths(rawslice, PATHTYPE_RAW_CONTOUR, 0, -1, rawZs[i], factors.internal_to_input, true)) {
@@ -866,7 +871,7 @@ int Main(int argc, const char** argv) {
             }
 
             for (auto &slicer : slicers) {
-                if (!slicer->sendZs(&(zs.front()), (int)zs.size())) {
+                if (!slicer->sendZs(zs)) {
                     std::string err = slicer->getErrorMessage();
                     fprintf(stderr, "Error sending Z values to slicer manager: %s", err.c_str());
                 }
@@ -917,7 +922,11 @@ int Main(int argc, const char** argv) {
                     }
                 }
 
-                readNextSlice(i, *clipres, slicers, rawslices, rawslice);
+                std::string err = readNextSlice(i, *clipres, slicers, rawslices, rawslice);
+                if (!err.empty()) {
+                    fprintf(stderr, err.c_str());
+                    return -1;
+                }
                 
                 for (auto &w : pathwriters_raw) {
                     if (!w->writePaths(rawslice, PATHTYPE_RAW_CONTOUR, 0, -1, zs[i], factors.internal_to_input, true)) {
