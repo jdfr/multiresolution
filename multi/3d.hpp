@@ -5,13 +5,16 @@
 #include "spec.hpp"
 #include "serialization.hpp"
 
+struct OutputSliceData;
+
 typedef struct ResultSingleTool: public SingleProcessOutput {
+            clp::Paths contours_alreadyfilled;
             double z;
             int ntool;
             int idx;
             bool has_err;
             bool used;
-            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxis_toolpaths, contours_withexternal_medialaxis, unprocessedToolPaths, medialAxisIndependentContours, infillingsIndependentContours,
+            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxis_toolpaths, contours_withexternal_medialaxis, unprocessedToolPaths, medialAxisIndependentContours, infillingsIndependentContours, contours_alreadyfilled,
                                      z, ntool, idx, alsoInfillingAreas, phase1complete, phase2complete, perimeterMedialAxesHaveBeenAdded, infillingMedialAxesHaveBeenAdded, contours_withexternal_medialaxis_used, used)
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
@@ -25,7 +28,7 @@ and adjusting accordingly the contours to be built. The functionality here is se
 of the scheduler. However, as the scheduler is already quite complex on its own, all (or
 hopefully most) of the logic to manage previous toolpaths is contained here*/
 class ToolpathManager {
-    clp::Paths auxUpdate, auxInitial, contours_alreadyfilled;
+    clp::Paths auxUpdate, auxInitial;
     //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
     void applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
     void applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
@@ -39,13 +42,15 @@ public:
       let the system know the contours of the object generated with
       low-res processes, measured with some scanning technology.*/
     void takeAdditionalAdditiveContours(double z, clp::Paths &additional) { additionalAdditiveContours.emplace(z, std::move(additional)); }
-    void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool);
+    void updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &contours_alreadyfilled, clp::Paths &rawSlice, double z, int ntool);
     std::shared_ptr<MultiSpec> spec;
     std::shared_ptr<ClippingResources> res;
     Multislicer multi;
     ToolpathManager(std::shared_ptr<ClippingResources> _res) : multi(std::move(_res)) { res = multi.res; spec = multi.res->spec; slicess.resize(spec->numspecs); }
-    bool multislice(clp::Paths &input, double z, int ntool, int output_index);
-    void removeUsedSlicesPastZ(double z);
+    bool processSlicePhase1(clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result);
+    bool processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours = std::vector<ResultSingleTool*>());
+    bool multislice(clp::Paths &rawSlice, double z, int ntool, int output_index);
+    void removeUsedSlicesPastZ(double z, std::vector<OutputSliceData> &output);
     void removeAdditionalContoursPastZ(double z);
     void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }
 };
@@ -61,11 +66,15 @@ typedef struct InputSliceData {
 } InputSliceData;
 
 typedef struct OutputSliceData {
-    //trivial type, no need to declare serialization list
-    double z;
-    int ntool;
-    int mapOutputToInput; //one to one mapping
-    bool computed;
+    ResultSingleTool* result;
+            std::vector<int> requiredContoursForPhase2;
+            double z;
+            int ntool;
+            int mapOutputToInput; //one to one mapping
+            int numSlicesRequiringThisOne;
+            bool computed;
+            SERIALIZATION_DEFINITION(requiredContoursForPhase2, z, ntool, mapOutputToInput, numSlicesRequiringThisOne, computed)
+    OutputSliceData() : result(NULL) {}
 } OutputSliceData;
 
 
@@ -136,6 +145,11 @@ class SimpleSlicingScheduler {
     void computeSimpleOutputOrderForInputSlices();
     void pruneInputZsAndCreateRawZs(double epsilon);
     bool getContourToAvoidVerticalOverwriting(clp::Paths &output);
+    void removeUnrequiredData(double z);
+    bool processReadyRawSlices();
+    bool tryToComputeSlicePhase2(ResultSingleTool &result);
+    bool processReadySlicesPhase2();
+    void post_deserialize_reconstruct();
 public:
     std::string err;
     bool has_err;
@@ -152,6 +166,7 @@ public:
             SERIALIZATION_CUSTOM_DEFINITION(
                 { serialize(f, input); },
                 { deserialize(f, input, InputSliceData(0, 0)); },
+                { post_deserialize_reconstruct(); }, 
                 output, num_output_by_tool, zmin, zmax, input_idx, output_idx, tm, rm);
     void clear() { input.clear(); output.clear(); err = std::string(); has_err = false; input_idx = output_idx = 0; zmin = zmax = 0.0; rm.clear(); }
 

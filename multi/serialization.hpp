@@ -7,7 +7,8 @@
 
 
 /*VERY BASIC SERIALIZATION FRAMEWORK
- * it can handle tree-like structures, but not anything more complicated such as DAGs implemented with shared_ptr */
+ * it can handle tree-like structures, but not anything more complicated such as DAGs implemented with shared_ptr
+   (note, however, that in some cases, cross-references within trees can be trivially reconstructed)*/
 
 ///////////////////////////////////////////
 // these templates are handy for declaring list of serialized variables
@@ -114,21 +115,23 @@ template<typename K, typename V> void deserialize(FILE *f, std::map<K, V> &data)
  *          fwrite(this, sizeof(Class), 1, f); //write everything at once
  *          serialize_all(f, this->member_vector, this->member_object);
  *     }
+ *      void Class::serialize_object(FILE *f) {
+ *          fread(this, sizeof(Class), 1, f); //write everything at once
+ *          deserialize_all(f, this->member_vector, this->member_object);
+ *     }
  * 
- * The problem here is that in general, custom objects and STL containers may contain pointers to allocated subobjects,
- * thus making this break apart in deserialization: when doing the corresponding fread(this, sizeof(Class), 1),
- * the STL containers / objects will end up in an inconsistent state, that will certainly provoke a segfault in
- * the subsequent deserialize_all(). That objects and STL containers may have different sizes in Debug and Release modes
- * is just the icing on the cake.
+ * The problem here is that in general, trivially serialized STL containers will be inconsistent when deserialized,
+ * so they will certainly provoke a segfault when deserialize_all() tries to modify them. That STL containers may have
+ * different sizes in Debug and Release modes is just the icing on the cake.
  */
 
 #define SERIALIZATION_DEFINITION(...) \
     void   serialize_object(FILE *f) {   serialize_all(f, __VA_ARGS__); } \
     void deserialize_object(FILE *f) { deserialize_all(f, __VA_ARGS__); }
 
-#define SERIALIZATION_CUSTOM_DEFINITION(SERIALIZE_CUSTOM, DESERIALIZE_CUSTOM, ...) \
+#define SERIALIZATION_CUSTOM_DEFINITION(SERIALIZE_CUSTOM, DESERIALIZE_CUSTOM, POST_DESERIALIZE_CUSTOM, ...) \
     void   serialize_object(FILE *f) { SERIALIZE_CUSTOM;     serialize_all(f, __VA_ARGS__); } \
-    void deserialize_object(FILE *f) { DESERIALIZE_CUSTOM; deserialize_all(f, __VA_ARGS__); }
+    void deserialize_object(FILE *f) { DESERIALIZE_CUSTOM; deserialize_all(f, __VA_ARGS__); POST_DESERIALIZE_CUSTOM; }
 
 
 /*variadic macro wizardry: define macro DECLARE_SERIALIZABLE_VARIABLES

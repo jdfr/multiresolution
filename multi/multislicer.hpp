@@ -25,7 +25,7 @@ typedef struct SingleProcessOutput {
     bool perimeterMedialAxesHaveBeenAdded;
     bool infillingMedialAxesHaveBeenAdded;
     bool contours_withexternal_medialaxis_used;
-    SingleProcessOutput() = default;
+    SingleProcessOutput() : alsoInfillingAreas(false), phase1complete(false), phase2complete(false), perimeterMedialAxesHaveBeenAdded(false), infillingMedialAxesHaveBeenAdded(false), contours_withexternal_medialaxis_used(false) {};
 #ifdef __GNUC__ //avoid annoying GCC warning about "defaulted move assignment for ResultSingleTool calls a non-trivial move assignment operator for virtual base "SingleProcessOutput" 
     SingleProcessOutput(SingleProcessOutput &&x) = default;
 #endif
@@ -148,7 +148,7 @@ public:
     //first half of applyProcess()
     bool applyProcessPhase1(SingleProcessOutput &output, clp::Paths &contours_tofill, int k);
     //second half of applyProcess()
-    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);
+    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_alreadyfilled, int k);
     // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the contours left 
     //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm
     bool applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);

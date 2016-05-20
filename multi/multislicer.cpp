@@ -646,7 +646,7 @@ bool Multislicer::applyProcessPhase1(SingleProcessOutput &output, clp::Paths &co
 
 //applyProcess second phase: finish computing perimter toolpaths and compute infilling toolpaths,
 //apply motion planning, and arrange results in the output struct in the format expected by callers
-bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
+bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_alreadyfilled, int k) {
     //start boilerplate
 
     auto spec    = res->spec.get();
@@ -826,7 +826,7 @@ bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths &co
 bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
     if (!applyProcessPhase1(output, contours_tofill, k)) return false;
     
-    return applyProcessPhase2(output, contours_tofill, contours_alreadyfilled, k);
+    return applyProcessPhase2(output, contours_alreadyfilled, k);
 }
 
 

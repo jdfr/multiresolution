@@ -9,12 +9,18 @@
 #include <algorithm>
 
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
-void ToolpathManager::removeUsedSlicesPastZ(double z) {
+void ToolpathManager::removeUsedSlicesPastZ(double z, std::vector<OutputSliceData> &output) {
     //TODO: decide how to remove additive contours if they are unrequired because feedback has been given with takeAdditionalAdditiveContours()
     bool sliceUpwards = spec->global.sliceUpwards;
     for (auto slices = slicess.begin(); slices != slicess.end(); ++slices) {
         slices->erase(std::remove_if(slices->begin(), slices->end(),
-            [z, sliceUpwards](std::shared_ptr<ResultSingleTool> sz) { return sz->used && (sliceUpwards ? (sz->z < z) : (sz->z > z)); }
+            [&output, z, sliceUpwards](std::shared_ptr<ResultSingleTool> &sz) {
+                bool toremove = sz->used && (output[sz->idx].numSlicesRequiringThisOne == 0) && (sliceUpwards ? (sz->z < z) : (sz->z > z));
+                if (toremove) {
+                    output[sz->idx].result = NULL;
+                }
+                return toremove;
+            }
         ), slices->end());
     }
 }
@@ -67,7 +73,7 @@ void ToolpathManager::applyContours(clp::Paths &contours, int ntool_contour, boo
 }
 
 //remove from the input contours the parts that are already there from previous slices
-void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &rawSlice, double z, int ntool) {
+void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &initialContour, clp::Paths &contours_alreadyfilled, clp::Paths &rawSlice, double z, int ntool) {
 
     bool processToComputeIsAdditive = !spec->global.addsub.addsubWorkflowMode || ntool == 0;
     bool computeContoursAlreadyFilled = spec->useContoursAlreadyFilled(ntool);
@@ -152,18 +158,58 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
       -ask for all slices within the range of the lowest process for that slice
       -do that recursively for each process, from lowest to highest
 */
-bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
+bool ToolpathManager::processSlicePhase1(clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result) {
+    slicess[ntool].push_back(std::make_shared<ResultSingleTool>(z, ntool, output_index));
+    ResultSingleTool &output = *(slicess[ntool].back());
 
-    updateInputWithProfilesFromPreviousSlices(auxInitial, rawSlice, z, ntool);
+    updateInputWithProfilesFromPreviousSlices(auxInitial, output.contours_alreadyfilled, rawSlice, z, ntool);
+
+    //TODO: intilialize properly the StartPosition of the MultiSpec
+
+    bool ret = multi.applyProcessPhase1(output, auxInitial, ntool);
+    output.has_err = !output.err.empty();
+    if (!ret) {
+        err = str("error in processSlicePhase1() at height z= ", z, ", process ", ntool, ": ", output.err, "output_idx=", output_index, "\n");
+        slicess.pop_back();
+        return ret;
+    }
+    result = &output;
+    return ret;
+}
+
+bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours) {
+    bool ret = multi.applyProcessPhase2(output, output.contours_alreadyfilled, output.ntool);
+    output.contours_alreadyfilled = clp::Paths();
+    output.has_err = !output.err.empty();
+    if (!ret) {
+        err = str("error in processSlicePhase2() at height z= ", output.z, ", process ", output.ntool, ": ", output.err, "output_idx=", output.idx, "\n");
+        slicess.pop_back();
+        return ret;
+    }
+    if (spec->global.substractiveOuter) {
+        removeOuter(output.ptoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
+        removeOuter(output.itoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
+        if (output.alsoInfillingAreas) {
+            removeOuter(output.infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
+        }
+    }
+    return ret;
+}
+
+
+bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
+    slicess[ntool].push_back(std::make_shared<ResultSingleTool>(z, ntool, output_index));
+    ResultSingleTool &output = *(slicess[ntool].back());
+
+    updateInputWithProfilesFromPreviousSlices(auxInitial, output.contours_alreadyfilled, rawSlice, z, ntool);
 
     //TODO: intilialize properly the StartPosition of the MultiSpec
 
     bool ret = false;
 
-    slicess[ntool].push_back(std::make_shared<ResultSingleTool>(z, ntool, output_index));
-    ResultSingleTool &output = *(slicess[ntool].back());
-    ret = multi.applyProcess(output, auxInitial, contours_alreadyfilled, ntool);
-    contours_alreadyfilled.clear();
+    ret = multi.applyProcess(output, auxInitial, output.contours_alreadyfilled, ntool);
+    
+    output.contours_alreadyfilled.clear();
     output.has_err = !output.err.empty();
     if (!ret) {
         err = str("error in applyProcess() at height z= ", z, ", process ", ntool, ": ", output.err, "\n");
@@ -521,7 +567,128 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
     }
 }
 
+//reconstruct cross-references from OutputSliceData to ResultSingleTool
+void SimpleSlicingScheduler::post_deserialize_reconstruct() {
+    if (output.empty()) return;
+    for (auto &slices : tm.slicess) {
+        for (auto &slice : slices) {
+            output[slice->idx].result = slice.get();
+        }
+    }
+}
+
+//helper method for processReadyRawSlices()
+void SimpleSlicingScheduler::removeUnrequiredData(double z) {
+    //TODO: we have all the information needed to decided what raw/previous/additional slices are required to compute each slice, so we could write a rule engine to schedule the removal of slices exactly when we know they are not needed again!
+
+    //delete slices ONLY if they have been used AND are way below the current input slice
+    //WARNING: THIS RELIES ON A SPECIFIC CALL PATTERN TO receiveNextInputSlice() and giveNextOutputSlice() to work correctly!!!!!
+    /*         the call pattern is a loop doing:
+          while (not_all_input_slices_have_been_sent) {
+              receiveNextInputSlice();
+              while (there_are_available_output_slices) {
+                  giveNextOutputSlice();
+              }
+          }
+    */
+    if (removeUnused && (tm.spec->global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
+        bool sliceUpwards = tm.spec->global.sliceUpwards;
+        /*why use factor 2.1: sometimes, a slice of ntool>0 will be scheduled *after*
+        the immediately higher slice of ntool==0. As a result, it is important to avoid
+        discarding slices up to two previous slices of ntool==0. Using 2.1 is to be on
+        the safe side regarding to round-off errors.*/
+        double zlimit = z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
+        rm.removeUsedRawSlices();
+        tm.removeAdditionalContoursPastZ(zlimit);
+        tm.removeUsedSlicesPastZ(zlimit, output);
+      }
+}
+
+//method to consume all pending raw slices, doing phase 1 slicing computations (and phase 2 if possible)
+bool SimpleSlicingScheduler::processReadyRawSlices() {
+    bool ok = true;
+    while (true) {
+        if (rm.rawReady((int)input_idx)) {
+            int idx_raw = input[input_idx].mapInputToRaw;
+            clp::Paths *raw = rm.getRawContour(idx_raw, (int)input_idx);
+            if (raw == NULL) break;
+            double z = rm.raw[idx_raw].z;
+            int this_output_idx = input[input_idx].mapInputToOutput;
+            auto &this_output = output[this_output_idx];
+            
+            has_err = !tm.processSlicePhase1(*raw, z, input[input_idx].ntool, this_output_idx, this_output.result);
+            this_output.requiredContoursForPhase2.clear();
+            rm.auxRawSlice.clear();
+            if (has_err) {
+                err = tm.err;
+                ok  = false;
+                break;
+            }
+            bool computePhase2Now = this_output.requiredContoursForPhase2.empty();
+            if (computePhase2Now) {
+                has_err = !tm.processSlicePhase2(*this_output.result);
+                if (has_err) {
+                    err = tm.err;
+                    ok  = false;
+                    break;
+                }
+                this_output.computed = true;
+            }
+            removeUnrequiredData(input[input_idx].z);
+            ++input_idx;
+            if (input_idx >= input.size()) break;
+        } else {
+            break;
+        }
+    }
+    return ok;
+}
+
+//helper method for processReadySlicesPhase2(): do phase 2 slicing computations if the system is ready
+bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
+    bool ok = true;
+    auto &requireds = output[result.idx].requiredContoursForPhase2;
+    std::vector<ResultSingleTool*> recalleds;
+    recalleds.reserve(requireds.size());
+    for (auto required : requireds) {
+        if ((output[required].result != NULL)  && output[required].result->phase1complete) {
+            recalleds.push_back(output[required].result);
+        }
+    }
+    if (recalleds.size()==requireds.size()) {
+        for (auto recalled : recalleds) {
+            --output[recalled->idx].numSlicesRequiringThisOne;
+        }
+        has_err = !tm.processSlicePhase2(result, std::move(recalleds));
+        if (has_err) {
+            err = tm.err;
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+//method to do all pending phase 2 slicing computations
+bool SimpleSlicingScheduler::processReadySlicesPhase2() {
+    for (auto &slices : tm.slicess) {
+        for (auto &slice : slices) {
+            if (slice->phase1complete && !slice->phase2complete) {
+                if (!tryToComputeSlicePhase2(*slice)) return false;
+            }
+        }
+    }
+    return true;
+}
+
+
 void SimpleSlicingScheduler::computeNextInputSlices() {
+//temporal arrangement until we are ready to drop the old method implementation
+const bool newmode = true;
+if (newmode) {
+    if(!processReadyRawSlices()) return;
+    if (false) processReadySlicesPhase2();
+    return;
+}
     while (true) {
         if (rm.rawReady((int)input_idx)) {
             int idx_raw = input[input_idx].mapInputToRaw;
@@ -553,7 +720,7 @@ void SimpleSlicingScheduler::computeNextInputSlices() {
                 weird things may happen if applicationPoint is not in the middle for some tool*/
                 //TODO: we have all the information needed to decided what raw/previous/additional slices are required to compute each slice, so we could write a rule engine to schedule the removal of slices exactly when we know they are not needed again!
                 double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
-                tm.removeUsedSlicesPastZ(zlimit);
+                tm.removeUsedSlicesPastZ(zlimit, output);
                 tm.removeAdditionalContoursPastZ(zlimit);
                 rm.removeUsedRawSlices();
             }
@@ -581,7 +748,8 @@ std::shared_ptr<ResultSingleTool> SimpleSlicingScheduler::giveNextOutputSlice() 
     return std::shared_ptr<ResultSingleTool>();
 }
 
-
+//this method should be refactored to remove the branch for !sched.tm.spec->global.fb.feedbackMesh
+//because that case should be handled with a RawSlicerManager
 std::string applyFeedback(Configuration &config, MetricFactors &factors, SimpleSlicingScheduler &sched, std::vector<double> &zs, std::vector<double> &scaled_zs) {
     if (sched.tm.spec->global.fb.feedbackMesh) {
 
