@@ -18,20 +18,6 @@ void addExtension(std::string &filename, std::string ext) {
     }
 }
 
-bool PathWriter::start() {
-    throw std::runtime_error("Base method PathWriter::close() should never be called!");
-}
-bool PathWriter::writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    throw std::runtime_error("Base method PathWriter::writePaths() should never be called!");
-}
-bool PathWriter::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
-    //this is the most sensible default definition for this method
-    return writePaths(encl.paths, type, radius, ntool, z, scaling, isClosed);
-}
-bool PathWriter::close() {
-    throw std::runtime_error("Base method PathWriter::close() should never be called!");
-}
-
 bool PathWriterDelegator::start() {
     if (!isopen) {
         for (auto &sub : subs) {

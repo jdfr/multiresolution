@@ -11,13 +11,16 @@ public:
     std::string filename;
     bool resumeAtStart;
     virtual ~PathWriter() {}
-    virtual bool start(); //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
-    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
+    virtual bool start() = 0; //start is not strictly necessary, it will be automatically called if the file is not already open, but it is convenient to be able to force its use
+    virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed) = 0;
     //this method has to be implemented only for subclasses that are used by SplittingPathWriter. It should really be on a separate EnclosedPathWriter subclass,
     //but then, we would like some objects to inherit both from EnclosedPathWriter and from the subclass PathWriterMultiFile, creating the need for virtual inheritance
     //(and that does not make much sense when we are using CRTP in PathWriterMultiFile, after all).
-    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed);
-    virtual bool close();
+    virtual bool writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
+        //this is the most sensible default definition for this method
+        return writePaths(encl.paths, type, radius, ntool, z, scaling, isClosed);
+    }
+    virtual bool close() = 0;
 };
 
 typedef std::function<bool(int, int, double)> PathFilter;
