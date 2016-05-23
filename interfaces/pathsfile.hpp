@@ -12,8 +12,6 @@
 FUNCTIONALITY TO READ/WRITE PATHSFILES
 *********************************************************/
 
-typedef std::vector<FILE*> FILES;
-
 bool fileExists(const char *filename);
 
 //Returns NULL if it could not resolve the path. The returned string must be freed with free()
