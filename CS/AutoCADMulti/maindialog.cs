@@ -29,6 +29,7 @@ namespace AutoCADMulti {
 
         private static readonly byte VALT = 255;
         private static readonly byte VALG = 200;
+        private static readonly byte VALS = 184;
         private static readonly byte VALM = 128;
         private static readonly byte VALC = 64;
         private static readonly Color[] perimeterColors = {
@@ -38,6 +39,14 @@ namespace AutoCADMulti {
           Color.FromRgb(VALT, VALT, 0),
           Color.FromRgb(VALT, 0, VALT),
           Color.FromRgb(0, VALT, VALT),
+        };
+        private static readonly Color[] surfaceColors = {
+          Color.FromRgb(VALS, 0, 0),
+          Color.FromRgb(0, VALS, 0),
+          Color.FromRgb(0, 0, VALS),
+          Color.FromRgb(VALS, VALS, 0),
+          Color.FromRgb(VALS, 0, VALS),
+          Color.FromRgb(0, VALS, VALS),
         };
         private static readonly Color[] infillingColors = {
           Color.FromRgb(VALM, 0, 0),
@@ -234,6 +243,7 @@ namespace AutoCADMulti {
                         while (loader.readNextPathFromFile(ref isDouble, ref info)) {
                             if (onlyToolpaths && !(
                                 (info.type == (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_PERIMETER) ||
+                                (info.type == (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_SURFACE)   ||
                                 (info.type == (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_INFILLING))) {
                                 continue;
                             }
@@ -251,16 +261,12 @@ namespace AutoCADMulti {
                             }
                             Color col;
                             switch (info.type) {
-                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_RAW_CONTOUR:
-                                    col = globalContourColor;     break;
-                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_PROCESSED_CONTOUR:
-                                    col = contourColors[ntool];   break;
-                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_PERIMETER:
-                                    col = perimeterColors[ntool]; break;
-                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_INFILLING:
-                                    col = infillingColors[ntool]; break;
-                                default:
-                                    col = otherColor;             break; //this should never happen
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_RAW_CONTOUR:        col = globalContourColor;     break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_PROCESSED_CONTOUR:  col =   contourColors[ntool]; break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_PERIMETER: col = perimeterColors[ntool]; break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_SURFACE:   col =   surfaceColors[ntool]; break;
+                                case (int)MultiSlicerInterface.MultiCfg.LoadPathType.PATHTYPE_TOOLPATH_INFILLING: col = infillingColors[ntool]; break;
+                                default:                                                                          col = otherColor;             break; //this should never happen
                             }
                             for (int i = 0; i < info.numpaths; i++) {
                                 int numpoints = *(info.numpointsArray++);
@@ -408,6 +414,7 @@ namespace AutoCADMulti {
             }*/
             //something like the commented code above would be necessary to retrieve the areas to infill, if we were going to handle infillings outside of the multislicing engine
             readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPathPerimeter, perimeterColors, tr, btr);
+            readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPathSurface,     surfaceColors, tr, btr);
             readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathToolPathInfilling, infillingColors, tr, btr);
             if (!alsoContours) return;
             readOutputSlice(result, mode2D, z, sliceIdx, SI.MultiCfg.PathType.PathContour,             contourColors, tr, btr);

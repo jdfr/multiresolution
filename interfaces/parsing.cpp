@@ -11,7 +11,7 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
         opts.add_options()
             ("nanoscribe",
                 po::value<std::string>()->value_name("filename"),
-                "save toolpaths (both perimeters and infillings) in *.gwl format. The slices are split to allow objects bigger than 300um to be built. A different GWL file for each region is created (or as many as processes if --nano-global is not specified). These are called 'regional' GWL files. Also, one global GWL file is created (or one for each process if --nano-global is not specified), that includes all corresponding regional GWL files. For each global GWL file, there is also a global debug GWL file, which adds delimiting squares and text to be able to identify individual regional GWL files. If this option is used, the GWL output configuration must be specified with other options, all having prefix nano-*, or pp-nano-* if specified per process.")
+                "save toolpaths (perimeters, surfaces and infillings) in *.gwl format. The slices are split to allow objects bigger than 300um to be built. A different GWL file for each region is created (or as many as processes if --nano-global is not specified). These are called 'regional' GWL files. Also, one global GWL file is created (or one for each process if --nano-global is not specified), that includes all corresponding regional GWL files. For each global GWL file, there is also a global debug GWL file, which adds delimiting squares and text to be able to identify individual regional GWL files. If this option is used, the GWL output configuration must be specified with other options, all having prefix nano-*, or pp-nano-* if specified per process.")
             ("nano-global",
                 "If this option is specified, all nano-* options described below are accepted, and the nanoscribe configuration is global for all processes. Otherwise, each process has its own nanoscribe configuration, which can be customized with pp-nano-* options. Nanoscribe options pp-nano-tool-* must be set separately for each process even if this option is specified. If this option IS NOT specified, nano-by-tool is IMPLICITLY specified.")
             ("nano-by-tool",
@@ -44,16 +44,22 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
             PREFIXNANODESC("GWL commands to be written at the end of each GLOBAL GWL file"))
         (PREFIXNANONAME("nano-perimeters-begin"),
             po::value<std::string>()->value_name("script"),
-            PREFIXNANODESC("GWL commands to be written when starting a section writing perimeter toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters and infillings."))
+            PREFIXNANODESC("GWL commands to be written when starting a section writing perimeter toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters, surfaces and / or infillings."))
         (PREFIXNANONAME("nano-perimeters-end"),
             po::value<std::string>()->value_name("script"),
             PREFIXNANODESC("GWL commands to be written when finishing a section writing perimeter toolpaths."))
+        (PREFIXNANONAME("nano-surfaces-begin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when starting a section writing surface toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters, surfaces and / or infillings."))
+        (PREFIXNANONAME("nano-surfaces-end"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written when finishing a section writing surface toolpaths."))
         (PREFIXNANONAME("nano-infillings-begin"),
             po::value<std::string>()->value_name("script"),
-            PREFIXNANODESC("GWL commands to be written when starting a section writing perimeter toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters and infillings."))
+            PREFIXNANODESC("GWL commands to be written when starting a section writing infilling toolpaths. This is useful when using different settings (speed, laser power, etc.) for perimeters, surfaces and / or infillings."))
         (PREFIXNANONAME("nano-infillings-end"),
             po::value<std::string>()->value_name("script"),
-            PREFIXNANODESC("GWL commands to be written when finishing a section writing perimeter toolpaths."))
+            PREFIXNANODESC("GWL commands to be written when finishing a section writing infilling toolpaths."))
         (PREFIXNANONAME("nano-scanmode"),
             po::value<std::string>()->value_name("piezo|galvo"),
             PREFIXNANODESC("nanoscribe scan mode, either 'piezo' or 'galvo'. Default value is 'galvo'"))
@@ -473,6 +479,14 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-perimeters-end"))) {
         if (!string.empty()) string += "\n";
         context->spec.nanos[idx]->endPerimeters   = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-surfaces-begin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->beginSurfaces   = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-surfaces-end"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->endSurfaces     = std::move(string);
     }
     if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-infillings-begin"))) {
         if (!string.empty()) string += "\n";

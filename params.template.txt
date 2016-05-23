@@ -60,7 +60,7 @@
     #--radius-removecommon 0
     #--nosnap
     #--infill linesh
-    #--infill-recursive
+    #--infilling-recursive
     #--infill-medialaxis-radius 1.0 0.5
 
   --process 1
@@ -77,5 +77,5 @@
     #--radius-removecommon 0
     #--nosnap
     #--infill linesh
-    #--infill-recursive
+    #--infilling-recursive
     #--infill-medialaxis-radius 1.0 0.5

@@ -40,6 +40,7 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
         case PATHTYPE_RAW_CONTOUR:        Type = ".raw";       break;
         case PATHTYPE_PROCESSED_CONTOUR:  Type = ".contour";   break;
         case PATHTYPE_TOOLPATH_PERIMETER: Type = ".perimeter"; break;
+        case PATHTYPE_TOOLPATH_SURFACE:   Type = ".surface";   break;
         case PATHTYPE_TOOLPATH_INFILLING: Type = ".infilling"; break;
         default:                          Type = ".unknown";
         }

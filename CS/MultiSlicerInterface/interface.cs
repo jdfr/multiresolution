@@ -16,7 +16,8 @@ namespace MultiSlicerInterface {
             PATHTYPE_RAW_CONTOUR        = 0,
             PATHTYPE_PROCESSED_CONTOUR  = 1,
             PATHTYPE_TOOLPATH_PERIMETER = 2,
-            PATHTYPE_TOOLPATH_INFILLING = 3
+            PATHTYPE_TOOLPATH_INFILLING = 3,
+            PATHTYPE_TOOLPATH_SURFACE   = 4
         };
         //enum defined for getOutputSliceInfo()
         public enum PathType : int {
@@ -24,6 +25,7 @@ namespace MultiSlicerInterface {
             PathContour           = 1,
             PathToolPathPerimeter = 2,
             PathToolPathInfilling = 3,
+            PathToolPathSurface   = 4,
         };
     }
 

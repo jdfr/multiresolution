@@ -284,6 +284,8 @@ inline clp::Paths *getDesiredPaths(SharedLibraryResult *result, int ntool, Outpu
         paths = &result->res[ntool]->ptoolpaths; break;
     case PathToolPathInfilling:
         paths = &result->res[ntool]->itoolpaths; break;
+    case PathToolPathSurface:
+        paths = &result->res[ntool]->stoolpaths; break;
     case PathContour:
     default:
         paths = &result->res[ntool]->contoursToShow; break;

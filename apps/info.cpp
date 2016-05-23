@@ -56,6 +56,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
             case PATHTYPE_RAW_CONTOUR:        fprintf(stdout, "                  type: raw slice (sliced from mesh file)\n"); break;
             case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "                  type: contours for tool %d\n", sliceheader.ntool); break;
             case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "                  type: perimeter toolpaths for tool %d\n", sliceheader.ntool); break;
+            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "                  type: surface   toolpaths for tool %d\n", sliceheader.ntool); break;
             case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "                  type: infilling toolpaths for tool %d\n", sliceheader.ntool); break;
             default:                          fprintf(stdout, "                  type: unknown (%d) for tool %d\n", sliceheader.type, sliceheader.ntool);
             }
@@ -81,6 +82,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
             case PATHTYPE_RAW_CONTOUR:        fprintf(stdout, "type=raw (from mesh file),        z=%.20g\n", sliceheader.z); break;
             case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "type=contour,            ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
             case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "type=perimeter toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
+            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "type=surface   toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
             case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "type=infilling toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
             default:                          fprintf(stdout, "type=%D (unknown),        ntool=%d, z=%.20g\n", sliceheader.type, sliceheader.ntool, sliceheader.z);
             }

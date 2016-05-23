@@ -168,7 +168,7 @@ std::string writeSlice(FILE *f, SliceHeader header, clp::Paths &paths, PathClose
 bool PathInFileSpec::matchesHeader(SliceHeader &h) {
     return (h.alldata.size()>=5) &&
             ((!usetype)     || (h.type == type)) &&
-            ((!usetoolpath) || (h.type == PATHTYPE_TOOLPATH_PERIMETER) || (h.type == PATHTYPE_TOOLPATH_INFILLING)) &&
+            ((!usetoolpath) || (h.type == PATHTYPE_TOOLPATH_PERIMETER) || (h.type == PATHTYPE_TOOLPATH_INFILLING) || (h.type == PATHTYPE_TOOLPATH_SURFACE)) &&
             ((!usentool)    || (h.ntool == ntool)) &&
             ((!usez)        || (std::fabs(h.z - z)<1e-6));
 }
@@ -186,6 +186,7 @@ std::string PathInFileSpec::readFromCommandLine(ParamReader &rd, int maxtimes, b
             else if ((t == 'c') || (typ[0] == '1')) { type = PATHTYPE_PROCESSED_CONTOUR; }
             else if ((t == 'p') || (typ[0] == '2')) { type = PATHTYPE_TOOLPATH_PERIMETER; }
             else if ((t == 'i') || (typ[0] == '3')) { type = PATHTYPE_TOOLPATH_INFILLING; }
+            else if ((t == 's') || (typ[0] == '4')) { type = PATHTYPE_TOOLPATH_SURFACE; }
             else if ((t == 't'))                    { usetype = false; usetoolpath = true; }
             else                                    { return str("Could not understand this type value: ", typ, "\n"); }
         } else if (strcmp(spectype, "ntool") == 0) {

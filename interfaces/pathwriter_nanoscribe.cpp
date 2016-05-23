@@ -49,13 +49,32 @@ bool SimpleNanoscribePathWriter::startWriter() {
     return true;
 }
 
+const bool BEGIN = true;
+const bool END   = false;
+std::string *getDelimString(std::shared_ptr<SimpleNanoscribeConfig> &config, int type, bool begin) {
+    switch (type) {
+        case PATHTYPE_TOOLPATH_PERIMETER : return begin ? &config->beginPerimeters : &config->endPerimeters;
+        case PATHTYPE_TOOLPATH_SURFACE   : return begin ? &config->beginSurfaces   : &config->endSurfaces;
+        case PATHTYPE_TOOLPATH_INFILLING :
+        default:                           return begin ? &config->beginInfillings : &config->endInfillings;
+    }
+}
+const char *getNameString(int type) {
+    switch (type) {
+        case PATHTYPE_TOOLPATH_PERIMETER : return "perimeter";
+        case PATHTYPE_TOOLPATH_SURFACE   : return "surface";
+        case PATHTYPE_TOOLPATH_INFILLING : return "infilling";
+        default:                           return "unknown";
+    }
+}
+
 bool SimpleNanoscribePathWriter::endWriter() {
     if (this->isopen && this->err.empty()) {
         if (!firstTime) {
-            std::string *endtype = lastType == PATHTYPE_TOOLPATH_PERIMETER ? &config->endPerimeters : &config->endInfillings;
+            std::string *endtype = getDelimString(config, lastType, END);
             if (!endtype->empty()) {
                 if (fputs(endtype->c_str(), this->f) < 0) {
-                    err = str("error: cannot write ", lastType == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
+                    err = str("error: cannot write ", getNameString(lastType), " starting for tool ", ntool, " in file ", this->filename);
                     return false;
                 }
             }
@@ -310,10 +329,10 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
                 return false;
             }
         }
-        std::string *begintype = type == PATHTYPE_TOOLPATH_PERIMETER ? &config->beginPerimeters : &config->beginInfillings;
+        std::string *begintype = getDelimString(config, type, BEGIN);
         if (!begintype->empty()) {
             if (fputs(begintype->c_str(), this->f) < 0) {
-                err = str("error: cannot write ", type == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
+                err = str("error: cannot write ", getNameString(type), " starting for tool ", ntool, " in file ", this->filename);
                 return false;
             }
         }
@@ -350,23 +369,17 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
             }
         }
         if (type != lastType) {
-            std::string *begin, *end;
-            if (type == PATHTYPE_TOOLPATH_PERIMETER) {
-                begin = &config->beginPerimeters;
-                end   = &config->endInfillings;
-            } else { //type == PATHTYPE_TOOLPATH_INFILLING
-                begin = &config->beginInfillings;
-                end   = &config->endPerimeters;
-            }
+            std::string *begin = getDelimString(config, type,     BEGIN);
+            std::string *end   = getDelimString(config, lastType, END);
             if (!end->empty()) {
                 if (fputs(end->c_str(), this->f) < 0) {
-                    err = str("error: cannot write ", lastType == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " ending for tool ", lastNTool, " in file ", this->filename);
+                    err = str("error: cannot write ", getNameString(lastType), " ending for tool ", lastNTool, " in file ", this->filename);
                     return false;
                 }
             }
             if (!begin->empty()) {
                 if (fputs(begin->c_str(), this->f) < 0) {
-                    err = str("error: cannot write ",     type == PATHTYPE_TOOLPATH_PERIMETER ? "perimeter" : "infilling", " starting for tool ", ntool, " in file ", this->filename);
+                    err = str("error: cannot write ", getNameString(type), " starting for tool ", ntool, " in file ", this->filename);
                     return false;
                 }
             }

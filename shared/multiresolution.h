@@ -9,7 +9,8 @@ typedef int LoadPathInfo_PathType;
 #define PATHTYPE_PROCESSED_CONTOUR  1
 #define PATHTYPE_TOOLPATH_PERIMETER 2
 #define PATHTYPE_TOOLPATH_INFILLING 3
-
+#define PATHTYPE_TOOLPATH_SURFACE   4
+#define NUM_PATHTYPES               5
 
 //this is used in struct LoadPathInfo
 typedef int LoadPathInfo_PathFormat;
@@ -23,6 +24,7 @@ typedef int OutputSliceInfo_PathType;
 #define PathContour           1
 #define PathToolPathPerimeter 2
 #define PathToolPathInfilling 3
+#define PathToolPathSurface   4
 
 //do not declare the shared library definitions if we only want the above definitions
 #ifndef INCLUDE_MULTIRESOLUTION_ONLY_FOR_DEFINITIONS 

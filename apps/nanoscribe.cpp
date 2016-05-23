@@ -26,7 +26,7 @@ template<typename Function> std::string processToolpaths(std::string &pathsfilen
         std::string err = sliceheader.readFromFile(f.f);
         if (!err.empty()) { return str("Error reading ", currentRecord, "-th slice header: ", err); }
 
-        if (!((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) {
+        if (!((sliceheader.type == PATHTYPE_TOOLPATH_PERIMETER) || (sliceheader.type == PATHTYPE_TOOLPATH_SURFACE) || (sliceheader.type == PATHTYPE_TOOLPATH_INFILLING))) {
             fseek(f.f, (long)(sliceheader.totalSize - sliceheader.headerSize), SEEK_CUR);
             continue;
         }

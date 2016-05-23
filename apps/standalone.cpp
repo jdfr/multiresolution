@@ -196,8 +196,8 @@ MainSpec::MainSpec() {
         ("dxf-contours",
             po::value<std::string>()->value_name("filename"),
             "Output contours in a *.dxf file (if both this and --dxf-toolpaths are specified, the file names MUST be different)")
-        ("dxf-separate-infillings",
-            "If this option is specified, and --dxf-toolpaths is also specified, toolpaths are written to two different files: one for perimeter toolpaths, other for infilling toolpaths. The files will have a common file name and different suffixes.")
+        ("dxf-separate-toolpaths",
+            "If this option is specified, and --dxf-toolpaths is also specified, toolpaths are written to different files according to their types: one for perimeter toolpaths, other for infilling toolpaths, and other for surface toolpaths. The files will have a common file name and different suffixes.")
         ("dxf-format",
             po::value<std::string>()->default_value("binary"),
             "Format of the output DXF files: either 'binary' or 'ascii'. The default is 'binary'")
@@ -494,7 +494,7 @@ int Main(int argc, const char** argv) {
             }
             dxf_generic_by_ntool = dxfOpts.count("dxf-by-tool")             == 0;
             dxf_generic_by_z     = dxfOpts.count("dxf-by-z")                == 0;
-            dxf_generic_by_typeT = dxfOpts.count("dxf-separate-infillings") == 0;
+            dxf_generic_by_typeT = dxfOpts.count("dxf-separate-toolpaths")  == 0;
             if (dxfOpts.count("dxf-toolpaths")) dxf_filename_toolpaths = std::move(dxfOpts["dxf-toolpaths"].as<std::string>());
             if (dxfOpts.count("dxf-contours"))  dxf_filename_contours  = std::move(dxfOpts["dxf-contours" ].as<std::string>());
 
@@ -693,7 +693,7 @@ int Main(int argc, const char** argv) {
                     };
                     if (!dxf_filename_toolpaths.empty()) {
                         delegator->addWriter(dxfCreator(dxf_filename_toolpaths + suffix, dxf_generic_by_typeT),
-                            [](int type, int ntool, double z) { return (type == PATHTYPE_TOOLPATH_PERIMETER) || (type == PATHTYPE_TOOLPATH_INFILLING); });
+                            [](int type, int ntool, double z) { return (type == PATHTYPE_TOOLPATH_SURFACE) || (type == PATHTYPE_TOOLPATH_PERIMETER) || (type == PATHTYPE_TOOLPATH_INFILLING); });
                     }
                     if (!dxf_filename_contours.empty()) {
                         delegator->addWriter(dxfCreator(dxf_filename_contours + suffix, true),
@@ -780,7 +780,7 @@ int Main(int argc, const char** argv) {
             }
 
             if (show) {
-                numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * 3 : schednumoutputslices * 2;
+                numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * (NUM_PATHTYPES - 1) : schednumoutputslices * (NUM_PATHTYPES - 2);
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
 
@@ -842,6 +842,10 @@ int Main(int argc, const char** argv) {
                             fprintf(stderr, "Error writing perimeter toolpaths for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
                             return -1;
                         }
+                        if (!pathwriter->writePaths(single->stoolpaths, PATHTYPE_TOOLPATH_SURFACE,   rad, single->ntool, zscaled, factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing surface   toolpaths for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
+                            return -1;
+                        }
                         if (!pathwriter->writePaths(single->itoolpaths, PATHTYPE_TOOLPATH_INFILLING, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
                             fprintf(stderr, "Error writing infilling toolpaths for ntool=%d, z=%f: %s\n", single->ntool, zscaled, pathwriter->err.c_str());
                             return -1;
@@ -896,8 +900,7 @@ int Main(int argc, const char** argv) {
             }
 
             if (show) {
-                //numoutputs: raw contours (numsteps), plus processed contours (numsteps*numtools), plus toolpaths (numsteps*numtools)
-                numoutputs = alsoContours ? numsteps + numresults * 3 : numresults * 2;
+                numoutputs = alsoContours ? numsteps + numresults * (NUM_PATHTYPES - 1) : numresults * (NUM_PATHTYPES - 2);
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
 
@@ -947,6 +950,10 @@ int Main(int argc, const char** argv) {
                     for (auto &pathwriter : pathwriters_toolpath) {
                         if (!pathwriter->writePaths(ress[k]->ptoolpaths, PATHTYPE_TOOLPATH_PERIMETER, rad, k, zs[i], factors.internal_to_input, false)) {
                             fprintf(stderr, "Error writing perimeter toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
+                            return -1;
+                        }
+                        if (!pathwriter->writePaths(ress[k]->stoolpaths, PATHTYPE_TOOLPATH_SURFACE,   rad, k, zs[i], factors.internal_to_input, false)) {
+                            fprintf(stderr, "Error writing surface   toolpaths  for ntool=%d, z=%f: %s\n", k, zs[i], pathwriter->err.c_str());
                             return -1;
                         }
                         if (!pathwriter->writePaths(ress[k]->itoolpaths, PATHTYPE_TOOLPATH_INFILLING, rad, k, zs[i], factors.internal_to_input, false)) {
