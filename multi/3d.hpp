@@ -14,8 +14,8 @@ typedef struct ResultSingleTool: public SingleProcessOutput {
             int idx;
             bool has_err;
             bool used;
-            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, itoolpaths, infillingAreas, medialAxis_toolpaths, contours_withexternal_medialaxis, unprocessedToolPaths, medialAxisIndependentContours, infillingsIndependentContours, contours_alreadyfilled,
-                                     z, ntool, idx, alsoInfillingAreas, phase1complete, phase2complete, perimeterMedialAxesHaveBeenAdded, infillingMedialAxesHaveBeenAdded, contours_withexternal_medialaxis_used, used)
+            SERIALIZATION_DEFINITION(contours, contoursToShow, ptoolpaths, stoolpaths, itoolpaths, infillingAreas, medialAxis_toolpaths, contours_withexternal_medialaxis, unprocessedToolPaths, medialAxisIndependentContours, infillingsIndependentContours, contours_alreadyfilled,
+                                     z, ntool, idx, alsoInfillingAreas, phase1complete, phase2complete, contours_withexternal_medialaxis_used, used)
     ResultSingleTool(std::string _err, double _z = NAN) : SingleProcessOutput(_err), z(_z), has_err(true) {};
     ResultSingleTool(double _z, int _ntool, int _idx) : SingleProcessOutput(), z(_z), ntool(_ntool), idx(_idx), has_err(false), used(false) {}
     ResultSingleTool() : SingleProcessOutput(), has_err(false), idx(-1), ntool(-1), z(NAN), used(true) {}
@@ -28,7 +28,7 @@ and adjusting accordingly the contours to be built. The functionality here is se
 of the scheduler. However, as the scheduler is already quite complex on its own, all (or
 hopefully most) of the logic to manage previous toolpaths is contained here*/
 class ToolpathManager {
-    clp::Paths auxUpdate, auxInitial;
+    clp::Paths auxUpdate, auxInitial, auxAbove, auxBelow;
     //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
     void applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
     void applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
@@ -49,7 +49,6 @@ public:
     ToolpathManager(std::shared_ptr<ClippingResources> _res) : multi(std::move(_res)) { res = multi.res; spec = multi.res->spec; slicess.resize(spec->numspecs); }
     bool processSlicePhase1(clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result);
     bool processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours = std::vector<ResultSingleTool*>());
-    bool multislice(clp::Paths &rawSlice, double z, int ntool, int output_index);
     void removeUsedSlicesPastZ(double z, std::vector<OutputSliceData> &output);
     void removeAdditionalContoursPastZ(double z);
     void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }

@@ -166,6 +166,7 @@ bool ToolpathManager::processSlicePhase1(clp::Paths &rawSlice, double z, int nto
     //TODO: intilialize properly the StartPosition of the MultiSpec
 
     bool ret = multi.applyProcessPhase1(output, auxInitial, ntool);
+    auxInitial.clear();
     output.has_err = !output.err.empty();
     if (!ret) {
         err = str("error in processSlicePhase1() at height z= ", z, ", process ", ntool, ": ", output.err, "output_idx=", output_index, "\n");
@@ -177,7 +178,42 @@ bool ToolpathManager::processSlicePhase1(clp::Paths &rawSlice, double z, int nto
 }
 
 bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours) {
-    bool ret = multi.applyProcessPhase2(output, output.contours_alreadyfilled, output.ntool);
+    bool hasAbove = false, hasBelow = false;
+    clp::Paths *internalParts = NULL;
+    if (spec->pp[output.ntool].differentiateSurfaceInfillings && !requiredContours.empty()) {
+        for (auto required : requiredContours) {
+            if (required->z < output.z) {
+                hasBelow = true; if (hasAbove) break;
+            } else {
+                hasAbove = true; if (hasBelow) break;
+            }
+        }
+        if (!(hasAbove && hasBelow)) {
+            auxInitial.clear();
+            internalParts = &auxInitial;
+        } else {
+            for (auto required : requiredContours) {
+                clp::Clipper *clipper;
+                if (required->z < output.z) {
+                    clipper = &res->clipper;
+                } else {
+                    clipper = &res->clipper2;
+                }
+                clipper->AddPaths(required->contours_withexternal_medialaxis_used ? required->contours_withexternal_medialaxis : required->contours, clp::ptSubject, true);
+            }
+            res->clipper .Execute(clp::ctUnion, auxBelow, clp::pftNonZero, clp::pftNonZero);
+            res->clipper .Clear();
+            ClipperEndOperation(res->clipper);
+            res->clipper2.Execute(clp::ctUnion, auxAbove, clp::pftNonZero, clp::pftNonZero);
+            res->clipper2.Clear();
+            ClipperEndOperation(res->clipper2);
+            res->clipperDo(auxInitial, clp::ctIntersection, auxAbove, auxBelow, clp::pftNonZero, clp::pftNonZero);
+            auxBelow.clear(); auxAbove.clear();
+            internalParts = &auxInitial;
+        }
+    }
+    bool ret = multi.applyProcessPhase2(output, internalParts, output.contours_alreadyfilled, output.ntool);
+    auxInitial.clear();
     output.contours_alreadyfilled = clp::Paths();
     output.has_err = !output.err.empty();
     if (!ret) {
@@ -187,42 +223,12 @@ bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<R
     }
     if (spec->global.substractiveOuter) {
         removeOuter(output.ptoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
+        removeOuter(output.stoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
         removeOuter(output.itoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
         if (output.alsoInfillingAreas) {
             removeOuter(output.infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
         }
     }
-    return ret;
-}
-
-
-bool ToolpathManager::multislice(clp::Paths &rawSlice, double z, int ntool, int output_index) {//, ResultConsumer &consumer) {
-    slicess[ntool].push_back(std::make_shared<ResultSingleTool>(z, ntool, output_index));
-    ResultSingleTool &output = *(slicess[ntool].back());
-
-    updateInputWithProfilesFromPreviousSlices(auxInitial, output.contours_alreadyfilled, rawSlice, z, ntool);
-
-    //TODO: intilialize properly the StartPosition of the MultiSpec
-
-    bool ret = false;
-
-    ret = multi.applyProcess(output, auxInitial, output.contours_alreadyfilled, ntool);
-    
-    output.contours_alreadyfilled.clear();
-    output.has_err = !output.err.empty();
-    if (!ret) {
-        err = str("error in applyProcess() at height z= ", z, ", process ", ntool, ": ", output.err, "\n");
-        slicess.pop_back();
-        return ret;
-    }
-    if (spec->global.substractiveOuter) {
-        removeOuter(output.ptoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
-        removeOuter(output.itoolpaths,         spec->global.outerLimitX, spec->global.outerLimitY);
-        if (output.alsoInfillingAreas) {
-            removeOuter(output.infillingAreas, spec->global.outerLimitX, spec->global.outerLimitY);
-        }
-    }
-
     return ret;
 }
 
@@ -439,7 +445,8 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
     std::vector<int> order_to_output(input.size());
     std::iota(order_to_output.begin(), order_to_output.end(), 0);
     auto comparator = [this](int a, int b) { double df = input[a].z - input[b].z; return (df < 0.0) || ((df == 0) && (input[a].ntool < input[b].ntool)); };
-    if (tm.spec->global.sliceUpwards) {
+    bool sliceUpwards = tm.spec->global.sliceUpwards;
+    if (sliceUpwards) {
         std::sort(order_to_output. begin(), order_to_output. end(), comparator);
     } else {
         std::sort(order_to_output.rbegin(), order_to_output.rend(), comparator);
@@ -450,8 +457,72 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
         output[i].mapOutputToInput = ii;
         output[i].z = input[ii].z;
         output[i].ntool = input[ii].ntool;
+        output[i].numSlicesRequiringThisOne = 0;
         input[ii].mapInputToOutput = i;
         ++num_output_by_tool[output[i].ntool];
+    }
+    if (tm.spec->global.anyDifferentiateSurfaceInfillings) {
+        typedef struct MinMax { double min, max, extent; MinMax(double mn, double mx, double factor) : min(mn), max(mx), extent((mx-mn)*factor) {} } MinMax;
+        std::vector<MinMax> minmaxzs;
+        size_t numouts = output.size();
+        minmaxzs.reserve(numouts);
+        for (auto &out : output) {
+            int ntool   = out.ntool;
+            double minz = out.z - tm.spec->pp[ntool].profile->applicationPoint;
+            double maxz = out.z + tm.spec->pp[ntool].profile->remainder;
+            minmaxzs.emplace_back(minz, maxz, tm.spec->pp[ntool].differentiateSurfaceFactor);
+        }
+        //helpers to parametrize subloop direction (either downwards or upwards)
+        int  for_inits[]      = {-1, +1};
+        bool loop_is_upwards;
+        auto loop_termination = [&loop_is_upwards, numouts](int  idx) { return loop_is_upwards ? idx < numouts : idx >= 0; };
+        auto loop_next        = [&loop_is_upwards]         (int &idx) { if    (loop_is_upwards) { ++idx; } else { --idx; } };
+        for (int k = 0; k < numouts; ++k) {
+            int ntool = output[k].ntool;
+            auto &ppspec = tm.spec->pp[ntool];
+            if (ppspec.differentiateSurfaceInfillings) {
+                //add the slices required to compute internal / external surfaces needed for this slice: first slices below, then slices above
+                //the code structure is almost identical for both cases (below and above), but it it has enough differences to make it quite
+                //confusing if we want to refactor them as a single loop parameterized on some intial values and conditions
+                
+                //try to add slices below. When sliceUpwards is true, the subloop is downwards, and vice versa
+                loop_is_upwards = !sliceUpwards;
+                double floor = minmaxzs[k].min - minmaxzs[k].extent;
+                for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
+                    bool different_ntool = ntool!=output[kk].ntool;
+                    //do not use slices from different tools if instructed to do so
+                    if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
+                    //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
+                    if (different_ntool && ((minmaxzs[kk].max - minmaxzs[k].min) > minmaxzs[k].extent)) continue;
+                    //keep adding slices while they are not too below us
+                    if (minmaxzs[kk].max > floor) {
+                        output[k].requiredContoursForPhase2.push_back(kk);
+                        ++output[kk].numSlicesRequiringThisOne;
+                    } else {
+                        break;
+                    }
+                }
+                
+                //try to add slices above. When sliceUpwards is true, the subloop is upwards, and vice versa
+                loop_is_upwards = sliceUpwards;
+                double ceil = minmaxzs[k].max + minmaxzs[k].extent;
+                for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
+                    bool different_ntool = ntool!=output[kk].ntool;
+                    //do not use slices from different tools if instructed to do so
+                    if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
+                    //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
+                    if (different_ntool && ((minmaxzs[k].max - minmaxzs[kk].min) > minmaxzs[k].extent)) continue;
+                    //keep adding slices while they are not too above us
+                    if (minmaxzs[kk].min < ceil) {
+                        output[k].requiredContoursForPhase2.push_back(kk);
+                        ++output[kk].numSlicesRequiringThisOne;
+                    } else {
+                        break;
+                    }
+                }
+                
+            }
+        }
     }
 }
 
@@ -595,8 +666,12 @@ void SimpleSlicingScheduler::removeUnrequiredData(double z) {
         /*why use factor 2.1: sometimes, a slice of ntool>0 will be scheduled *after*
         the immediately higher slice of ntool==0. As a result, it is important to avoid
         discarding slices up to two previous slices of ntool==0. Using 2.1 is to be on
-        the safe side regarding to round-off errors.*/
-        double zlimit = z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
+        the safe side regarding to round-off errors.. But we use 4.1:
+                -add 1 because weird things may happen if applicationPoint is not in the
+                 middle for some tool
+                -add 1 because computing surface toolpaths in phase 2 require feedback
+                 from previously computed contours in phase 1*/
+        double zlimit = z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 4.1 : -4.1);
         rm.removeUsedRawSlices();
         tm.removeAdditionalContoursPastZ(zlimit);
         tm.removeUsedSlicesPastZ(zlimit, output);
@@ -616,15 +691,13 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
             auto &this_output = output[this_output_idx];
             
             has_err = !tm.processSlicePhase1(*raw, z, input[input_idx].ntool, this_output_idx, this_output.result);
-            this_output.requiredContoursForPhase2.clear();
             rm.auxRawSlice.clear();
             if (has_err) {
                 err = tm.err;
                 ok  = false;
                 break;
             }
-            bool computePhase2Now = this_output.requiredContoursForPhase2.empty();
-            if (computePhase2Now) {
+            if (this_output.requiredContoursForPhase2.empty()) {
                 has_err = !tm.processSlicePhase2(*this_output.result);
                 if (has_err) {
                     err = tm.err;
@@ -663,6 +736,7 @@ bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
             err = tm.err;
             ok = false;
         }
+        output[result.idx].computed = true;
     }
     return ok;
 }
@@ -682,53 +756,9 @@ bool SimpleSlicingScheduler::processReadySlicesPhase2() {
 
 void SimpleSlicingScheduler::computeNextInputSlices() {
 //temporal arrangement until we are ready to drop the old method implementation
-const bool newmode = true;
-if (newmode) {
     if(!processReadyRawSlices()) return;
-    if (false) processReadySlicesPhase2();
+    if (tm.spec->global.anyDifferentiateSurfaceInfillings) processReadySlicesPhase2();
     return;
-}
-    while (true) {
-        if (rm.rawReady((int)input_idx)) {
-            int idx_raw = input[input_idx].mapInputToRaw;
-            clp::Paths *raw = rm.getRawContour(idx_raw, (int)input_idx);
-            if (raw == NULL) break;
-            double z = rm.raw[idx_raw].z;
-            has_err = !tm.multislice(*raw, z, input[input_idx].ntool, input[input_idx].mapInputToOutput);
-            rm.auxRawSlice.clear();
-            if (has_err) {
-                err = tm.err;
-                break;
-            }
-            output[input[input_idx].mapInputToOutput].computed = true;
-            //delete slices ONLY if they have been used AND are way below the current input slice
-            //WARNING: THIS RELIES ON A SPECIFIC CALL PATTERN TO receiveNextInputSlice() and giveNextOutputSlice() to work correctly!!!!!
-            /*         the call pattern is a loop doing:
-            while (not_all_input_slices_have_been_sent) {
-            receiveNextInputSlice();
-            while (there_are_available_output_slices) {
-            giveNextOutputSlice();
-            }
-            }*/
-            if (removeUnused && (tm.spec->global.schedMode!=ManualScheduling) ){//&& (input[input_idx].ntool == 0)) {
-                bool sliceUpwards = tm.spec->global.sliceUpwards;
-                /*why use factor 3.1: sometimes, a slice of ntool>0 will be scheduled *after*
-                the immediately higher slice of ntool==0. As a result, it is important to avoid
-                discarding slices up to two previous slices of ntool==0. Using 2.1 is to be on
-                the safe side regarding to round-off errors. But we use 3.1 (adding 1) because
-                weird things may happen if applicationPoint is not in the middle for some tool*/
-                //TODO: we have all the information needed to decided what raw/previous/additional slices are required to compute each slice, so we could write a rule engine to schedule the removal of slices exactly when we know they are not needed again!
-                double zlimit = input[input_idx].z - tm.spec->pp[0].profile->sliceHeight * (sliceUpwards ? 2.1 : -2.1);
-                tm.removeUsedSlicesPastZ(zlimit, output);
-                tm.removeAdditionalContoursPastZ(zlimit);
-                rm.removeUsedRawSlices();
-            }
-            ++input_idx;
-            if (input_idx >= input.size()) break;
-        } else {
-            break;
-        }
-    }
 }
 
 //this method will return slices in the intended ordering, if available

@@ -99,11 +99,11 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
     po::options_description opts("Slicing engine options (global)");
     opts.add_options()
         ("save-contours",
-            "If this option is specified, the processed and raw contours will be provided as output (in addition to the perimeter and infilling toolpaths)")
+            "If this option is specified, the processed and raw contours will be provided as output (in addition to the toolpaths)")
         ("correct-input",
             "If this option is specified, the orientation of raw contours will be corrected. Useful if the raw contours are not generated with Slic3r::TriangleMeshSlicer")
         ("motion-planner",
-            "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular perimeter entry points). Please note: All perimeters are planned first, and then all infillings. If you want to apply motion planning to perimeters and infillings together, set the per-process option lump-all-toolpaths-together.")
+            "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular perimeter entry points). Please note: perimeters, surfaces and infillings are planned independently and sequentially. If you want to apply motion planning to perimeters, surfaces and infillings together, set the per-process options lump-*.")
         ("subtractive-box-mode",
             po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"),
             "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
@@ -134,7 +134,7 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
             "If addsub mode is activated, high-res details should be processed in process 0. This option applies a morphological closing before any other operation to contours for the first process, with the idea of overwriting all high-res negative details, which should be re-created later by other processes. The value is the radius of the dilation in mesh file units x 1000 (the factor can be modified in the config file), and it can be tuned to make the operation to overwrite more or less negative details.")
         ("overwrite-gradual",
             po::value<std::vector<double>>()->multitoken()->value_name("[rad_1 inf_1 rad_2 inf_2 ...]"),
-            "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The members of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. As more steps are used, the overwriting is more gradual, but also more expensive to compute. The fastest setting is to use just the pair 0 1; while this creates very smooth perimeter toolpaths (w.r.t. more complex pair sequences), it also generates really big overwrites everywhere. For geometries with long protusions that are narrow at the base, the first pairs should add up substantially over 1, in order to be able to overwrite these protusions (unfortunately, this may result in subtle small overwritings elsewhere). The longer the pair sequence, the less overwriting is generated. In general, this option is quite versatile, but may require a trial-and-error process to settle on a pair sequence that works correctly for some geometries. PLEASE NOTE: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius)")
+            "If addsub mode is activated, high-res details should be processed in process 0. This option overwrites high-res positive details trying to minimize the overwritten area. Values are given as pairs of factors in the range [0,1] of the radius of the process 0 (or twice the radius, if clearance is being used). The first elements of the pairs are widths and should decrease in the range (1,0], while the second elements are inflation ratios and should increase in the range [0,1]. The members of each pair should add up to at least 1. In effect, the sequence of pairs determines a sequence of partially inflated segments. As more steps are used, the overwriting is more gradual, but also more expensive to compute. The fastest setting is to use just the pair 0 1; while this creates very smooth perimeter toolpaths (w.r.t. more complex pair sequences), it also generates really big overwrites everywhere. For geometries with long protusions that are narrow at the base, the first pairs should add up substantially over 1, in order to be able to overwrite these protusions (unfortunately, this may result in subtle small overwritings elsewhere). The longer the pair sequence, the less overwriting is generated. In general, this option is quite versatile, but may require a trial-and-error process to settle on a pair sequence that works correctly for some geometries. PLEASE NOTE: using this option renders unnecessary the use of --medialaxis-radius (but not --infill-medialaxis-radius or --surface-infill-medialaxis-radius)")
         ("feedback",
             po::value<std::vector<std::string>>()->multitoken(),
             "If the first manufacturing process has low fidelity (thus, effectively containing errors at high-res), we need as feedback the true manufactured shape, up to date. With this option, the feedback can be provided offline (i.e., low-res processes have been computed and carried out before using offline feedback). This option takes two values. The first is the format of the feedback file: either 'mesh' (stl) or 'paths' (*.paths format). The second is the feedback file name itself.")
@@ -142,6 +142,45 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
     if (useNano==YesAddNano)         nanoOptionsGenerator<true>(opts);
     if (useRP  ==YesAddResponseFile)      addResponseFileOption(opts);
     return opts;
+}
+
+#define MODE_INFILL  true
+#define MODE_SURFACE false
+#define PREFIX_INFILL  "infill"
+#define PREFIX_SURFACE "surface-infill"
+#define PREFIXINFILLNAME(X) (MODE_IS_INFILLING ? PREFIX_INFILL X : PREFIX_SURFACE X)
+
+template<bool MODE_IS_INFILLING> void infillingOptions(po::options_description &opts) {
+    opts.add_options()
+        (PREFIXINFILLNAME(""),
+            po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"),
+            MODE_IS_INFILLING ?
+                "This option enables infillings. If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled). There is a series of additional options --infill-*, described below" 
+              : "External surfaces are defined as the subset of each slice which is not covered both above and below by other slices that are close in Z. This option is exactly the same as --infill, with a set of additional options --surface-infill-*, but specifies the infilling for the parts of the slices that are external according to the preceding definition). If this option is not specified, no distinction is made between external and internal parts (all are infilled with the same parameters).")
+        (PREFIXINFILLNAME("-maxconcentric"),
+            po::value<int>()->value_name("max"),
+            MODE_IS_INFILLING ?
+                "If '--" PREFIX_INFILL  " concentric' is specified, its value is the maximum number of concentric perimeters that are generated"
+              : "If '--" PREFIX_SURFACE " concentric' is specified, its value is the maximum number of concentric perimeters that are generated")
+        (PREFIXINFILLNAME("-lineoverlap"),
+            po::value<double>()->default_value(0.001)->value_name("ratio"),
+            MODE_IS_INFILLING ?
+                "This is the ratio of overlapping between lines, if --" PREFIX_INFILL  " (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value."
+              : "This is the ratio of overlapping between lines, if --" PREFIX_SURFACE " (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value.")
+        (PREFIXINFILLNAME("-byregion"),
+            MODE_IS_INFILLING ?
+                "If specified, and --" PREFIX_INFILL  " (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_INFILL  "-static-mode is specified, this option is ignored."
+              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_SURFACE "-static-mode is specified, this option is ignored.")
+        (PREFIXINFILLNAME("-static-mode"),
+            MODE_IS_INFILLING ?
+                "If specified, and --" PREFIX_INFILL  " (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_INFILL  "-lineoverlap). This option overrides --" PREFIX_INFILL  "-byregion."
+              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_SURFACE "-lineoverlap). This option overrides --" PREFIX_SURFACE "-byregion.")
+        (PREFIXINFILLNAME("-medialaxis-radius"),
+            po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
+            MODE_IS_INFILLING ?
+                "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --" PREFIX_INFILL  " and --infilling-recursive are specified"
+              : "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --" PREFIX_SURFACE " and --infilling-recursive are specified")
+        ;
 }
 
 po::options_description perProcessOptionsGenerator(AddNano useNano) {
@@ -152,9 +191,9 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers.")
         ("no-preprocessing",
             po::value<double>()->implicit_value(0.0)->value_name("rad"),
-            "If specified, the raw contours are not pre-processed before generating the perimeter and infilling toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
+            "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("no-toolpaths",
-            "If specified, the perimeter and infilling toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
+            "If specified, the toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
         ("voxel-profile",
             po::value<std::string>()->value_name("(constant|ellipsoid)"),
             "required if slicing-scheduler or slicing-manual are specified: the voxel profile can be either 'constant', 'ellipsoid', 'interpolated'")
@@ -181,7 +220,7 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("safestep",
             "If specified, and gridstep is specified, the engine tries to minimize the resolution loss caused by snapping")
         ("clearance",
-            "If specified, the current process is computed such that perimeter and infilling toolpaths cannot overlap")
+            "If specified, the current process is computed such that toolpaths cannot overlap")
         ("smoothing",
             po::value<double>()->value_name("length"),
             "If snap is not specified and clearance is not specified for the current process, this MUST be specified, and it is the smoothing radius for the computed contours")
@@ -194,29 +233,27 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("medialaxis-radius",
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             "If specified, it is a series of factors in the range 0.0-1.0. The following algorithm is applied for each factor: toolpaths following the medial axis of the contours are generated in regions of the raw contours that are not covered by the processed contours, in order to minimize such non-covered regions. The lower the factor, the more likely the algorithm is to add a toolpath.")
-        ("infill",
-            po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"),
-            "If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled)")
-        ("infill-perimeter-overlap",
+        ;
+    infillingOptions<MODE_INFILL> (opts);
+    infillingOptions<MODE_SURFACE>(opts);
+    opts.add_options()
+        ("compute-surfaces-just-with-same-process",
+            po::value<bool>()->default_value(true)->value_name("true|false"),
+            "If --surface-infill is specified, this flag is used to compute the distinction between external and internal parts of a slice. If this flag is false, external parts are those which are not covered both above and below by other slices of any process that are close in Z. If it is true, only nearby slices of the same process are taken into account.")
+        ("compute-surfaces-extent-factor",
+            po::value<double>()->default_value(0.1)->value_name("ratio"),
+            "If --surface-infill is specified, this option is used to compute the distinction between external and internal parts of a slice. The external parts of the slice are computed as those which are not covered both above and below by other slices that are close in Z. Each slice takes up an extent in Z, depending on its process (i.e., it exists in a well defined range of Z values). A slice is defined to be close in Z to the slice for which the external parts are being computed, if the separation of their extents in Z is less than the extent of the second slice times the value of this option.")
+        ("infilling-perimeter-overlap",
             po::value<double>()->default_value(0.7)->value_name("ratio"),
-            "This is the ratio of overlapping between the perimeter toolpath and the inner infilling toolpaths. This only has effect if 'clearance' is not specified and 'radius-removecommon is 0")
-        ("infill-maxconcentric",
-            po::value<int>()->value_name("max"),
-            "If '--infill concentric' is specified, its value is the maximum number of concentric perimeters that are generated")
-        ("infill-lineoverlap",
-            po::value<double>()->default_value(0.001)->value_name("ratio"),
-            "This is the ratio of overlapping between lines, if --infill (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value.")
-        ("infill-byregion",
-            "If specified, and --infill (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --infill-static-mode is specified, this option is ignored.")
-        ("infill-static-mode",
-            "If specified, and --infill (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --infill-lineoverlap). This option overrides --infill-byregion.")
-        ("infill-recursive",
-            "If specified, infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (useful only for --infill (linesh|linesv|concentric))")
-        ("infill-medialaxis-radius",
-            po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
-            "Same as medialaxis-radius, but applied to regions not covered by infillings inside processed contours, if --infill and --infill-recursive are specified")
+            "This is the ratio of overlapping between the perimeter toolpath and the inner infilling/surface infilling toolpaths (i.e., this option is common to infillings specified with --infill and --surface-infill). This only has effect if --clearance is not specified and --radius-removecommon is 0")
+        ("infilling-recursive",
+            "If specified, infilling/surface-infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (not useful for value justcontour in --infill or --surface-infill). This option is common to infillings specified with --infill and --surface-infill")
+        ("lump-surfaces-to-perimeters",
+            "Perimeters and surfaces are toolpaths, but each one is output separately. However, if this option is specified, all surfaces will be lumped together with the perimeters for this tool. This happens *before* motion planning is applied.")
+        ("lump-surfaces-to-infillings",
+            "Infillings and surfaces are toolpaths, but each one is output separately. However, if this option is specified, all surfaces will be lumped together with the infillings for this tool. This happens *before* motion planning is applied.")
         ("lump-all-toolpaths-together",
-            "Perimeters and infillings are toolpaths, but each one is output separately, to enable possible optimizations in the printing of the infillings (which do not need to be as accurate as perimeters). However, if this option is specified, all infillings will be lumped together with the perimeters for this tool, and all will be output as perimeters (even if they are infillings). This happens *before* motion planning is applied, so in that case motion planning is applied to all toolpaths together.")
+            "Perimeters, surfaces and infillings are toolpaths, but each one is output separately, to enable possible optimizations in the printing of the infillings (which do not need to be as accurate as perimeters). However, if this option is specified, all infillings will be lumped together with the perimeters for this tool, and all will be output as perimeters (even if they are infillings). This happens *before* motion planning is applied, so in that case motion planning is applied to all toolpaths together. This option overrides the --lump-surfaces-to-* options.")
         ;
     if (useNano==YesAddNano) nanoOptionsGenerator<false>(opts);
     return opts;
@@ -697,6 +734,31 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
     }
 }
 
+template<bool MODE_IS_INFILLING> bool parseInfilling(int k, InfillingSpec &ispec, po::variables_map &vm) {
+    bool useit  = vm.count(PREFIXINFILLNAME(""))  != 0;
+    if (useit) {
+        const std::string & val = vm[PREFIXINFILLNAME("")].as<std::string>();
+        if      (val.compare("concentric")  == 0) ispec.infillingMode = InfillingConcentric;
+        else if (val.compare("linesh")      == 0) ispec.infillingMode = InfillingRectilinearH;
+        else if (val.compare("linesv")      == 0) ispec.infillingMode = InfillingRectilinearV;
+        else if (val.compare("justcontour") == 0) ispec.infillingMode = InfillingJustContours;
+        else                                      throw po::error(str("For process ", k, ": invalid --", PREFIXINFILLNAME(""), " mode: ", val));
+        ispec.infillingLineOverlap       = vm[PREFIXINFILLNAME("-lineoverlap")].as<double>();
+        ispec.infillingWhole             = vm.count(PREFIXINFILLNAME("-byregion"))     == 0;
+        ispec.infillingStatic            = vm.count(PREFIXINFILLNAME("-static-mode"))  != 0;
+        ispec.useMaxConcentricRecursive  = (ispec.infillingMode == InfillingConcentric) && (vm.count(PREFIXINFILLNAME("-maxconcentric")) != 0);
+        if (ispec.useMaxConcentricRecursive) {
+            ispec.maxConcentricRecursive = vm[PREFIXINFILLNAME("-maxconcentric")].as<int>();
+        }
+        if (vm.count(PREFIXINFILLNAME("-medialaxis-radius"))) {
+            ispec.medialAxisFactorsForInfillings = std::move(vm[PREFIXINFILLNAME("-medialaxis-radius")].as<std::vector<double>>());
+        }
+    } else {
+        ispec.infillingMode = InfillingNone;
+    }
+    return useit;
+}
+
 //this method CANNOT be called until parseGlobal has been called
 void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variables_map &vm ) {
     bool doscale = factors.doparamscale;
@@ -704,7 +766,16 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
 
     spec.pp[k].radiusRemoveCommon = (clp::cInt)getScaled(vm["radius-removecommon"].as<double>(), scale, doscale);
 
-    spec.pp[k].lumpToolpathsTogether = vm.count("lump-all-toolpaths-together") != 0;
+    spec.pp[k].lumpToolpathsTogether    = vm.count("lump-all-toolpaths-together") != 0;
+    spec.pp[k].lumpSurfacesToPerimeters = vm.count("lump-surfaces-to-perimeters") != 0;
+    spec.pp[k].lumpSurfacesToInfillings = vm.count("lump-surfaces-to-infillings") != 0;
+    if (spec.pp[k].lumpSurfacesToPerimeters && spec.pp[k].lumpSurfacesToInfillings) {
+        throw po::error(str("Cannot specify --lump-surfaces-to-perimeters and --lump-surfaces-to-infillings together for process ", k));
+    }
+    if (spec.pp[k].lumpToolpathsTogether) {
+        spec.pp[k].lumpSurfacesToPerimeters = 
+        spec.pp[k].lumpSurfacesToInfillings = false;
+    }
 
     bool radxpresent = vm.count("radx") != 0;
     if (radxpresent) {
@@ -823,29 +894,21 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
     }
 
-    bool useinfill = vm.count("infill") != 0;
-    if (useinfill) {
-        const std::string & val = vm["infill"].as<std::string>();
-        if      (val.compare("concentric")  == 0) spec.pp[k].infillingMode = InfillingConcentric;
-        else if (val.compare("linesh")      == 0) spec.pp[k].infillingMode = InfillingRectilinearH;
-        else if (val.compare("linesv")      == 0) spec.pp[k].infillingMode = InfillingRectilinearV;
-        else if (val.compare("justcontour") == 0) spec.pp[k].infillingMode = InfillingJustContours;
-        else                                      throw po::error(str("For process ", k, ": invalid infill mode: ", val));
-        spec.pp[k].infillingPerimeterOverlap  = vm["infill-perimeter-overlap"].as<double>();
-        spec.pp[k].infillingLineOverlap       = vm["infill-lineoverlap"]      .as<double>();
-        spec.pp[k].infillingRecursive         = vm.count("infill-recursive")    != 0;
-        spec.pp[k].infillingWhole             = vm.count("infill-byregion")     == 0;
-        spec.pp[k].infillingStatic            = vm.count("infill-static-mode")  != 0;
-        spec.pp[k].useMaxConcentricRecursive  = (spec.pp[k].infillingMode == InfillingConcentric) && (vm.count("infill-maxconcentric") != 0);
-        if (spec.pp[k].useMaxConcentricRecursive) {
-            spec.pp[k].maxConcentricRecursive = vm["infill-maxconcentric"].as<int>();
-        }
-        if (vm.count("infill-medialaxis-radius")) {
-            spec.pp[k].medialAxisFactorsForInfillings = std::move(vm["infill-medialaxis-radius"].as<std::vector<double>>());
-        }
-    } else {
-        spec.pp[k].infillingMode = InfillingNone;
+    bool useinfill  = parseInfilling<MODE_INFILL> (k, spec.pp[k].internalInfilling, vm);
+    bool usesurface = parseInfilling<MODE_SURFACE>(k, spec.pp[k]. surfaceInfilling, vm);
+    if (!useinfill && usesurface) {
+        throw po::error(str("For process ", k, ": if --surface-infill is specified, --infill MUST ALSO be specified!!!!"));
     }
+    if (usesurface && !spec.global.useScheduler) {
+        throw po::error(str("For process ", k, ": --surface-infill cannot be used if global option --slicing-uniform was specified!!!!"));
+    }
+    if (useinfill || usesurface) {
+        spec.pp[k].infillingPerimeterOverlap  = vm["infilling-perimeter-overlap"].as<double>();
+        spec.pp[k].infillingRecursive         = vm.count("infilling-recursive")    != 0;
+    }
+    spec.pp[k].differentiateSurfaceInfillings = usesurface;
+    spec.pp[k].differentiateSurfaceFactor                         = vm["compute-surfaces-extent-factor"].as<double>();
+    spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool = vm["compute-surfaces-just-with-same-process"].as<bool>();
 }
 
 void ParserLocalAndGlobal::setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin) {

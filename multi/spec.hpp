@@ -66,6 +66,7 @@ typedef struct GlobalSpec {
     //not mean to be read from the command line (for internal use)
     bool substractiveOuter;
     clp::cInt outerLimitX, outerLimitY;
+    bool anyDifferentiateSurfaceInfillings;
     GlobalSpec(std::shared_ptr<Configuration> _config) : config(std::move(_config)) {}
 } GlobalSpec;
 
@@ -139,6 +140,19 @@ GLOBAL AND LOCAL PARAMETERS
 
 enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearV, InfillingRectilinearH };
 
+typedef struct InfillingSpec {
+    std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
+    InfillingMode infillingMode;     //how to deal with infillings
+    bool CUSTOMINFILLINGS;
+    bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
+    bool infillingStatic;            //if infilling is rectilinear, this flag decides if the bounding box is static (global) or computed as specified by flag infillingWhole
+    bool useMaxConcentricRecursive;  //flag to decide if maxConcentricRecursive is used
+    int maxConcentricRecursive;      //maximum number of concentric infillings
+    double infillingLineOverlap;     //ratio to determine the overlapping between lines if we are using line infills
+    void computeCUSTOMINFILLINGS();
+
+} InfillingSpec;
+
 typedef struct PerProcessSpec {
     //required parameters (replicated for each resolution)
     clp::cInt radius;                // radius of the tool
@@ -151,19 +165,21 @@ typedef struct PerProcessSpec {
     bool      applysnap;             // flag to snap to grid
     bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
     bool      addInternalClearance;  // make sure that the toolpath is smooth enough to not write over itself
-    bool      lumpToolpathsTogether; //instad of outputting perimeters and infillings separately, lump all them as perimeters
-    std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
-    std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
-    InfillingMode infillingMode;     //how to deal with infillings
-    bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
-    bool infillingStatic;            //if infilling is rectilinear, this flag decides if the bounding box is static (global) or computed as specified by flag infillingWhole
-    bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
-    bool doPreprocessing;            //flag to decide if preprocessing may be applied
-    bool useMaxConcentricRecursive;  //flag to decide if maxConcentricRecursive is used
-    int maxConcentricRecursive;      //maximum number of concentric infillings
-    double infillingPerimeterOverlap;//ratio to determine the overlapping between contours and infillings under some circumstances
-    double infillingLineOverlap;     //ratio to determine the overlapping between lines if we are using line infills
+    bool      lumpToolpathsTogether; //instead of outputting perimeters and infillings separately, lump all them as perimeters
+    bool      lumpSurfacesToPerimeters;
+    bool      lumpSurfacesToInfillings;
+    bool      doPreprocessing;       //flag to decide if preprocessing may be applied
     double noPreprocessingOffset;    //if no preprocessing is done, a morphological opening is done with this value
+    std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
+    
+    InfillingSpec internalInfilling;
+    InfillingSpec  surfaceInfilling;
+    
+    double infillingPerimeterOverlap;//ratio to determine the overlapping between contours and infillings under some circumstances
+    double differentiateSurfaceFactor;
+    bool computeDifferentiationOnlyWithContoursFromSameTool;
+    bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
+    bool differentiateSurfaceInfillings;
 
     std::shared_ptr<VerticalProfile> profile;
 
@@ -178,6 +194,9 @@ typedef struct PerProcessSpec {
     double    shiftY;
     bool      useRadiusRemoveCommon;
     bool      higherProcessUsesRadiusRemoveCommon;
+    bool any_CUSTOMINFILLINGS;
+    bool any_InfillingJustContours;
+    bool any_isnot_InfillingNone;
 
     SnapToGridSpec snapspec;
 

@@ -3,6 +3,13 @@
 #include <algorithm>
 #include <limits>
 
+void InfillingSpec::computeCUSTOMINFILLINGS() {
+    CUSTOMINFILLINGS = (infillingMode == InfillingConcentric)   ||
+                       (infillingMode == InfillingRectilinearH) ||
+                       (infillingMode == InfillingRectilinearV);
+}
+
+
 bool MultiSpec::validate() {
     //do not validate anything for now
     return true;
@@ -14,9 +21,19 @@ bool MultiSpec::validate() {
 //the logic implemented here to initialize the parameters is intimately intertwined with multiliscing code
 std::string MultiSpec::populateParameters() {
     std::string result;
+    global.anyDifferentiateSurfaceInfillings = false;
     for (size_t k = 0; k<numspecs; ++k) {
+        
+        global.anyDifferentiateSurfaceInfillings = global.anyDifferentiateSurfaceInfillings || pp[k].differentiateSurfaceInfillings;
+        
         pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
         anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;
+
+        pp[k].internalInfilling.computeCUSTOMINFILLINGS();
+        pp[k]. surfaceInfilling.computeCUSTOMINFILLINGS();
+        pp[k].any_CUSTOMINFILLINGS      =  pp[k].internalInfilling.CUSTOMINFILLINGS                        ||  pp[k].surfaceInfilling.CUSTOMINFILLINGS;
+        pp[k].any_InfillingJustContours = (pp[k].internalInfilling.infillingMode == InfillingJustContours) || (pp[k].surfaceInfilling.infillingMode == InfillingJustContours);
+        pp[k].any_isnot_InfillingNone   = (pp[k].internalInfilling.infillingMode != InfillingNone)         || (pp[k].surfaceInfilling.infillingMode != InfillingNone);
 
         if (!pp[k].applysnap) continue;
 
@@ -59,6 +76,15 @@ std::string MultiSpec::populateParameters() {
     pp[numspecs - 1].higherProcessUsesRadiusRemoveCommon = false;
     for (int k = (int)numspecs - 2; k >= 0; k--) {
         pp[k].higherProcessUsesRadiusRemoveCommon = pp[k+1].higherProcessUsesRadiusRemoveCommon || pp[k+1].useRadiusRemoveCommon;
+    }
+    
+    //to have sane defaults, just in case some downstream code does not test for pp[k].differentiateSurfaceInfillings
+    if (global.anyDifferentiateSurfaceInfillings) {
+        for (size_t k = 0; k<numspecs; ++k) {
+            if (!pp[k].differentiateSurfaceInfillings) {
+                pp[k].surfaceInfilling = pp[k].internalInfilling;
+            }
+        }
     }
 
     //initialize also global parameters

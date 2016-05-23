@@ -12,7 +12,7 @@ typedef struct SingleProcessOutput {
     std::string err;
     clp::Paths contours;
     clp::Paths contoursToShow;
-    clp::Paths ptoolpaths, itoolpaths;
+    clp::Paths ptoolpaths, stoolpaths, itoolpaths;
     clp::Paths infillingAreas;
     clp::Paths medialAxis_toolpaths;
     clp::Paths contours_withexternal_medialaxis;
@@ -22,10 +22,8 @@ typedef struct SingleProcessOutput {
     bool alsoInfillingAreas;
     bool phase1complete;
     bool phase2complete;
-    bool perimeterMedialAxesHaveBeenAdded;
-    bool infillingMedialAxesHaveBeenAdded;
     bool contours_withexternal_medialaxis_used;
-    SingleProcessOutput() : alsoInfillingAreas(false), phase1complete(false), phase2complete(false), perimeterMedialAxesHaveBeenAdded(false), infillingMedialAxesHaveBeenAdded(false), contours_withexternal_medialaxis_used(false) {};
+    SingleProcessOutput() : alsoInfillingAreas(false), phase1complete(false), phase2complete(false), contours_withexternal_medialaxis_used(false) {};
 #ifdef __GNUC__ //avoid annoying GCC warning about "defaulted move assignment for ResultSingleTool calls a non-trivial move assignment operator for virtual base "SingleProcessOutput" 
     SingleProcessOutput(SingleProcessOutput &&x) = default;
 #endif
@@ -99,7 +97,7 @@ template<typename Output, typename Input> void ClippingResources::offsetDo(Outpu
 }
 inline bool ClippingResources::AddPaths(clp::Path  &path,  clp::PolyType pt, bool closed) { return clipper.AddPath (path,  pt, closed); }
 inline bool ClippingResources::AddPaths(clp::Paths &paths, clp::PolyType pt, bool closed) { return clipper.AddPaths(paths, pt, closed); }
-inline int ClippingResources::AddPaths(std::vector<clp::Paths> &pathss, clp::PolyType pt, bool closed) {
+inline int  ClippingResources::AddPaths(std::vector<clp::Paths> &pathss, clp::PolyType pt, bool closed) {
     int firstbad = -1;
     for (auto paths = pathss.begin(); paths != pathss.end(); ++paths) {
         //this way to report errors is to add all paths regardless of some intermediate one failing
@@ -123,14 +121,16 @@ class Infiller {
 public:
     std::shared_ptr<ClippingResources> res;
     Infiller(std::shared_ptr<ClippingResources> _res) : res(std::move(_res)) {}
-    bool processInfillings(size_t k, std::vector<clp::Paths> *_infillingsIndependentContours, clp::Paths &infillingAreas, clp::Paths &accumInfillingsHolder, clp::Paths &contoursToBeInfilled);
     void clear() { infillingsIndependentContours = NULL; accumInfillings = NULL; }
+    bool applyInfillings(size_t k, bool nextProcessSameKind, InfillingSpec &infillingSpec, std::vector<clp::Paths> &perimetersIndependentContours, clp::Paths &infillingAreas, std::vector<clp::Paths> *_infillingsIndependentContours, clp::Paths &accumInfillingsHolder);
 protected:
     //state variables for infilling algorithms (necessary because of recursive implementations, to avoid passing an awful lot of context in each stack frame)
     double infillingRadius, erodedInfillingRadius; bool infillingUseClearance, infillingRecursive; int numconcentric;
     clp::cInt globalShift; bool useGlobalShift;
+    clp::Paths AUX;
     clp::Paths *accumInfillings;
     std::vector<clp::Paths> *infillingsIndependentContours;
+    bool processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec &infillingSpec, clp::Paths &infillingAreas, clp::Paths &accumInfillingsHolder);
     bool applySnapConcentricInfilling; SnapToGridSpec concentricInfillingSnapSpec; //this is state for the recursive call to processInfillingsConcentricRecursive
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
     void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, bool horizontal);
@@ -140,19 +140,16 @@ class Multislicer {
 protected:
     Infiller infiller;
     //these variables are here to avoid recurring std::vector growing costs, but they are not intended to be used directly, but aliased as method parameters
-    clp::Paths AUX1, AUX2, AUX3, AUX4, accumInfillingsHolder;
+    clp::Paths AUX1, AUX2, AUX3, AUX4, accumInfillingsHolder, accumInfillingsHolderSurface;
 public:
     std::shared_ptr<ClippingResources> res;
     Multislicer(std::shared_ptr<ClippingResources> _res) : infiller(_res), res(std::move(_res)) { }
-    void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear(); infiller.clear(); }
+    void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear(); accumInfillingsHolderSurface.clear(); infiller.clear(); }
     //first half of applyProcess()
     bool applyProcessPhase1(SingleProcessOutput &output, clp::Paths &contours_tofill, int k);
     //second half of applyProcess()
-    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths &contours_alreadyfilled, int k);
-    // contours_tofill is an in-out parameter, it starts with the contours to fill, it ends with the contours left 
-    //contours_alreadyfilled should already have been carved out from contours_tofill; it has to be provided as an additional argument just in case it is needed by the doDiscardCommonToolPaths sub-algorithm
+    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths *internalParts, clp::Paths &contours_alreadyfilled, int k);
     bool applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);
-    //ditto for applyProcess
     int applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int kinit = -1, int kend = -1);
 };
 

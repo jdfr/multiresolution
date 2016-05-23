@@ -271,7 +271,7 @@ bool RawSlicerManager::start(const char * fname) {
         return false;
     }
     
-    numRecords = fileheader.numRecords;
+    numRecords = (int)fileheader.numRecords;
 
     iop_f = IOPaths(f);
 
