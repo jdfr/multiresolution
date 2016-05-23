@@ -1,6 +1,5 @@
 #include "pathwriter_nanoscribe.hpp"
 #include "pathwriter_multifile.tpp"
-#include "apputil.hpp"
 
 template class PathWriterMultiFile<SimpleNanoscribePathWriter>;
 

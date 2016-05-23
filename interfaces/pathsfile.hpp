@@ -12,6 +12,28 @@
 FUNCTIONALITY TO READ/WRITE PATHSFILES
 *********************************************************/
 
+//simple type for using RAII with FILE*
+typedef struct FILEOwner {
+    FILE *f;
+    FILEOwner() : f(NULL) {}
+    FILEOwner(const char *fname, const char *mode) : f(fopen(fname, mode)) {}
+    ~FILEOwner()  { close(); }
+    bool isopen() { return f!=NULL; }
+    bool open(const char *fname, const char *mode) {
+        if (!close()) return false;
+        f = fopen(fname, mode);
+        return isopen();
+    }
+    bool close()   {
+        bool ret = true;
+        if (f != NULL) {
+            ret = fclose(f)==0;
+            f = NULL;
+        }
+        return ret;
+    }
+} FILEOwner;
+
 bool fileExists(const char *filename);
 
 //Returns NULL if it could not resolve the path. The returned string must be freed with free()
