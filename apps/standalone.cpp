@@ -824,7 +824,6 @@ int Main(int argc, const char** argv) {
                 while (1) {
                     if (sched.output_idx >= sched.output.size()) break;
                     std::shared_ptr<ResultSingleTool> single = sched.giveNextOutputSlice(); //this method will return slices in the ordering
-                    if (saveContours) results.push_back(single);
                     if (sched.has_err) {
                         fprintf(stderr, "Error in giveNextOutputSlice.1: %s\n", sched.err.c_str());
                         return -1;
@@ -834,8 +833,9 @@ int Main(int argc, const char** argv) {
                         fprintf(stderr, "Error in giveNextOutputSlice.2: %s\n", single->err.c_str());
                         return -1;
                     }
+                    if (saveContours) results.push_back(single);
                     printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
-                    double zscaled = single->z                          * factors.internal_to_input;
+                    double zscaled = single->z                           * factors.internal_to_input;
                     double rad     = multispec->pp[single->ntool].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
                         if (!pathwriter->writePaths(single->ptoolpaths, PATHTYPE_TOOLPATH_PERIMETER, rad, single->ntool, zscaled, factors.internal_to_input, false)) {
