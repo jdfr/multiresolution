@@ -6,7 +6,8 @@
 void InfillingSpec::computeCUSTOMINFILLINGS() {
     CUSTOMINFILLINGS = (infillingMode == InfillingConcentric)   ||
                        (infillingMode == InfillingRectilinearH) ||
-                       (infillingMode == InfillingRectilinearV);
+                       (infillingMode == InfillingRectilinearV) ||
+                       (infillingMode == InfillingRectilinearVH);
 }
 
 

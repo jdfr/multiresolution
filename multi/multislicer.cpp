@@ -409,7 +409,8 @@ bool Infiller::applyInfillings(size_t k, bool nextProcessSameKind, InfillingSpec
 
 bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec &ispec, clp::Paths &infillingAreas, clp::Paths &accumInfillingsHolder) {
     infillingRadius = (double)ppspec.radius;
-    erodedInfillingRadius = std::abs(infillingRadius*(1 - ispec.infillingLineOverlap));
+    erodedInfillingRadius    = std::abs(infillingRadius*(1 - ispec.infillingLineOverlap));
+    erodedInfillingRadiusBis = std::abs(infillingRadius*(1 - ispec.infillingLineOverlapBis));
     infillingUseClearance = ppspec.addInternalClearance;
     accumInfillings = &accumInfillingsHolder;
     infillingRecursive = ppspec.infillingRecursive || (!ispec.medialAxisFactorsForInfillings.empty());
@@ -428,14 +429,14 @@ bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec
             if (!processInfillingsConcentricRecursive(*hp)) return false;
         }
         break;
-    } case InfillingRectilinearV:
-      case InfillingRectilinearH:
-        bool horizontal = ispec.infillingMode == InfillingRectilinearH;
+    } case InfillingRectilinearH:
+      case InfillingRectilinearV:
+      case InfillingRectilinearVH:
         if (ispec.infillingStatic || ispec.infillingWhole) {
             BBox bb = getBB(infillingAreas);
             globalShift = 0; //promote to command line parameter if necessary
             useGlobalShift = ispec.infillingStatic;
-            processInfillingsRectilinear(ppspec, infillingAreas, bb, horizontal);
+            processInfillingsRectilinear(ppspec, infillingAreas, bb, ispec.infillingMode);
         } else {
             HoledPolygons hps;
             AddPathsToHPs(res->clipper, infillingAreas, hps);
@@ -445,7 +446,7 @@ bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec
                 subinfillings.clear();
                 BBox bb = getBB(*hp);
                 hp->moveToPaths(subinfillings);
-                processInfillingsRectilinear(ppspec, subinfillings, bb, horizontal);
+                processInfillingsRectilinear(ppspec, subinfillings, bb, ispec.infillingMode);
             }
         }
         break;
@@ -453,11 +454,8 @@ bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec
     return true;
 }
 
-void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, bool horizontal) {
+clp::Paths Infiller::computeClippedLines(BBox &bb, double erodedInfillingRadius, bool horizontal) {
     double epsilon_start = 0;// infillingRadius * 0.01; //do not start the lines exactly on the boundary, but a little bit past it
-    double epsilon_erode = infillingRadius * 0.01; //do not erode a full radius, but keep a small offset
-    double erode_value = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
-    clp::cInt minLineSize = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
     clp::cInt delta = (clp::cInt)(2 * erodedInfillingRadius);
     clp::cInt relevantMin = (horizontal ? bb.miny : bb.minx) + (clp::cInt)epsilon_start;
     clp::cInt relevantMax =  horizontal ? bb.maxy : bb.maxx;
@@ -480,10 +478,28 @@ void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &
             line.front().X = (accum++) * delta + shift;
         }
     }
+    return lines;
+}
+
+template<typename T, typename Fun> void erase_remove_idiom(std::vector<T> &vector, Fun predicate) {
+    vector.erase(std::remove_if(vector.begin(), vector.end(), predicate), vector.end());
+}
+
+void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingMode mode) {
+    double epsilon_erode    = infillingRadius * 0.01; //do not erode a full radius, but keep a small offset
+    double erode_value      = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
+    clp::cInt minLineSize   = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
+    bool horizontal         = mode == InfillingRectilinearH;
+    clp::Paths lines        = computeClippedLines(bb, erodedInfillingRadius,    horizontal);
+    if (mode == InfillingRectilinearVH) {
+        horizontal          = true;
+        clp::Paths linesBis = computeClippedLines(bb, erodedInfillingRadiusBis, horizontal);
+        MOVETO(linesBis, lines);
+    }
     if (erode_value != 0.0) {
-        clp::Paths aux;
-        res->offsetDo(aux, erode_value, infillingAreas, clp::jtRound, clp::etClosedPolygon);
-        res->clipper.AddPaths(aux, clp::ptClip, true);
+        res->offsetDo(AUX, erode_value, infillingAreas, clp::jtRound, clp::etClosedPolygon);
+        res->clipper.AddPaths(AUX, clp::ptClip, true);
+        AUX.clear();
     } else {
         res->clipper.AddPaths(infillingAreas, clp::ptClip, true);
     }
@@ -499,18 +515,18 @@ void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &
         verySimpleSnapPathsToGrid(lines, ppspec.snapspec);
     }
     //IMPORTANT: these lambdas test if the line distance is below the threshold. If diagonal lines are possible, a new lambda must be added to handle them!
-    if (horizontal) {
-        auto test = [minLineSize](clp::Path &line) {return std::abs(line.front().X - line.back().X) < minLineSize; };
-        lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
-    } else { //vertical
-        auto test = [minLineSize](clp::Path &line) {return std::abs(line.front().Y - line.back().Y) < minLineSize; };
-        lines.erase(std::remove_if(lines.begin(), lines.end(), test), lines.end());
+    if        (mode == InfillingRectilinearH) {
+        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().X - line.back().X) < minLineSize; });
+    } else if (mode == InfillingRectilinearV) {
+        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().Y - line.back().Y) < minLineSize; });
+    } else if (mode == InfillingRectilinearVH) {
+        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return (std::abs(line.front().X - line.back().X) < minLineSize) && (std::abs(line.front().Y - line.back().Y) < minLineSize); });
     }
     COPYTO(lines, *accumInfillings);
     if (infillingRecursive) {
         res->offsetDo(lines, infillingRadius, lines, clp::jtRound, clp::etOpenRound);
         MOVETO(lines, *infillingsIndependentContours);
-    }
+    }    
 }
 
 /* quite hard to get right: plenty of cases were it seems like the medial axis algorithm should be

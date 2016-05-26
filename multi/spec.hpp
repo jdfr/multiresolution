@@ -138,7 +138,7 @@ public:
 GLOBAL AND LOCAL PARAMETERS
 *********************************************************/
 
-enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearV, InfillingRectilinearH };
+enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearH, InfillingRectilinearV, InfillingRectilinearVH };
 
 typedef struct InfillingSpec {
     std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
@@ -149,6 +149,7 @@ typedef struct InfillingSpec {
     bool useMaxConcentricRecursive;  //flag to decide if maxConcentricRecursive is used
     int maxConcentricRecursive;      //maximum number of concentric infillings
     double infillingLineOverlap;     //ratio to determine the overlapping between lines if we are using line infills
+    double infillingLineOverlapBis;  // this is used for horizontal lines when infillingMode == InfillingRectilinearVH
     void computeCUSTOMINFILLINGS();
 
 } InfillingSpec;

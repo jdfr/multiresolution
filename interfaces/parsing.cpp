@@ -153,9 +153,9 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
 template<bool MODE_IS_INFILLING> void infillingOptions(po::options_description &opts) {
     opts.add_options()
         (PREFIXINFILLNAME(""),
-            po::value<std::string>()->value_name("(linesh|linesv|concentric|justcontour)"),
+            po::value<std::string>()->value_name("(linesh|linesv|linesvh|concentric|justcontour)"),
             MODE_IS_INFILLING ?
-                "This option enables infillings. If specified, the value must be either 'linesh'/'linesv' (infilling is done with horizontal/vertical lines), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled). There is a series of additional options --infill-*, described below" 
+                "This option enables infillings. If specified, the value must be either 'linesh'/'linesv'/'linesvh' (infilling is done with horizontal/vertical lines or combining both), 'concentric', (infilling is done with concentric toolpaths), or 'justcontour' (this is useful for the shared-library use case: infillings will be generated outside the engine; the engine just provides the contours to be infilled). There is a series of additional options --infill-*, described below" 
               : "External surfaces are defined as the subset of each slice which is not covered both above and below by other slices that are close in Z. This option is exactly the same as --infill, with a set of additional options --surface-infill-*, but specifies the infilling for the parts of the slices that are external according to the preceding definition). If this option is not specified, no distinction is made between external and internal parts (all are infilled with the same parameters).")
         (PREFIXINFILLNAME("-maxconcentric"),
             po::value<int>()->value_name("max"),
@@ -163,18 +163,18 @@ template<bool MODE_IS_INFILLING> void infillingOptions(po::options_description &
                 "If '--" PREFIX_INFILL  " concentric' is specified, its value is the maximum number of concentric perimeters that are generated"
               : "If '--" PREFIX_SURFACE " concentric' is specified, its value is the maximum number of concentric perimeters that are generated")
         (PREFIXINFILLNAME("-lineoverlap"),
-            po::value<double>()->default_value(0.001)->value_name("ratio"),
+            po::value<std::vector<double>>()->value_name("ratio"),
             MODE_IS_INFILLING ?
-                "This is the ratio of overlapping between lines, if --" PREFIX_INFILL  " (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value."
-              : "This is the ratio of overlapping between lines, if --" PREFIX_SURFACE " (linesh|linesv|concentric) is specified. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value.")
+                "This is the ratio of overlapping between lines, if --" PREFIX_INFILL  " (linesh|linesv|linesvh|concentric) is specified. Default value is 0.001. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value. If --" PREFIX_INFILL  " linesvh is specified, more than one value can be specified, to control spacing of vertical and horizontal lines independently."
+              : "This is the ratio of overlapping between lines, if --" PREFIX_SURFACE " (linesh|linesv|linesvh|concentric) is specified. Default value is 0.001. Negative values will make the infilling to be not solid, with the lined spaced apart by a space equal to the x-radius of the process times the magnitude of the negative value. If --" PREFIX_SURFACE " linesvh is specified, more than one value can be specified, to control spacing of vertical and horizontal lines independently.")
         (PREFIXINFILLNAME("-byregion"),
             MODE_IS_INFILLING ?
-                "If specified, and --" PREFIX_INFILL  " (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_INFILL  "-static-mode is specified, this option is ignored."
-              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_SURFACE "-static-mode is specified, this option is ignored.")
+                "If specified, and --" PREFIX_INFILL  " (linesh|linesv|linesvh) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_INFILL  "-static-mode is specified, this option is ignored."
+              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv|linesvh) is specified, the infill lines are computed in a separate reference frame for each different region (slower, but more regular results may be obtained), instead of for all of them at once (faster, but infillings may be irregular in some cases). However, if --" PREFIX_SURFACE "-static-mode is specified, this option is ignored.")
         (PREFIXINFILLNAME("-static-mode"),
             MODE_IS_INFILLING ?
-                "If specified, and --" PREFIX_INFILL  " (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_INFILL  "-lineoverlap). This option overrides --" PREFIX_INFILL  "-byregion."
-              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_SURFACE "-lineoverlap). This option overrides --" PREFIX_SURFACE "-byregion.")
+                "If specified, and --" PREFIX_INFILL  " (linesh|linesv|linesvh) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_INFILL  "-lineoverlap). This option overrides --" PREFIX_INFILL  "-byregion."
+              : "If specified, and --" PREFIX_SURFACE " (linesh|linesv|linesvh) is specified, the infill lines are computed in a static reference frame (the default is a reference frame per slice). This option is useful to make lines in different slices to fall in the same position, which is useful if the infilling is not solid (see option --" PREFIX_SURFACE "-lineoverlap). This option overrides --" PREFIX_SURFACE "-byregion.")
         (PREFIXINFILLNAME("-medialaxis-radius"),
             po::value<std::vector<double>>()->multitoken()->value_name("list of 0..1 factors"),
             MODE_IS_INFILLING ?
@@ -734,19 +734,27 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
     }
 }
 
-template<bool MODE_IS_INFILLING> bool parseInfilling(int k, InfillingSpec &ispec, po::variables_map &vm) {
+template<bool MODE_IS_INFILLING> bool parseInfilling(int k, InfillingSpec &ispec, PerProcessSpec &ppspec, po::variables_map &vm) {
     bool useit  = vm.count(PREFIXINFILLNAME(""))  != 0;
     if (useit) {
         const std::string & val = vm[PREFIXINFILLNAME("")].as<std::string>();
         if      (val.compare("concentric")  == 0) ispec.infillingMode = InfillingConcentric;
         else if (val.compare("linesh")      == 0) ispec.infillingMode = InfillingRectilinearH;
         else if (val.compare("linesv")      == 0) ispec.infillingMode = InfillingRectilinearV;
+        else if (val.compare("linesvh")     == 0) ispec.infillingMode = InfillingRectilinearVH;
         else if (val.compare("justcontour") == 0) ispec.infillingMode = InfillingJustContours;
         else                                      throw po::error(str("For process ", k, ": invalid --", PREFIXINFILLNAME(""), " mode: ", val));
-        ispec.infillingLineOverlap       = vm[PREFIXINFILLNAME("-lineoverlap")].as<double>();
-        ispec.infillingWhole             = vm.count(PREFIXINFILLNAME("-byregion"))     == 0;
-        ispec.infillingStatic            = vm.count(PREFIXINFILLNAME("-static-mode"))  != 0;
-        ispec.useMaxConcentricRecursive  = (ispec.infillingMode == InfillingConcentric) && (vm.count(PREFIXINFILLNAME("-maxconcentric")) != 0);
+        if (ppspec.addInternalClearance && ispec.infillingMode == InfillingRectilinearVH) {
+            throw po::error(str("It makes no sense for process ", k, " to simultaneously have options --clearance and ", PREFIXINFILLNAME(""), " linesvh"));
+        }
+        std::vector<double> overlaps;
+        if (vm.count(PREFIXINFILLNAME("-lineoverlap")) != 0) overlaps = std::move(vm[PREFIXINFILLNAME("-lineoverlap")].as<std::vector<double>>());
+        auto osize                      = overlaps.size();
+        ispec.infillingLineOverlap      = osize == 0 ? 0.001                      : overlaps[0];
+        ispec.infillingLineOverlapBis   = osize <  2 ? ispec.infillingLineOverlap : overlaps[1];
+        ispec.infillingWhole            = vm.count(PREFIXINFILLNAME("-byregion"))     == 0;
+        ispec.infillingStatic           = vm.count(PREFIXINFILLNAME("-static-mode"))  != 0;
+        ispec.useMaxConcentricRecursive = (ispec.infillingMode == InfillingConcentric) && (vm.count(PREFIXINFILLNAME("-maxconcentric")) != 0);
         if (ispec.useMaxConcentricRecursive) {
             ispec.maxConcentricRecursive = vm[PREFIXINFILLNAME("-maxconcentric")].as<int>();
         }
@@ -894,8 +902,8 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         spec.pp[k].medialAxisFactors = std::move(vm["medialaxis-radius"].as<std::vector<double>>());
     }
 
-    bool useinfill  = parseInfilling<MODE_INFILL> (k, spec.pp[k].internalInfilling, vm);
-    bool usesurface = parseInfilling<MODE_SURFACE>(k, spec.pp[k]. surfaceInfilling, vm);
+    bool useinfill  = parseInfilling<MODE_INFILL> (k, spec.pp[k].internalInfilling, spec.pp[k], vm);
+    bool usesurface = parseInfilling<MODE_SURFACE>(k, spec.pp[k]. surfaceInfilling, spec.pp[k], vm);
     if (!useinfill && usesurface) {
         throw po::error(str("For process ", k, ": if --surface-infill is specified, --infill MUST ALSO be specified!!!!"));
     }

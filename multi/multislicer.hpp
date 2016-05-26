@@ -125,7 +125,11 @@ public:
     bool applyInfillings(size_t k, bool nextProcessSameKind, InfillingSpec &infillingSpec, std::vector<clp::Paths> &perimetersIndependentContours, clp::Paths &infillingAreas, std::vector<clp::Paths> *_infillingsIndependentContours, clp::Paths &accumInfillingsHolder);
 protected:
     //state variables for infilling algorithms (necessary because of recursive implementations, to avoid passing an awful lot of context in each stack frame)
-    double infillingRadius, erodedInfillingRadius; bool infillingUseClearance, infillingRecursive; int numconcentric;
+    double       infillingRadius;
+    double erodedInfillingRadius;
+    double erodedInfillingRadiusBis;
+    bool infillingUseClearance, infillingRecursive;
+    int numconcentric;
     clp::cInt globalShift; bool useGlobalShift;
     clp::Paths AUX;
     clp::Paths *accumInfillings;
@@ -133,7 +137,8 @@ protected:
     bool processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec &infillingSpec, clp::Paths &infillingAreas, clp::Paths &accumInfillingsHolder);
     bool applySnapConcentricInfilling; SnapToGridSpec concentricInfillingSnapSpec; //this is state for the recursive call to processInfillingsConcentricRecursive
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
-    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, bool horizontal);
+    clp::Paths computeClippedLines(BBox &bb, double erodedInfillingRadius, bool horizontal);
+    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingMode mode);
 };
 
 class Multislicer {
