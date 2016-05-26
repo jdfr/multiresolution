@@ -551,7 +551,7 @@ bool Infiller::processInfillingsConcentricRecursive(HoledPolygon &hp) {
         if (!ok) return false;
         MOVETO(smoothed, next);
     }
-    COPYTO(next, *accumInfillings);
+    applyToPaths<copyOpenToClosedPath, AmortizedCost>(next, *accumInfillings); //COPYTO(next, *accumInfillings);
     if (infillingRecursive) {
         res->offsetDo(smoothed, erodedInfillingRadius, next, clp::jtRound, clp::etOpenRound);
         MOVETO(smoothed, *infillingsIndependentContours);
