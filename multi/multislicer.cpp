@@ -705,25 +705,45 @@ bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths *in
         if (discardCommonToolpaths) {
             res->doDiscardCommonToolPaths(k, output.ptoolpaths, contours_alreadyfilled, AUX4);
         }
+        
+        bool additionalPerimeters = ppspec.numAdditionalPerimeters > 0;
+        
+        if (additionalPerimeters) {// && false) {
+            //TODO: as it stands this is extremely hacky. Refactor!
+            InfillingSpec pspec;
+            pspec.infillingMode             = InfillingConcentric;
+            pspec.useMaxConcentricRecursive = true;
+            //TODO: fix the logic for maxConcentricRecursive: it seems to do one less concentric perimeter than it ought to do
+            pspec.maxConcentricRecursive    = ppspec.numAdditionalPerimeters + 1;
+            pspec.infillingLineOverlap      = ppspec.perimeterLineOverlap;
+            pspec.computeCUSTOMINFILLINGS();
+            std::vector<clp::Paths> additionalPerimetersIndependentContours;
+            if (!infiller.applyInfillings(k, nextProcessSameKind, pspec, perimetersIndependentContours, output.contours, &additionalPerimetersIndependentContours, output.ptoolpaths)) {
+                this->clear();
+                return false;
+            }
+        }
+
         if (nextProcessSameKind && ppspec.any_CUSTOMINFILLINGS && ppspec.infillingRecursive) {
             perimetersIndependentContours.resize(1);
             res->offsetDo(perimetersIndependentContours[0], (double)ppspec.radius, output.ptoolpaths, clp::jtRound, clp::etOpenRound);
         }
-
+        
         //generate the infilling contour only if necessary
         output.alsoInfillingAreas = ppspec.any_InfillingJustContours;
         //the way to generate the infilling regions depends on the flag discardCommonToolpaths
         if (ppspec.any_isnot_InfillingNone) {
-            if (discardCommonToolpaths) {
+            if (discardCommonToolpaths || additionalPerimeters) {
                 //this is more expensive than the alternative, but necessary for possibly open toolpaths
-                if (perimetersIndependentContours.empty()) {
+                if (perimetersIndependentContours.empty() || additionalPerimeters) {
                     res->operateInflatedLinesAndContours(clp::ctDifference, *infillingAreas, output.contours, output.ptoolpaths, (double)ppspec.radius, &AUX4, (clp::Paths*)NULL);
                 } else {
-                    res->clipperDo(*infillingAreas, clp::ctDifference, output.contours, perimetersIndependentContours[0], clp::pftNonZero, clp::pftNonZero);
+                    res->clipperDo(*infillingAreas, clp::ctDifference, output.contours, perimetersIndependentContours, clp::pftNonZero, clp::pftNonZero);
                 }
             } else {
                 //0.99: cannot be 1.0, clipping / round-off errors crop up
-                double shrinkFactor = (ppspec.addInternalClearance) ? 0.99 : (1-ppspec.infillingPerimeterOverlap);
+                double shrinkFactor = ((ppspec.addInternalClearance) ? 0.99 : (1 - ppspec.infillingPerimeterOverlap));
+                if (ppspec.numAdditionalPerimeters > 0) shrinkFactor += ((ppspec.numAdditionalPerimeters * 2) * (1 - ppspec.perimeterLineOverlap));
                 res->offsetDo(*infillingAreas, -(double)ppspec.radius * shrinkFactor, output.unprocessedToolPaths, clp::jtRound, clp::etClosedPolygon);
             }
         }

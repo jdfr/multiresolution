@@ -151,7 +151,6 @@ typedef struct InfillingSpec {
     double infillingLineOverlap;     //ratio to determine the overlapping between lines if we are using line infills
     double infillingLineOverlapBis;  // this is used for horizontal lines when infillingMode == InfillingRectilinearVH
     void computeCUSTOMINFILLINGS();
-
 } InfillingSpec;
 
 typedef struct PerProcessSpec {
@@ -178,6 +177,8 @@ typedef struct PerProcessSpec {
     
     double infillingPerimeterOverlap;//ratio to determine the overlapping between contours and infillings under some circumstances
     double differentiateSurfaceFactor;
+    double perimeterLineOverlap;
+    int    numAdditionalPerimeters;
     bool computeDifferentiationOnlyWithContoursFromSameTool;
     bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
     bool differentiateSurfaceInfillings;

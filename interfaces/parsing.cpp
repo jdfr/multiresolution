@@ -248,6 +248,12 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             "This is the ratio of overlapping between the perimeter toolpath and the inner infilling/surface infilling toolpaths (i.e., this option is common to infillings specified with --infill and --surface-infill). This only has effect if --clearance is not specified and --radius-removecommon is 0")
         ("infilling-recursive",
             "If specified, infilling/surface-infilling with higher resolution processes is applied recursively in the parts of the processed contours not convered by infilling toolpaths for the current process (not useful for value justcontour in --infill or --surface-infill). This option is common to infillings specified with --infill and --surface-infill")
+        ("additional-perimeters",
+            po::value<int>()->default_value(0)->value_name("num"),
+            "There is always at least one perimeter. If this value is > 0, it is the number of additional perimeters to add (to reinforce the shell)")
+        ("additional-perimeters-lineoverlap",
+            po::value<double>()->default_value(0.001)->value_name("ratio"),
+            "If there are additional perimeters, this is the ratio of overlap between them (just like --infill-lineoverlap and --surface-infill-lineoverlap).")
         ("lump-surfaces-to-perimeters",
             "Perimeters and surfaces are toolpaths, but each one is output separately. However, if this option is specified, all surfaces will be lumped together with the perimeters for this tool. This happens *before* motion planning is applied.")
         ("lump-surfaces-to-infillings",
@@ -917,6 +923,8 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].differentiateSurfaceInfillings = usesurface;
     spec.pp[k].differentiateSurfaceFactor                         = vm["compute-surfaces-extent-factor"].as<double>();
     spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool = vm["compute-surfaces-just-with-same-process"].as<bool>();
+    spec.pp[k].perimeterLineOverlap = vm["additional-perimeters-lineoverlap"].as<double>();
+    spec.pp[k].numAdditionalPerimeters = vm["additional-perimeters"].as<int>();
 }
 
 void ParserLocalAndGlobal::setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin) {
