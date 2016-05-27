@@ -113,15 +113,16 @@ void SliceHeader::setTo(clp::Paths &paths, PathCloseMode mode, int64 _type, int6
 }
 
 void SliceHeader::setBuffer() {
-    alldata.clear();
-    alldata.reserve(numFields);
-    alldata.push_back(T64(totalSize));
-    alldata.push_back(T64(headerSize));
-    alldata.push_back(T64(type));
-    alldata.push_back(T64(ntool));
-    alldata.push_back(T64(z));
-    alldata.push_back(T64(saveFormat));
-    alldata.push_back(T64(scaling));
+    if (alldata.size() < numFields) {
+        alldata.resize(numFields);
+    }
+    alldata[0] = totalSize;
+    alldata[1] = headerSize;
+    alldata[2] = type;
+    alldata[3] = ntool;
+    alldata[4] = z;
+    alldata[5] = saveFormat;
+    alldata[6] = scaling;
 }
 
 
