@@ -191,7 +191,7 @@ inline double applyTransform2DCompatibleZ(double z, TransformationMatrix matrix)
 }
 
 inline bool transform2DIsIdentityInXY(TransformationMatrix matrix) {
-    return (matrix[0] == 1.0) && (matrix[1] == 1.0) && (matrix[4] == 1.0) && (matrix[5] == 1.0) && (matrix[3] == 0.0) && (matrix[7] == 0.0);
+    return (matrix[0] == 1.0) && (matrix[1] == 0.0) && (matrix[3] == 0.0) && (matrix[4] == 0.0) && (matrix[5] == 1.0) && (matrix[7] == 0.0);
 }
 
 inline bool transform2DIsIdentityInZ(TransformationMatrix matrix) {
