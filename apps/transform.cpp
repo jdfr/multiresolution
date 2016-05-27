@@ -13,6 +13,7 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2
     if (is2DCompatible) {
         if (!identityInZ) {
             sliceheader.z = applyTransform2DCompatibleZ(sliceheader.z, matrix);
+            sliceheader.setBuffer();
         }
         if (!identityInXY) {
             for (auto path = paths.begin(); path != paths.end(); ++path) {
