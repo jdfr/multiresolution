@@ -9,7 +9,7 @@
 //0.952031 0.180332 0.247219 -0.000000 -0.301287 0.693675 0.654249 -0.000000 -0.053507 -0.697349 0.714732 0.000000 0.000000 0.000000 0.000000 1.000000
 
 
-std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2DCompatible, bool identityInZ, bool identityInXY, SliceHeader &sliceheader, DPaths &paths) {
+std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2DCompatible, bool identityInZ, bool identityInXY, SliceHeader &sliceheader, DPaths &paths, clp::Paths *paths_input) {
     if (is2DCompatible) {
         if (!identityInZ) {
             sliceheader.z = applyTransform2DCompatibleZ(sliceheader.z, matrix);
@@ -22,10 +22,19 @@ std::string transformAndSave(IOPaths &iop, TransformationMatrix matrix, bool is2
                 }
             }
         }
+        bool saveAsInt64 = identityInXY && (paths_input!=NULL);
+        sliceheader.saveFormat = saveAsInt64 ? PATHFORMAT_INT64 : PATHFORMAT_DOUBLE;
+        sliceheader.setBuffer();
         std::string err = sliceheader.writeToFile(iop.f);
         if (!err.empty()) { return err; }
-        if (!iop.writeDoublePaths(paths, PathOpen)) {
-            return std::string("Error while writing double clipperpaths!!!");
+        if (saveAsInt64) {
+            if (!iop.writeClipperPaths(*paths_input, PathOpen)) {
+                return std::string("Error while writing int64 clipperpaths!!!");
+            }
+        } else {
+            if (!iop.writeDoublePaths(paths, PathOpen)) {
+                return std::string("Error while writing double clipperpaths!!!");
+            }
         }
     } else {
         Paths3D paths3;
@@ -93,30 +102,26 @@ std::string transformPaths(const char * filename, const char *outputname, Transf
         if (sliceheader.alldata.size() < 7) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
         if (sliceheader.saveFormat == PATHFORMAT_INT64) {
             DPaths paths;
-            {
-                clp::Paths paths_input;
-                if (!iop_f.readClipperPaths(paths_input)) {
-                    return str("Error reading ", currentRecord, "-th integer clipperpaths: header is too short!");
-                }
-                paths.resize(paths_input.size());
-                for (int k = 0; k < paths.size(); ++k) {
-                    paths[k].reserve(paths_input[k].size());
-                    auto endp = paths_input[k].end();
-                    for (auto point = paths_input[k].begin(); point != endp; ++point) {
-                        paths[k].push_back(clp::DoublePoint(point->X * sliceheader.scaling, point->Y * sliceheader.scaling));
-                    }
+            clp::Paths paths_input;
+            if (!iop_f.readClipperPaths(paths_input)) {
+                return str("Error reading ", currentRecord, "-th integer clipperpaths: header is too short!");
+            }
+            paths.resize(paths_input.size());
+            for (int k = 0; k < paths.size(); ++k) {
+                paths[k].reserve(paths_input[k].size());
+                auto endp = paths_input[k].end();
+                for (auto point = paths_input[k].begin(); point != endp; ++point) {
+                    paths[k].push_back(clp::DoublePoint(point->X * sliceheader.scaling, point->Y * sliceheader.scaling));
                 }
             }
-            sliceheader.saveFormat = PATHFORMAT_DOUBLE;
-            sliceheader.setBuffer();
-            err = transformAndSave(iop_o, matrix, is2DCompatible, identityInZ, identityInXY, sliceheader, paths);
+            err = transformAndSave(iop_o, matrix, is2DCompatible, identityInZ, identityInXY, sliceheader, paths, &paths_input);
             if (!err.empty()) return err;
         } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
             DPaths paths;
             if (!iop_f.readDoublePaths(paths)) {
                 return str("Error reading ", currentRecord, "-th double clipperpaths: header is too short!");
             }
-            err = transformAndSave(iop_o, matrix, is2DCompatible, identityInZ, identityInXY, sliceheader, paths);
+            err = transformAndSave(iop_o, matrix, is2DCompatible, identityInZ, identityInXY, sliceheader, paths, NULL);
             if (!err.empty()) return err;
         } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
             Paths3D paths;
