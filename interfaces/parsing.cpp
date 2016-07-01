@@ -552,7 +552,9 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
         context->spec.nanos[idx]->galvomode = galvomode;
     }
     
-    context->spec.splits[idx].applyMotionPlanning = context->applyMotionPlanner;
+    if (idx < context->spec.splits.size()) {
+        context->spec.splits[idx].applyMotionPlanning = context->applyMotionPlanner;
+    }
 
     if (GLOBAL) context->spec.splits[idx].wallAngle = 90.0;
     if (current.count(PREFIXNANONAME("nano-angle"))) {
