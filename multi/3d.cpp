@@ -621,7 +621,11 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
                     next = &auxaux;
                 }
                 if (firstTime) {
-                    auxRawSlice = std::move(*next);
+                    if (next == &auxaux) {
+                        auxRawSlice = std::move(*next);
+                    } else {
+                        auxRawSlice = *next;
+                    }
                     firstTime = false;
                 } else {
                     sched->tm.res->clipperDo(auxRawSlice, clp::ctIntersection, auxRawSlice, *next, clp::pftNonZero, clp::pftNonZero);
