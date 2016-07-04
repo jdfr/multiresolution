@@ -433,7 +433,7 @@ bool writeSquare(FILE *f, clp::Path square, double factor) {
         ) >= 0;
 }
 
-bool NanoscribeSplittingPathWriter::finishAfterClose() {
+bool NanoscribeSplittingPathWriter::finishBeforeClose() {
     bool ok = true;
     std::vector<std::string> debugnames(states.size());
     for (auto state = states.begin(); state != states.end(); ++state) {

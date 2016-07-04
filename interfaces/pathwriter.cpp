@@ -158,6 +158,7 @@ bool PathsFileWriter::close() {
 }
 
 bool SplittingPathWriter::setup(bool resume, std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z) {
+    alreadyfinished = false;
     resumeAtStart = resume;
     filename = std::move(file);
     numtools = ntools;
@@ -232,7 +233,9 @@ bool SplittingPathWriter::start() {
 }
 
 bool SplittingPathWriter::close() {
+    if (alreadyfinished) return true;
     bool ok = true;
+    if (!finishBeforeClose()) ok = false;
     for (auto &state : states) {
         for (auto &subw : state.subwriters.data) {
             if (!subw->close()) {
@@ -241,9 +244,7 @@ bool SplittingPathWriter::close() {
             }
         }
     }
-    if (ok) {
-        ok = finishAfterClose();
-    }
+    alreadyfinished = true;
     return ok;
 }
 

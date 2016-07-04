@@ -80,7 +80,7 @@ public:
     virtual bool start();
     virtual bool writePaths(clp::Paths &paths, int type, double radius, int ntool, double z, double scaling, bool isClosed);
     virtual bool close();
-    virtual bool finishAfterClose() { return true; } //this method will get called after closing all subwritters, if everything is OK up to that point
+    virtual bool finishBeforeClose() { return true; } //this method will get called before closing all subwritters, if everything is OK up to that point
 protected:
     SplittingPathWriter() {} //this constructor is to be used by subclasses
     bool setup(bool resume, std::shared_ptr<ClippingResources> _res, int ntools, Configuration *_cfg, SplittingSubPathWriterCreator &callback, PathSplitterConfigs splitterconfs, std::string file, bool generic_type, bool generic_ntool, bool generic_z);
@@ -88,6 +88,7 @@ protected:
     int numtools;
     bool justone;
     bool isopen;
+    bool alreadyfinished;
 };
 
 void addExtension(std::string &filename, std::string ext);
