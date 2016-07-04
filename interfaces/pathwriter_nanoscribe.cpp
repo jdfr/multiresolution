@@ -108,6 +108,10 @@ bool SimpleNanoscribePathWriter::specificClose() {
 
 bool SimpleNanoscribePathWriter::writeEnclosedPaths(PathSplitter::EnclosedPaths &encl, int type, double radius, int ntool, double z, double scaling, bool isClosed) {
     square = std::move(encl.actualSquare);
+    if (delegateWork) {
+        int idx = findOrCreateSubwriter(type, radius, ntool, z);
+        subwriters[idx]->square = std::move(square);
+    }
     return this->writePaths(encl.paths, type, radius, ntool, z, scaling, isClosed);
 }
 
