@@ -471,17 +471,21 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
         context->spec.nanos[0]      = std::make_shared<SimpleNanoscribeConfig>();
         context->spec.generic_ntool = current.count("nano-by-tool") == 0;
         context->spec.generic_z     = current.count("nano-by-z")    == 0;
+        context->spec.toolChanges   = NULL;
     } else {
         if (!context->spec.useSpec) {
             return;
         }
-        context->spec.toolChanges = context->spec.nanos[0]->toolChanges = std::make_shared<ToolChanges>(numtools);
+        if (context->spec.toolChanges == NULL) {
+            context->spec.toolChanges = context->spec.nanos[0]->toolChanges = std::make_shared<ToolChanges>(numtools);
+        }
         if (!context->spec.isGlobal) {
             context->spec.nanos .resize(numtools);
             context->spec.splits.resize(numtools);
             for (int i = 1; i < numtools; ++i) {
                 context->spec.splits[i] = context->spec.splits[0];
                 context->spec.nanos[i]  = std::make_shared<SimpleNanoscribeConfig>(*context->spec.nanos[0]);
+                context->spec.nanos[i]->toolChanges = context->spec.toolChanges;
             }
         }
         idx = ntool;
