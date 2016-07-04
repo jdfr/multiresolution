@@ -47,7 +47,7 @@ template<typename T> int PathWriterMultiFile<T>::findOrCreateSubwriter(int _type
     }
     if (!generic_for_ntool) N = str(".N", _ntool);
     if (!generic_for_z)     Z = str(".Z", _z);
-    std::string newfilename = str(filename, Type, N, Z, ".dxf");
+    std::string newfilename = str(filename, Type, N, Z, extension);
     subwriters.push_back(static_cast<T*>(this)->createSubWriter(newfilename, epsilon, generic_for_type, generic_for_ntool, generic_for_z));
     subwriters.back()->type = _type;
     subwriters.back()->radius = _radius;
