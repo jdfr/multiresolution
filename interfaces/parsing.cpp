@@ -192,6 +192,8 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("no-preprocessing",
             po::value<double>()->implicit_value(0.0)->value_name("rad"),
             "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
+        ("always-preprocessing",
+            "If specified, the raw contours are *always* pre-processed before generating the toolpaths, even for the last process, *IF* not in add-sub mode (if add-sub mode is enabled, this is just ignored). Useful for smoothing unnecesary details out of contours and toolpaths (i.e. reducing possibly unnecesary intermediate points).")
         ("no-toolpaths",
             "If specified, the toolpaths are not computed, and the contours are computed without taking into account the toolpaths (they are not smoothed out by the tool radius). This is useful if the toolpaths are not relevant, and it is better to have the full contour as output.")
         ("voxel-profile",
@@ -896,8 +898,9 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].applysnap            = vm.count("snap")      != 0;
     spec.pp[k].snapSmallSafeStep    = vm.count("safestep")  != 0;
     spec.pp[k].addInternalClearance = vm.count("clearance") != 0;
-    spec.pp[k].doPreprocessing      = vm.count("no-preprocessing") == 0;
-    spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")     == 0;
+    spec.pp[k].doPreprocessing      = vm.count("no-preprocessing")     == 0;
+    spec.pp[k].alwaysPreprocessing  = vm.count("always-preprocessing") != 0;
+    spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")         == 0;
 
     if (spec.pp[k].applysnap) {
         if (vm.count("gridstep") == 0) {

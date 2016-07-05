@@ -107,7 +107,7 @@ void ClippingResources::removeHighResDetails(size_t k, clp::Paths &contours, clp
     offset.ArcTolerance = (double)ppspec.arctolG;
     offsetDo2(opened, (double)-ppspec.radius, (double)ppspec.radius, contours, lowres, clp::jtRound, clp::etClosedPolygon);
 
-    if (!ppspec.applysnap) {
+    if (!ppspec.applysnap || ((k+1)==spec->numspecs)) {
         //if we are not snapping to grid, operations below do not apply
         lowres = std::move(opened); //RESULT IS RETURNED IN lowres
         return;
@@ -609,7 +609,7 @@ bool Multislicer::applyProcessPhase1(SingleProcessOutput &output, clp::Paths &co
     //this only makes sense if there is a tool with higher resolution down the line
     if (ppspec.doPreprocessing) {
         if (nextProcessSameKind) {
-            if (notthelast) {
+            if (notthelast || ppspec.alwaysPreprocessing) {
                 res->removeHighResDetails(k, contours_tofill, lowres, AUX3, AUX4);
             } else {
                 if ((spec->numspecs > 1) && spec->pp[k - 1].applysnap) {

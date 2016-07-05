@@ -169,6 +169,7 @@ typedef struct PerProcessSpec {
     bool      lumpSurfacesToPerimeters;
     bool      lumpSurfacesToInfillings;
     bool      doPreprocessing;       //flag to decide if preprocessing may be applied
+    bool      alwaysPreprocessing;   //flag to decide if preprocessing is unconditionally applied
     double noPreprocessingOffset;    //if no preprocessing is done, a morphological opening is done with this value
     std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
     
