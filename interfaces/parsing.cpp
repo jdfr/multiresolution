@@ -943,6 +943,10 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool = vm["compute-surfaces-just-with-same-process"].as<bool>();
     spec.pp[k].perimeterLineOverlap = vm["additional-perimeters-lineoverlap"].as<double>();
     spec.pp[k].numAdditionalPerimeters = vm["additional-perimeters"].as<int>();
+    
+    if (spec.pp[k].alwaysSupported && !spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool) {
+        throw po::error(str("Process ", k, " has '--always-supported' and '--compute-surfaces-just-with-same-process false'. These options are not compatible: the first one requires supportting slices to be computed beforehand, while the second one instructs the system to also consider high-res supporting slices, which HAVE to be computed AFTER low-res neighboring slices. A possible way to solve this conundrum would be to implement an option to consider raw slices instead of computed contours."));
+    }
 }
 
 void ParserLocalAndGlobal::setParsedOptions(std::vector<std::string> &args, const char *CommandLineOrigin) {

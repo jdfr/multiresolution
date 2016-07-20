@@ -782,7 +782,8 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
             if (!this_output.requiredContoursForPhase1.empty()) {
                 auto &requireds = this_output.requiredContoursForPhase1;
                 recalleds = getRequiredContours(requireds);
-                if (recalleds.empty()) {
+                has_err = recalleds.empty();
+                if (has_err) {
                     err = str("Error: slice with input_idx=", input_idx, " should be ready for phase 1 of processing, but it requires some other slices to have already passed phase 1 themselves, but not all of them already have. Currently, the scheduler is not designed to re-order the slices in the face of this eventuality, so the process just ends with this error. This is probably due to some hiccup in the order of slices if using --slicing-manual");
                     ok = false;
                     break;
