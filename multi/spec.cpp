@@ -23,9 +23,11 @@ bool MultiSpec::validate() {
 std::string MultiSpec::populateParameters() {
     std::string result;
     global.anyDifferentiateSurfaceInfillings = false;
+    global.anyAlwaysSupported                = false;
     for (size_t k = 0; k<numspecs; ++k) {
         
         global.anyDifferentiateSurfaceInfillings = global.anyDifferentiateSurfaceInfillings || pp[k].differentiateSurfaceInfillings;
+        global.anyAlwaysSupported                = global.anyAlwaysSupported                || pp[k].alwaysSupported;
         
         pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
         anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;

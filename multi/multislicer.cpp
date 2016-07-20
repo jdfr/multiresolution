@@ -2,7 +2,6 @@
 #include "orientPaths.hpp"
 #include "medialaxis.hpp"
 #include "showcontours.hpp"
-#include <algorithm>
 
 /////////////////////////////////////////////////
 /*MACHINERY FOR THE QUICK HACK TO ADAPT THE CODE
@@ -479,10 +478,6 @@ clp::Paths Infiller::computeClippedLines(BBox &bb, double erodedInfillingRadius,
         }
     }
     return lines;
-}
-
-template<typename T, typename Fun> void erase_remove_idiom(std::vector<T> &vector, Fun predicate) {
-    vector.erase(std::remove_if(vector.begin(), vector.end(), predicate), vector.end());
 }
 
 void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingMode mode) {

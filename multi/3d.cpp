@@ -1,11 +1,9 @@
 #include "3d.hpp"
-#include "auxgeom.hpp"
 #include "orientPaths.hpp"
 #include "pathsfile.hpp"
 #include "slicermanager.hpp"
 #include "showcontours.hpp"
 #include <numeric>
-#include <algorithm>
 
 //if this is too heavy (I doubt it), it can be merged into loops where it makes sense
 void ToolpathManager::removeUsedSlicesPastZ(double z, std::vector<OutputSliceData> &output) {
@@ -150,6 +148,41 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
 }
 
+void ToolpathManager::removeFromContourSegmentsWithoutSupport(clp::Paths &contour, ResultSingleTool &output, std::vector<ResultSingleTool*> &requiredContours) {
+    computeContoursAboveAndBelow(output, requiredContours, false);
+    bool sliceUpwards = spec->global.sliceUpwards;
+    clp::Paths *support = sliceUpwards ? &output.contoursBelow : &output.contoursAbove;
+    clp::Paths localSupport;
+    if (support->empty()) {
+        contour.clear();
+    } else {
+        bool doOffset = spec->pp[output.ntool].supportOffset!=0;
+        double supportOffset = (double)spec->pp[output.ntool].supportOffset;
+        clp::Paths segment;
+        if (doOffset) {
+            res->offsetDo(localSupport, supportOffset, *support, clp::jtRound, clp::etClosedPolygon);
+            support = &localSupport;
+        }
+        HoledPolygons hps;
+        int initialSize = hps.size();
+        AddPathsToHPs(res->clipper, contour, hps);
+        erase_remove_idiom(hps, [this, &segment, support, doOffset, supportOffset](HoledPolygon &hp){
+                segment.clear();
+                if (doOffset) {
+                    hp.offset(res->offset, supportOffset, segment);
+                } else {
+                    hp.copyToPaths(segment);
+                }
+                res->clipperDo(segment, clp::ctIntersection, *support, segment, clp::pftNonZero, clp::pftNonZero);
+                return segment.empty();
+            });
+        if (hps.size()!=initialSize)  {
+            contour.clear();
+            AddHPsToPaths(hps, contour);
+        }
+    }
+}
+
 
 /*IMPORTANT: right now, the following method should work right only if the slices are weakly ordered. The calling order should be:
    -while there are slices to be computed:
@@ -157,11 +190,15 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
       -ask for all slices within the range of the lowest process for that slice
       -do that recursively for each process, from lowest to highest
 */
-bool ToolpathManager::processSlicePhase1(clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result) {
+bool ToolpathManager::processSlicePhase1(std::vector<ResultSingleTool*> &requiredContours, clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result) {
     slicess[ntool].push_back(std::make_shared<ResultSingleTool>(z, ntool, output_index));
     ResultSingleTool &output = *(slicess[ntool].back());
 
     updateInputWithProfilesFromPreviousSlices(auxInitial, output.contours_alreadyfilled, rawSlice, z, ntool);
+    
+    if (!requiredContours.empty()) {
+        removeFromContourSegmentsWithoutSupport(auxInitial, output, requiredContours);
+    }
 
     //TODO: intilialize properly the StartPosition of the MultiSpec
 
@@ -177,40 +214,64 @@ bool ToolpathManager::processSlicePhase1(clp::Paths &rawSlice, double z, int nto
     return ret;
 }
 
-bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours) {
+/* Compute contours above and below, *only* if not computed yet.
+ * This method is intended to be used two times, re-evaluating above/below ONLY if necessary.
+ * However, for this memoization to be the CORRECT behavior, the way to use it is:
+ *        - first call:  requiredContours must contain ONLY contours either above or below. Let this set of contours be F
+ *        - second call: requiredContours must contain contours BOTH above and below. Let this set of contours be S,
+ *                       with {Sa, Sb} being a partition of S such that Sa only contains the contours above, and Sb the contours below.
+ *                       Then, for the calls to be correct, the following must be true: (F==Sa) || (F==Sb)
+*/
+bool ToolpathManager::computeContoursAboveAndBelow(ResultSingleTool &output, std::vector<ResultSingleTool*> &requiredContours, bool onlyIfBothAboveAndBelow) {
     bool hasAbove = false, hasBelow = false;
+    for (auto required : requiredContours) {
+        if (required->z < output.z) {
+            hasBelow = true; if (hasAbove) break;
+        } else {
+            hasAbove = true; if (hasBelow) break;
+        }
+    }
+    if (onlyIfBothAboveAndBelow && !(hasAbove && hasBelow)) {
+        return false;
+    }
+    for (auto required : requiredContours) {
+        clp::Clipper *clipper;
+        if (required->z < output.z) {
+            if (output.contoursBelowAlreadyComputed) continue;
+            clipper = &res->clipper;
+        } else {
+            if (output.contoursAboveAlreadyComputed) continue;
+            clipper = &res->clipper2;
+        }
+        clipper->AddPaths(required->contours_withexternal_medialaxis_used ? required->contours_withexternal_medialaxis : required->contours, clp::ptSubject, true);
+    }
+    if (hasBelow && !output.contoursBelowAlreadyComputed) {
+        output.contoursBelowAlreadyComputed = true;
+        res->clipper.Execute(clp::ctUnion, output.contoursBelow, clp::pftNonZero, clp::pftNonZero);
+    }
+    res->clipper.Clear();
+    ClipperEndOperation(res->clipper);
+    if (hasAbove && !output.contoursAboveAlreadyComputed) {
+        output.contoursAboveAlreadyComputed = true;
+        res->clipper2.Execute(clp::ctUnion, output.contoursAbove, clp::pftNonZero, clp::pftNonZero);
+    }
+    res->clipper2.Clear();
+    ClipperEndOperation(res->clipper2);
+    return true;
+}
+
+bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours) {
     clp::Paths *internalParts = NULL;
     if (spec->pp[output.ntool].differentiateSurfaceInfillings && !requiredContours.empty()) {
-        for (auto required : requiredContours) {
-            if (required->z < output.z) {
-                hasBelow = true; if (hasAbove) break;
-            } else {
-                hasAbove = true; if (hasBelow) break;
-            }
-        }
-        if (!(hasAbove && hasBelow)) {
-            auxInitial.clear();
-            internalParts = &auxInitial;
+        bool haveBeenComputed = computeContoursAboveAndBelow(output, requiredContours, true);
+        if (haveBeenComputed) {
+            res->clipperDo(auxInitial, clp::ctIntersection, output.contoursAbove, output.contoursBelow, clp::pftNonZero, clp::pftNonZero);
+            //output.contoursAbove = clp::Paths();
+            //output.contoursBelow = clp::Paths();
         } else {
-            for (auto required : requiredContours) {
-                clp::Clipper *clipper;
-                if (required->z < output.z) {
-                    clipper = &res->clipper;
-                } else {
-                    clipper = &res->clipper2;
-                }
-                clipper->AddPaths(required->contours_withexternal_medialaxis_used ? required->contours_withexternal_medialaxis : required->contours, clp::ptSubject, true);
-            }
-            res->clipper .Execute(clp::ctUnion, auxBelow, clp::pftNonZero, clp::pftNonZero);
-            res->clipper .Clear();
-            ClipperEndOperation(res->clipper);
-            res->clipper2.Execute(clp::ctUnion, auxAbove, clp::pftNonZero, clp::pftNonZero);
-            res->clipper2.Clear();
-            ClipperEndOperation(res->clipper2);
-            res->clipperDo(auxInitial, clp::ctIntersection, auxAbove, auxBelow, clp::pftNonZero, clp::pftNonZero);
-            auxBelow.clear(); auxAbove.clear();
-            internalParts = &auxInitial;
+            auxInitial.clear();
         }
+        internalParts = &auxInitial;
     }
     bool ret = multi.applyProcessPhase2(output, internalParts, output.contours_alreadyfilled, output.ntool);
     auxInitial.clear();
@@ -461,7 +522,7 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
         input[ii].mapInputToOutput = i;
         ++num_output_by_tool[output[i].ntool];
     }
-    if (tm.spec->global.anyDifferentiateSurfaceInfillings) {
+    if (tm.spec->global.anyDifferentiateSurfaceInfillings || tm.spec->global.anyAlwaysSupported) {
         typedef struct MinMax { double min, max, extent; MinMax(double mn, double mx, double factor) : min(mn), max(mx), extent((mx-mn)*factor) {} } MinMax;
         std::vector<MinMax> minmaxzs;
         size_t numouts = output.size();
@@ -480,44 +541,71 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
         for (int k = 0; k < numouts; ++k) {
             int ntool = output[k].ntool;
             auto &ppspec = tm.spec->pp[ntool];
-            if (ppspec.differentiateSurfaceInfillings) {
-                //add the slices required to compute internal / external surfaces needed for this slice: first slices below, then slices above
+            
+            if (ppspec.differentiateSurfaceInfillings || ppspec.alwaysSupported) {
+                //add the slices above and below this slice: first slices below, then slices above
                 //the code structure is almost identical for both cases (below and above), but it it has enough differences to make it quite
                 //confusing if we want to refactor them as a single loop parameterized on some intial values and conditions
                 
+                //ATTENTION: the memoization logic in computeContoursAboveAndBelow() REQUIRES requiredContoursForPhase1 to be a proper subset of requiredContoursForPhase2,
+                //           AND that requiredContoursForPhase1 is always exactly the subset of all above slices in requiredContoursForPhase2 (alternatively, exactly the subset of all below slices in requiredContoursForPhase2)
+                //if that condition were to be unmet, MAKE SURE that the logic in computeContoursAboveAndBelow() IS NO LONGER SAVING ALREADY COMPUTED VALUES, OR FIX IT MORE SUBTLY
+                
                 //try to add slices below. When sliceUpwards is true, the subloop is downwards, and vice versa
-                loop_is_upwards = !sliceUpwards;
-                double floor = minmaxzs[k].min - minmaxzs[k].extent;
-                for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
-                    bool different_ntool = ntool!=output[kk].ntool;
-                    //do not use slices from different tools if instructed to do so
-                    if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
-                    //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
-                    if (different_ntool && ((minmaxzs[kk].max - minmaxzs[k].min) > minmaxzs[k].extent)) continue;
-                    //keep adding slices while they are not too below us
-                    if (minmaxzs[kk].max > floor) {
-                        output[k].requiredContoursForPhase2.push_back(kk);
-                        ++output[kk].numSlicesRequiringThisOne;
-                    } else {
-                        break;
+                bool recordForSurface   = ppspec.differentiateSurfaceInfillings;
+                bool recordForSupport   = sliceUpwards && ppspec.alwaysSupported;
+                bool recordForAnyReason = recordForSurface || recordForSupport;
+                if (recordForAnyReason) {
+                    double floor        = minmaxzs[k].min - minmaxzs[k].extent;
+                    loop_is_upwards     = !sliceUpwards;
+                    for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
+                        bool different_ntool = ntool!=output[kk].ntool;
+                        //do not use slices from different tools if instructed to do so
+                        if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
+                        //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
+                        if (different_ntool && ((minmaxzs[kk].max - minmaxzs[k].min) > minmaxzs[k].extent)) continue;
+                        //keep adding slices while they are not too below us
+                        if (minmaxzs[kk].max > floor) {
+                            if (recordForSurface) {
+                                output[k].requiredContoursForPhase2.push_back(kk);
+                                ++output[kk].numSlicesRequiringThisOne;
+                            }
+                            if (recordForSupport) {
+                                output[k].requiredContoursForPhase1.push_back(kk);
+                                ++output[kk].numSlicesRequiringThisOne;
+                            }
+                        } else {
+                            break;
+                        }
                     }
                 }
                 
                 //try to add slices above. When sliceUpwards is true, the subloop is upwards, and vice versa
-                loop_is_upwards = sliceUpwards;
-                double ceil = minmaxzs[k].max + minmaxzs[k].extent;
-                for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
-                    bool different_ntool = ntool!=output[kk].ntool;
-                    //do not use slices from different tools if instructed to do so
-                    if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
-                    //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
-                    if (different_ntool && ((minmaxzs[k].max - minmaxzs[kk].min) > minmaxzs[k].extent)) continue;
-                    //keep adding slices while they are not too above us
-                    if (minmaxzs[kk].min < ceil) {
-                        output[k].requiredContoursForPhase2.push_back(kk);
-                        ++output[kk].numSlicesRequiringThisOne;
-                    } else {
-                        break;
+                recordForSurface    = ppspec.differentiateSurfaceInfillings;
+                recordForSupport    = (!sliceUpwards) && ppspec.alwaysSupported;
+                recordForAnyReason  = recordForSurface || recordForSupport;
+                if (recordForAnyReason) {
+                    double ceil     = minmaxzs[k].max + minmaxzs[k].extent;
+                    loop_is_upwards = sliceUpwards;
+                    for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
+                        bool different_ntool = ntool!=output[kk].ntool;
+                        //do not use slices from different tools if instructed to do so
+                        if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
+                        //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
+                        if (different_ntool && ((minmaxzs[k].max - minmaxzs[kk].min) > minmaxzs[k].extent)) continue;
+                        //keep adding slices while they are not too above us
+                        if (minmaxzs[kk].min < ceil) {
+                            if (recordForSurface) {
+                                output[k].requiredContoursForPhase2.push_back(kk);
+                                ++output[kk].numSlicesRequiringThisOne;
+                            }
+                            if (recordForSupport) {
+                                output[k].requiredContoursForPhase1.push_back(kk);
+                                ++output[kk].numSlicesRequiringThisOne;
+                            }
+                        } else {
+                            break;
+                        }
                     }
                 }
                 
@@ -687,14 +775,26 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
     bool ok = true;
     while (true) {
         if (rm.rawReady((int)input_idx)) {
+            int this_output_idx = input[input_idx].mapInputToOutput;
+            auto &this_output = output[this_output_idx];
+            std::vector<ResultSingleTool*> recalleds;
+            
+            if (!this_output.requiredContoursForPhase1.empty()) {
+                auto &requireds = this_output.requiredContoursForPhase1;
+                recalleds = getRequiredContours(requireds);
+                if (recalleds.empty()) {
+                    err = str("Error: slice with input_idx=", input_idx, " should be ready for phase 1 of processing, but it requires some other slices to have already passed phase 1 themselves, but not all of them already have. Currently, the scheduler is not designed to re-order the slices in the face of this eventuality, so the process just ends with this error. This is probably due to some hiccup in the order of slices if using --slicing-manual");
+                    ok = false;
+                    break;
+                }
+            }
+                
             int idx_raw = input[input_idx].mapInputToRaw;
             clp::Paths *raw = rm.getRawContour(idx_raw, (int)input_idx);
             if (raw == NULL) break;
             double z = rm.raw[idx_raw].z;
-            int this_output_idx = input[input_idx].mapInputToOutput;
-            auto &this_output = output[this_output_idx];
             
-            has_err = !tm.processSlicePhase1(*raw, z, input[input_idx].ntool, this_output_idx, this_output.result);
+            has_err = !tm.processSlicePhase1(recalleds, *raw, z, input[input_idx].ntool, this_output_idx, this_output.result);
             rm.auxRawSlice.clear();
             if (has_err) {
                 err = tm.err;
@@ -720,10 +820,9 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
     return ok;
 }
 
-//helper method for processReadySlicesPhase2(): do phase 2 slicing computations if the system is ready
-bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
-    bool ok = true;
-    auto &requireds = output[result.idx].requiredContoursForPhase2;
+//precondition: !requiredContoursIdxs.empty()
+//result: if all required contours have been computed, return vector of pointers to them. Otherwise, return empty vector
+std::vector<ResultSingleTool*> SimpleSlicingScheduler::getRequiredContours(std::vector<int> &requireds) {
     std::vector<ResultSingleTool*> recalleds;
     recalleds.reserve(requireds.size());
     for (auto required : requireds) {
@@ -731,10 +830,22 @@ bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
             recalleds.push_back(output[required].result);
         }
     }
-    if (recalleds.size()==requireds.size()) {
+    if (recalleds.size()!=requireds.size()) {
+        recalleds.clear();
+    } else {
         for (auto recalled : recalleds) {
             --output[recalled->idx].numSlicesRequiringThisOne;
         }
+    }
+    return recalleds;
+}
+
+//helper method for processReadySlicesPhase2(): do phase 2 slicing computations if the system is ready
+bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
+    bool ok = true;
+    auto &requireds = output[result.idx].requiredContoursForPhase2;
+    std::vector<ResultSingleTool*> recalleds = getRequiredContours(requireds);
+    if (!recalleds.empty()) {
         has_err = !tm.processSlicePhase2(result, std::move(recalleds));
         if (has_err) {
             err = tm.err;

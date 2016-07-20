@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include <iterator>
+#include <algorithm>
 
 #if defined(_WIN32) || defined(_WIN64)
 #else
@@ -14,6 +15,10 @@
 std::string handleClipperException(clp::clipperException &e);
 
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f);
+
+template<typename T, typename Fun> void erase_remove_idiom(std::vector<T> &vector, Fun predicate) {
+    vector.erase(std::remove_if(vector.begin(), vector.end(), predicate), vector.end());
+}
 
 template<typename T> inline void MOVETO(T &source, std::vector<T> &dest) {
     dest.push_back(std::move(source));

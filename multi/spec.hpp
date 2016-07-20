@@ -67,6 +67,7 @@ typedef struct GlobalSpec {
     bool substractiveOuter;
     clp::cInt outerLimitX, outerLimitY;
     bool anyDifferentiateSurfaceInfillings;
+    bool anyAlwaysSupported;
     GlobalSpec(std::shared_ptr<Configuration> _config) : config(std::move(_config)) {}
 } GlobalSpec;
 
@@ -161,6 +162,7 @@ typedef struct PerProcessSpec {
     clp::cInt arctolG;               // arcTolerance when doing offseting at the gridstep scale
     clp::cInt burrLength;            // radius to remove too small details (applied when no snap is done)
     clp::cInt radiusRemoveCommon;    // radius to remove shared arcs between contours of different resolutions (applying this in the current, naive way may become quite expensive)
+    clp::cInt supportOffset;         //support offset value if flag alwaysSupported is set
     bool      computeToolpaths;      // flag to effectively compute the toolpaths (alternative: only contours, without taking into account toolpath smoothing effects)
     bool      applysnap;             // flag to snap to grid
     bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
@@ -170,6 +172,7 @@ typedef struct PerProcessSpec {
     bool      lumpSurfacesToInfillings;
     bool      doPreprocessing;       //flag to decide if preprocessing may be applied
     bool      alwaysPreprocessing;   //flag to decide if preprocessing is unconditionally applied
+    bool      alwaysSupported;       //flag to decide if contours have to overlap with contours of the previous slice
     double noPreprocessingOffset;    //if no preprocessing is done, a morphological opening is done with this value
     std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
     

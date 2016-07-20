@@ -256,6 +256,10 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         ("additional-perimeters-lineoverlap",
             po::value<double>()->default_value(0.001)->value_name("ratio"),
             "If there are additional perimeters, this is the ratio of overlap between them (just like --infill-lineoverlap and --surface-infill-lineoverlap).")
+        ("always-supported",
+            po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
+            "If this option is specified, each contour segment is considered separately: if the contour segment does not overlap with any contour within a previous slice which is just next to this one in Z, it is not used. The rationale is that some 3D structures may have low-res blobs connected only by high-res bridges. Blindly printing all low-res blobs would print them in the void without any support. To decide if two slices are next to each other in Z, the criteria are the same as used in options --compute-surfaces-just-with-same-process and --compute-surfaces-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; both the previous slice and the contour segments will be offseted by that length before testing for overlappings"
+        )
         ("lump-surfaces-to-perimeters",
             "Perimeters and surfaces are toolpaths, but each one is output separately. However, if this option is specified, all surfaces will be lumped together with the perimeters for this tool. This happens *before* motion planning is applied.")
         ("lump-surfaces-to-infillings",
@@ -901,7 +905,12 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].doPreprocessing      = vm.count("no-preprocessing")     == 0;
     spec.pp[k].alwaysPreprocessing  = vm.count("always-preprocessing") != 0;
     spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")         == 0;
+    spec.pp[k].alwaysSupported      = vm.count("always-supported")     != 0;
 
+    if (spec.pp[k].alwaysSupported) {
+        spec.pp[k].supportOffset = (clp::cInt)(spec.pp[k].radius * vm["always-supported"].as<double>());
+    }
+    
     if (spec.pp[k].applysnap) {
         if (vm.count("gridstep") == 0) {
             throw po::error(str("Process ", k, " has --snap, so it requires --gridstep, but it was not specified!"));
