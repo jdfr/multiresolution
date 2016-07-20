@@ -164,7 +164,7 @@ void ToolpathManager::removeFromContourSegmentsWithoutSupport(clp::Paths &contou
             support = &localSupport;
         }
         HoledPolygons hps;
-        int initialSize = hps.size();
+        int initialSize = (int)hps.size();
         AddPathsToHPs(res->clipper, contour, hps);
         erase_remove_idiom(hps, [this, &segment, support, doOffset, supportOffset](HoledPolygon &hp){
                 segment.clear();
