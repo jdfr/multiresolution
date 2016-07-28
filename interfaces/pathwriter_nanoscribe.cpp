@@ -28,6 +28,7 @@ SimpleNanoscribePathWriter::SimpleNanoscribePathWriter(PathSplitter &_splitter, 
     splitter(_splitter),
     config(std::move(_config)),
     firstTime(true),
+    beforeFirstDifferentZ(false),
     current_z_block(0),
     overrideGalvoMode(splitter.config.wallAngle == 90.0) {
     resumeAtStart = false;
@@ -340,6 +341,13 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
                 return false;
             }
         }
+        if (!config->afterbeginScript.empty()) {
+            if (fputs(config->afterbeginScript.c_str(), this->f) < 0) {
+                err = str("error: cannot write script after-beggining for file ", this->filename);
+                return false;
+            }
+        }
+        beforeFirstDifferentZ = true;
     } else {
         if (ntool != lastNTool) {
             std::string &end = (*config->toolChanges)[lastNTool].second;
@@ -370,6 +378,15 @@ bool SimpleNanoscribePathWriter::setupStateForToolpaths(bool firstTime, int type
             if (fprintf(this->f, config->zoffsetFormatting.c_str(), nanoscribe_z - nanoscribe_last_z) < 0) {
                 err = str("error writing Z block change to file <", this->filename, "> in SimpleNanoscribePathWriter::writePathsSpecific()");
                 return false;
+            }
+            if (beforeFirstDifferentZ) {
+                beforeFirstDifferentZ = false;
+                if (!config->afterFirstZChange.empty()) {
+                    if (fputs(config->afterFirstZChange.c_str(), this->f) < 0) {
+                        err = str("error: cannot write script afterFirstZChange for file ", this->filename);
+                        return false;
+                    }
+                }
             }
         }
         if (type != lastType) {

@@ -32,7 +32,13 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
     opts.add_options()
         (PREFIXNANONAME("nano-file-begin"),
             po::value<std::string>()->value_name("script"),
-            PREFIXNANODESC("GWL commands to be written at the beginning of each REGIONAL GWL file, but AFTER doing any positioning with StageGoto* commands (useful to insert findInterfaceAt commands)."))
+            PREFIXNANODESC("GWL commands to be written at the beginning of each REGIONAL GWL file, but AFTER doing any positioning with StageGoto* commands but BEFORE Z positioning commands (useful to insert findInterfaceAt commands)."))
+        (PREFIXNANONAME("nano-file-afterbegin"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written at the beginning of each REGIONAL GWL file, but AFTER everything else, including Z positioning commands (compare to the previous option)"))
+        (PREFIXNANONAME("nano-file-afterfirstzchange"),
+            po::value<std::string>()->value_name("script"),
+            PREFIXNANODESC("GWL commands to be written in each REGIONAL GWL after the first Z change"))
         (PREFIXNANONAME("nano-file-end"),
             po::value<std::string>()->value_name("script"),
             PREFIXNANODESC("GWL commands to be written at the end of each REGIONAL GWL file"))
@@ -512,6 +518,14 @@ template<bool GLOBAL> void parseNano(int ntool, int numtools, po::variables_map 
     if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-begin"))) {
         if (!string.empty()) string += "\n";
         context->spec.nanos[idx]->beginScript       = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-afterbegin"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->afterbeginScript  = std::move(string);
+    }
+    if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-afterfirstzchange"))) {
+        if (!string.empty()) string += "\n";
+        context->spec.nanos[idx]->afterFirstZChange = std::move(string);
     }
     if (nanoOptionGetIfPresent<GLOBAL, std::string>(context, current, string, PREFIXNANONAME("nano-file-end"))) {
         if (!string.empty()) string += "\n";
