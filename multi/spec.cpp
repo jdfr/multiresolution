@@ -31,6 +31,7 @@ std::string MultiSpec::populateParameters() {
         
         pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
         anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;
+        anyEnsureAttachmentOffset      = anyEnsureAttachmentOffset || (pp[k].ensureAttachmentOffset != 0);
 
         pp[k].internalInfilling.computeCUSTOMINFILLINGS();
         pp[k]. surfaceInfilling.computeCUSTOMINFILLINGS();
@@ -96,6 +97,7 @@ std::string MultiSpec::populateParameters() {
         global.outerLimitX = global.limitX - (pp[0].radius * 3);
         global.outerLimitY = global.limitY - (pp[0].radius * 3);
     }
+    
     return result;
 }
 

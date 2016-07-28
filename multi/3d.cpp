@@ -82,9 +82,6 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //for subtractive process: initialContour <- previously_computed_additive_contours - rawSlice - previously_computed_subtractive_contours
     //for additive process:    initialContour <- rawSlice - previously_computed_additive_contours
 
-    //process the raw slice
-    res->clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
-
     bool doNotUseStoredAdditiveContours = false;
     bool appliedAdditional = false;
 
@@ -135,7 +132,17 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
             }
         }
     }
+    
+    bool ensureAttachment = spec->pp[ntool].ensureAttachmentOffset != 0;
+    
+    if (ensureAttachment) {
+        res->clipper.Execute(clp::ctUnion, auxUpdate, clp::pftNonZero, clp::pftNonZero);
+        ensureAttachment = !auxUpdate.empty();
+    }
 
+    //process the raw slice
+    res->clipper.AddPaths(rawSlice, processToComputeIsAdditive ? clp::ptSubject : clp::ptClip, true);
+    
     //apply operations
     res->clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
     res->clipper.Clear();
@@ -146,6 +153,53 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
         ClipperEndOperation(res->clipper2);
     }
     //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
+    
+    //apply --ensure-attachment-offset
+    if (ensureAttachment && !initialContour.empty()) {
+        clp::cInt attachmentOffset = spec->pp[ntool].ensureAttachmentOffset;
+        double offset;
+        //TODO: the following logic/values are extracted from ClippingResources::generateToolPath(); extract them to a submethod or field in spec->pp[ntool] and use them from both here and that method
+        if (spec->pp[ntool].computeToolpaths) {
+            if (spec->pp[ntool].applysnap) {
+                offset = (double)spec->pp[ntool].safestep;
+            } else if (spec->pp[ntool].addInternalClearance) {
+                offset = (double)spec->pp[ntool].radius;
+            } else {
+                offset = (double)spec->pp[ntool].burrLength;
+            }
+            offset += (double)spec->pp[ntool].radius;
+            res->offsetDo(auxEnsure, -offset, initialContour, clp::jtRound, clp::etClosedPolygon);
+            //do not go on if all contours will vanish later, because this treatment will make them larger, so they will not
+            if (!auxEnsure.empty()) {
+                if (spec->pp[ntool].ensureAttachmentUseMinimalOffset) {
+                    //remove small artifacts from the contour (but uses only dissapearance under negative offset)
+                    HoledPolygons hps, result;
+                    AddPathsToHPs(res->clipper, initialContour, hps);
+                    double moffset = spec->pp[ntool].ensureAttachmentMinimalOffset;
+                    auto &offseter = res->offset;
+                    erase_remove_idiom(hps, [&result, &offseter, moffset](HoledPolygon &hp){
+                        hp.offset(offseter, -moffset, result);
+                        return result.empty();
+                    });
+                    initialContour.clear();
+                    AddHPsToPaths(hps, initialContour);
+                }
+                
+                if (!initialContour.empty()) {
+                    //inflate the initial contour to overlap the already present contours
+                    res->offsetDo(auxEnsure, attachmentOffset, initialContour, clp::jtRound, clp::etClosedPolygon);
+                    //intersect with the already present contours to compute the overlapping
+                    res->clipperDo(auxEnsure, clp::ctIntersection, auxEnsure, auxUpdate, clp::pftNonZero, clp::pftNonZero);
+                    //inflate slightly the overlapping to avoid it being disconnected from the initial contour
+                    res->offsetDo(auxUpdate, attachmentOffset/100, auxEnsure, clp::jtMiter, clp::etClosedPolygon);
+                    //fuse the overlapping with the initial contour
+                    res->clipperDo(initialContour, clp::ctUnion, initialContour, auxUpdate, clp::pftNonZero, clp::pftNonZero);
+                }
+            }
+        }
+        auxUpdate.clear();
+        auxEnsure.clear();
+    }
 }
 
 void ToolpathManager::removeFromContourSegmentsWithoutSupport(clp::Paths &contour, ResultSingleTool &output, std::vector<ResultSingleTool*> &requiredContours) {

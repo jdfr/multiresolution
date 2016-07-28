@@ -29,7 +29,7 @@ and adjusting accordingly the contours to be built. The functionality here is se
 of the scheduler. However, as the scheduler is already quite complex on its own, all (or
 hopefully most) of the logic to manage previous toolpaths is contained here*/
 class ToolpathManager {
-    clp::Paths auxUpdate, auxInitial;
+    clp::Paths auxUpdate, auxInitial, auxEnsure;
     //this function is the body of the inner loop in updateInputWithProfilesFromPreviousSlices(), parametrized in the contour
     void applyContours(clp::Paths &contours, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
     void applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);

@@ -266,6 +266,12 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
             "If this option is specified, each contour segment is considered separately: if the contour segment does not overlap with any contour within a previous slice which is just next to this one in Z, it is not used. The rationale is that some 3D structures may have low-res blobs connected only by high-res bridges. Blindly printing all low-res blobs would print them in the void without any support. To decide if two slices are next to each other in Z, the criteria are the same as used in options --compute-surfaces-just-with-same-process and --compute-surfaces-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; both the previous slice and the contour segments will be offseted by that length before testing for overlappings"
         )
+        ("ensure-attachment-offset",
+            po::value<double>()->default_value(0.0)->value_name("additional_offset"),
+            "For slicing-scheduler or slicing-manual, high-res portions can overhang with relatively narrow and insecure attachments to low-res bulk elements. If the manufacturing processes allow for overlapping toolpaths (e.g. stereolithography), this option can be used to ensure a degree of overlapping between the processes. This option is incompatible with the use of --addsub or --radius-removecommon. WARNING: see also --ensure-attachment-cutoff-offset.")
+        ("ensure-attachment-cutoff-offset",
+            po::value<double>()->value_name("offset"),
+            "If --ensure-attachment-offset is not zero, it is usually applied to contours with many small/narrow islands that are artifacts that should not be included in the computation of the attachment. This option represents a thickness for these islands: if any contour island dissapears when being negatively offseted by the amount of this option, it will be discarded.")
         ("lump-surfaces-to-perimeters",
             "Perimeters and surfaces are toolpaths, but each one is output separately. However, if this option is specified, all surfaces will be lumped together with the perimeters for this tool. This happens *before* motion planning is applied.")
         ("lump-surfaces-to-infillings",
@@ -955,8 +961,15 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].differentiateSurfaceInfillings = usesurface;
     spec.pp[k].differentiateSurfaceFactor                         = vm["compute-surfaces-extent-factor"].as<double>();
     spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool = vm["compute-surfaces-just-with-same-process"].as<bool>();
-    spec.pp[k].perimeterLineOverlap = vm["additional-perimeters-lineoverlap"].as<double>();
+    spec.pp[k].perimeterLineOverlap    = vm["additional-perimeters-lineoverlap"].as<double>();
     spec.pp[k].numAdditionalPerimeters = vm["additional-perimeters"].as<int>();
+    
+    spec.pp[k].ensureAttachmentOffset            = (clp::cInt)getScaled(vm["ensure-attachment-offset"].as<double>(), scale, doscale);
+    spec.pp[k].ensureAttachmentUseMinimalOffset  = vm.count("ensure-attachment-cutoff-offset") != 0;
+    if (spec.pp[k].ensureAttachmentUseMinimalOffset) {
+        spec.pp[k].ensureAttachmentMinimalOffset = getScaled(vm["ensure-attachment-cutoff-offset"].as<double>(), scale, doscale);
+    }
+    
     
     if (spec.pp[k].alwaysSupported && !spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool) {
         throw po::error(str("Process ", k, " has '--always-supported' and '--compute-surfaces-just-with-same-process false'. These options are not compatible: the first one requires supportting slices to be computed beforehand, while the second one instructs the system to also consider high-res supporting slices, which HAVE to be computed AFTER low-res neighboring slices. A possible way to solve this conundrum would be to implement an option to consider raw slices instead of computed contours."));
@@ -1075,6 +1088,14 @@ void ParserAllLocalAndGlobal::perProcessCallback(int k, po::variables_map &proce
 void ParserAllLocalAndGlobal::finishCallback() {
     std::string err = spec.populateParameters();
     if (!err.empty()) throw po::error(std::move(err));
+    if (spec.anyEnsureAttachmentOffset) {
+        if (spec.anyUseRadiusesRemoveCommon) {
+            throw po::error("error: If any process uses --ensure-attachment-offset, no process can use --radius-removecommon!!!!");
+        }
+        if (spec.global.addsub.addsubWorkflowMode) {
+            throw po::error("error: If any process uses --ensure-attachment-offset, option --addsub cannot be used!!!!");
+        }
+    }
 }
 
 ParserNanoLocalAndGlobal::ParserNanoLocalAndGlobal(bool _applyMotionPlanner, Configuration &c, MetricFactors &f, NanoscribeSpec &n, std::shared_ptr<po::options_description> g, std::shared_ptr<po::options_description> l) :
