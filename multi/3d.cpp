@@ -167,15 +167,18 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
             } else {
                 offset = (double)spec->pp[ntool].burrLength;
             }
-            offset += (double)spec->pp[ntool].radius;
+            //offset += (double)spec->pp[ntool].radius;
             res->offsetDo(auxEnsure, -offset, initialContour, clp::jtRound, clp::etClosedPolygon);
             //do not go on if all contours will vanish later, because this treatment will make them larger, so they will not
             if (!auxEnsure.empty()) {
                 if (spec->pp[ntool].ensureAttachmentUseMinimalOffset) {
+                    double moffset = spec->pp[ntool].ensureAttachmentMinimalOffset;
+                    //this is to remove long and narrow artifacts
+                    res->offsetDo(auxEnsure,     -moffset/100, initialContour, clp::jtRound, clp::etClosedPolygon);
+                    res->offsetDo(initialContour, moffset/100, auxEnsure,      clp::jtRound, clp::etClosedPolygon);
                     //remove small artifacts from the contour (but uses only dissapearance under negative offset)
                     HoledPolygons hps, result;
                     AddPathsToHPs(res->clipper, initialContour, hps);
-                    double moffset = spec->pp[ntool].ensureAttachmentMinimalOffset;
                     auto &offseter = res->offset;
                     erase_remove_idiom(hps, [&result, &offseter, moffset](HoledPolygon &hp){
                         hp.offset(offseter, -moffset, result);

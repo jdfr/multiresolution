@@ -268,7 +268,7 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
         )
         ("ensure-attachment-offset",
             po::value<double>()->default_value(0.0)->value_name("additional_offset"),
-            "For slicing-scheduler or slicing-manual, high-res portions can overhang with relatively narrow and insecure attachments to low-res bulk elements. If the manufacturing processes allow for overlapping toolpaths (e.g. stereolithography), this option can be used to ensure a degree of overlapping between the processes. This option is incompatible with the use of --addsub or --radius-removecommon. WARNING: see also --ensure-attachment-cutoff-offset.")
+            "For slicing-scheduler or slicing-manual, high-res portions can overhang with relatively narrow and insecure attachments to low-res bulk elements. If the manufacturing processes allow for overlapping toolpaths (e.g. stereolithography), this option can be used to ensure a degree of overlapping between the processes. This option is incompatible with the use of --addsub or --radius-removecommon. Unfortunately, if this option is used, corners tend to be unnecesarily overwritten. This can be avoided (but not completely removed in all cases) with --ensure-attachment-cutoff-offset.")
         ("ensure-attachment-cutoff-offset",
             po::value<double>()->value_name("offset"),
             "If --ensure-attachment-offset is not zero, it is usually applied to contours with many small/narrow islands that are artifacts that should not be included in the computation of the attachment. This option represents a thickness for these islands: if any contour island dissapears when being negatively offseted by the amount of this option, it will be discarded.")
