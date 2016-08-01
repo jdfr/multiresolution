@@ -139,11 +139,12 @@ public:
 GLOBAL AND LOCAL PARAMETERS
 *********************************************************/
 
-enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearH, InfillingRectilinearV, InfillingRectilinearVH };
+enum InfillingMode { InfillingNone, InfillingJustContours, InfillingConcentric, InfillingRectilinearH, InfillingRectilinearV, InfillingRectilinearVH, InfillingRectilinearAlternateVH };
 
 typedef struct InfillingSpec {
     std::vector<double> medialAxisFactorsForInfillings; //list of medialAxis factors, each list should be strictly decreasing
     InfillingMode infillingMode;     //how to deal with infillings
+    bool infillingAlternate;         //if infilling is InfillingRectilinearAlternateVH, this flag is used to alternate between vertical and horizontal infillings (if true, the infilling must be V)
     bool CUSTOMINFILLINGS;
     bool infillingWhole;             //if infilling is rectilinear, this flag decides if the lines are applied per region (slow, but useful for narrow regions), or to the whole contour
     bool infillingStatic;            //if infilling is rectilinear, this flag decides if the bounding box is static (global) or computed as specified by flag infillingWhole

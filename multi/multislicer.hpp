@@ -138,7 +138,7 @@ protected:
     bool applySnapConcentricInfilling; SnapToGridSpec concentricInfillingSnapSpec; //this is state for the recursive call to processInfillingsConcentricRecursive
     bool processInfillingsConcentricRecursive(HoledPolygon &hp);
     clp::Paths computeClippedLines(BBox &bb, double erodedInfillingRadius, bool horizontal);
-    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingMode mode);
+    void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingSpec &ispec);
 };
 
 class Multislicer {

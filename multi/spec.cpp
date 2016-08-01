@@ -4,10 +4,11 @@
 #include <limits>
 
 void InfillingSpec::computeCUSTOMINFILLINGS() {
-    CUSTOMINFILLINGS = (infillingMode == InfillingConcentric)   ||
-                       (infillingMode == InfillingRectilinearH) ||
-                       (infillingMode == InfillingRectilinearV) ||
-                       (infillingMode == InfillingRectilinearVH);
+    CUSTOMINFILLINGS = (infillingMode == InfillingConcentric)    ||
+                       (infillingMode == InfillingRectilinearH)  ||
+                       (infillingMode == InfillingRectilinearV)  ||
+                       (infillingMode == InfillingRectilinearVH) ||
+                       (infillingMode == InfillingRectilinearAlternateVH);
 }
 
 

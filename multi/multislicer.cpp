@@ -431,11 +431,12 @@ bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec
     } case InfillingRectilinearH:
       case InfillingRectilinearV:
       case InfillingRectilinearVH:
+      case InfillingRectilinearAlternateVH:
         if (ispec.infillingStatic || ispec.infillingWhole) {
             BBox bb = getBB(infillingAreas);
             globalShift = 0; //promote to command line parameter if necessary
             useGlobalShift = ispec.infillingStatic;
-            processInfillingsRectilinear(ppspec, infillingAreas, bb, ispec.infillingMode);
+            processInfillingsRectilinear(ppspec, infillingAreas, bb, ispec);
         } else {
             HoledPolygons hps;
             AddPathsToHPs(res->clipper, infillingAreas, hps);
@@ -445,7 +446,7 @@ bool Infiller::processInfillings(size_t k, PerProcessSpec &ppspec, InfillingSpec
                 subinfillings.clear();
                 BBox bb = getBB(*hp);
                 hp->moveToPaths(subinfillings);
-                processInfillingsRectilinear(ppspec, subinfillings, bb, ispec.infillingMode);
+                processInfillingsRectilinear(ppspec, subinfillings, bb, ispec);
             }
         }
         break;
@@ -480,15 +481,23 @@ clp::Paths Infiller::computeClippedLines(BBox &bb, double erodedInfillingRadius,
     return lines;
 }
 
-void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingMode mode) {
+void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingSpec &ispec) {
     double epsilon_erode    = infillingRadius * 0.01; //do not erode a full radius, but keep a small offset
     double erode_value      = (infillingUseClearance) ? epsilon_erode - infillingRadius : 0.0;
     clp::cInt minLineSize   = (clp::cInt)(infillingRadius*1.0); //do not allow ridiculously small lines
-    bool horizontal         = mode == InfillingRectilinearH;
-    clp::Paths lines        = computeClippedLines(bb, erodedInfillingRadius,    horizontal);
-    if (mode == InfillingRectilinearVH) {
-        horizontal          = true;
-        clp::Paths linesBis = computeClippedLines(bb, erodedInfillingRadiusBis, horizontal);
+    bool horizontal;
+    double erodedInfRToUse;
+    if (ispec.infillingMode != InfillingRectilinearAlternateVH) {
+        erodedInfRToUse     = erodedInfillingRadius;
+        horizontal          = ispec.infillingMode == InfillingRectilinearH;
+    } else {
+        erodedInfRToUse     = ispec.infillingAlternate ? erodedInfillingRadius : erodedInfillingRadiusBis;
+        ispec.infillingAlternate = !ispec.infillingAlternate;
+        horizontal          = ispec.infillingAlternate;
+    }
+    clp::Paths lines        = computeClippedLines(bb, erodedInfRToUse,          horizontal);
+    if (ispec.infillingMode == InfillingRectilinearVH) { //in this case, put H *and* V lines in the same infilling
+        clp::Paths linesBis = computeClippedLines(bb, erodedInfillingRadiusBis, true);
         MOVETO(linesBis, lines);
     }
     if (erode_value != 0.0) {
@@ -510,12 +519,12 @@ void Infiller::processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &
         verySimpleSnapPathsToGrid(lines, ppspec.snapspec);
     }
     //IMPORTANT: these lambdas test if the line distance is below the threshold. If diagonal lines are possible, a new lambda must be added to handle them!
-    if        (mode == InfillingRectilinearH) {
-        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().X - line.back().X) < minLineSize; });
-    } else if (mode == InfillingRectilinearV) {
-        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().Y - line.back().Y) < minLineSize; });
-    } else if (mode == InfillingRectilinearVH) {
+    if (ispec.infillingMode == InfillingRectilinearVH) {
         erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return (std::abs(line.front().X - line.back().X) < minLineSize) && (std::abs(line.front().Y - line.back().Y) < minLineSize); });
+    } else if (horizontal) {
+        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().X - line.back().X) < minLineSize; });
+    } else /*if (!horizontal)*/ {
+        erase_remove_idiom(lines, [minLineSize](clp::Path &line) {return  std::abs(line.front().Y - line.back().Y) < minLineSize; });
     }
     COPYTO(lines, *accumInfillings);
     if (infillingRecursive) {

@@ -350,6 +350,23 @@ bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<R
     return ret;
 }
 
+void ToolpathManager::serialize_custom(FILE *f) {
+    int numspecs = spec->numspecs;
+    serialize(f, numspecs);
+    for (int k=0; k<numspecs; ++k) {
+        serialize(f, spec->pp[k].internalInfilling.infillingAlternate);
+        serialize(f, spec->pp[k].surfaceInfilling .infillingAlternate);
+    }
+}
+void ToolpathManager::deserialize_custom(FILE *f) {
+    int numspecs;
+    deserialize(f, numspecs);
+    for (int k=0; k<numspecs; ++k) {
+        deserialize(f, spec->pp[k].internalInfilling.infillingAlternate);
+        deserialize(f, spec->pp[k].surfaceInfilling .infillingAlternate);
+    }
+}
+
 
 void RawSlicesManager::removeUsedRawSlices() {
     for (int k = 0; k < raw.size(); ++k) {

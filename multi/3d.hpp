@@ -35,12 +35,15 @@ class ToolpathManager {
     void applyContours(std::vector<clp::Paths> &contourss, int k, bool processIsAdditive, bool computeContoursAlreadyFilled, double diffwidth);
     void removeFromContourSegmentsWithoutSupport(clp::Paths &contour, ResultSingleTool &output, std::vector<ResultSingleTool*> &requiredContours);
     bool computeContoursAboveAndBelow(ResultSingleTool &output, std::vector<ResultSingleTool*> &requiredContours, bool onlyIfBothAboveAndBelow);
+    void serialize_custom(FILE *f);
+    void deserialize_custom(FILE *f);
 public:
     friend class SimpleSlicingScheduler;
     std::string err;
             std::vector<std::vector<std::shared_ptr<ResultSingleTool>>> slicess; //the outer vector has one element for each process. The inner vectors are previous slices with their z values
             std::map<double, clp::Paths> additionalAdditiveContours;
-            SERIALIZATION_DEFINITION(additionalAdditiveContours, slicess, spec->startState)
+            SERIALIZATION_CUSTOM_DEFINITION({ serialize_custom(f); }, { deserialize_custom(f); }, {},
+                                            additionalAdditiveContours, slicess, spec->startState)
     /*this method is to add feedback to the multislicing process:
       let the system know the contours of the object generated with
       low-res processes, measured with some scanning technology.*/
