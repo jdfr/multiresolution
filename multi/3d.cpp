@@ -361,6 +361,9 @@ void ToolpathManager::serialize_custom(FILE *f) {
 void ToolpathManager::deserialize_custom(FILE *f) {
     int numspecs;
     deserialize(f, numspecs);
+    if (numspecs != spec->numspecs) {
+        throw std::runtime_error(str("number of tools from configuration (", spec->numspecs, ") does not match number of tools from the serialized state(", numspecs, ")!!!"));
+    }
     for (int k=0; k<numspecs; ++k) {
         deserialize(f, spec->pp[k].internalInfilling.infillingAlternate);
         deserialize(f, spec->pp[k].surfaceInfilling .infillingAlternate);
