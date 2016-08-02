@@ -190,11 +190,11 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
                 
                 if (!initialContour.empty()) {
                     //inflate the initial contour to overlap the already present contours
-                    res->offsetDo(auxEnsure, attachmentOffset, initialContour, clp::jtRound, clp::etClosedPolygon);
+                    res->offsetDo(auxEnsure, (double)attachmentOffset, initialContour, clp::jtRound, clp::etClosedPolygon);
                     //intersect with the already present contours to compute the overlapping
                     res->clipperDo(auxEnsure, clp::ctIntersection, auxEnsure, auxUpdate, clp::pftNonZero, clp::pftNonZero);
                     //inflate slightly the overlapping to avoid it being disconnected from the initial contour
-                    res->offsetDo(auxUpdate, attachmentOffset/100, auxEnsure, clp::jtMiter, clp::etClosedPolygon);
+                    res->offsetDo(auxUpdate, (double)attachmentOffset / 100, auxEnsure, clp::jtMiter, clp::etClosedPolygon);
                     //fuse the overlapping with the initial contour
                     res->clipperDo(initialContour, clp::ctUnion, initialContour, auxUpdate, clp::pftNonZero, clp::pftNonZero);
                 }
@@ -351,7 +351,7 @@ bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<R
 }
 
 void ToolpathManager::serialize_custom(FILE *f) {
-    int numspecs = spec->numspecs;
+    int numspecs = (int)spec->numspecs;
     serialize(f, numspecs);
     for (int k=0; k<numspecs; ++k) {
         serialize(f, spec->pp[k].internalInfilling.infillingAlternate);
