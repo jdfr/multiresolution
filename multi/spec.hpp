@@ -2,7 +2,6 @@
 #define  SPEC_HEADER
 
 #include "config.hpp"
-#include "motionPlanner.hpp"
 #include "snapToGrid.hpp"
 #include <memory>
 #include <cmath>
@@ -68,6 +67,9 @@ typedef struct GlobalSpec {
     clp::cInt outerLimitX, outerLimitY;
     bool anyDifferentiateSurfaceInfillings;
     bool anyAlwaysSupported;
+    bool anyUseRadiusesRemoveCommon;
+    bool anyEnsureAttachmentOffset;
+    bool anyOverhangAlwaysSupported;
     GlobalSpec(std::shared_ptr<Configuration> _config) : config(std::move(_config)) {}
 } GlobalSpec;
 
@@ -163,8 +165,9 @@ typedef struct PerProcessSpec {
     clp::cInt arctolG;               // arcTolerance when doing offseting at the gridstep scale
     clp::cInt burrLength;            // radius to remove too small details (applied when no snap is done)
     clp::cInt radiusRemoveCommon;    // radius to remove shared arcs between contours of different resolutions (applying this in the current, naive way may become quite expensive)
-    clp::cInt supportOffset;         //support offset value if flag alwaysSupported is set
-    clp::cInt ensureAttachmentOffset;//offset to ensure attachment of overhanging hihg-res segments to the main low-res structure
+    clp::cInt overhangOffset;        // offset value if flag
+    clp::cInt supportOffset;         // support offset value if flag alwaysSupported is set
+    clp::cInt ensureAttachmentOffset;// offset to ensure attachment of overhanging hihg-res segments to the main low-res structure
     bool      computeToolpaths;      // flag to effectively compute the toolpaths (alternative: only contours, without taking into account toolpath smoothing effects)
     bool      applysnap;             // flag to snap to grid
     bool      snapSmallSafeStep;     // flag to use a small safeStep if snapping to grid
@@ -176,6 +179,8 @@ typedef struct PerProcessSpec {
     bool      alwaysPreprocessing;   //flag to decide if preprocessing is unconditionally applied
     bool      alwaysSupported;       //flag to decide if contours have to overlap with contours of the previous slice
     bool      ensureAttachmentUseMinimalOffset; //flag to decide if ensureAttachmentMinimalOffset is used
+    bool      overhangAlwaysSupported;//flag to change the motion planner to avoid starting toolpaths in overhangs
+    bool      keepStartInsideSupport; //flag to modulate the behavior if flag overhangAlwaysSupported is set
     double noPreprocessingOffset;    //if no preprocessing is done, a morphological opening is done with this value
     std::vector<double> medialAxisFactors; //list of medialAxis factors, each list should be strictly decreasing
     
@@ -183,11 +188,14 @@ typedef struct PerProcessSpec {
     InfillingSpec  surfaceInfilling;
     
     double infillingPerimeterOverlap;//ratio to determine the overlapping between contours and infillings under some circumstances
-    double differentiateSurfaceFactor;
+    double differentiateSurfaceExtentFactor;
+    double        alwaysSupportExtentFactor;
+    double     considerOverhangExtentFactor;
     double perimeterLineOverlap;
     double ensureAttachmentMinimalOffset;
     int    numAdditionalPerimeters;
     bool computeDifferentiationOnlyWithContoursFromSameTool;
+    bool       considerOverhangOnlyWithContoursFromSameTool;
     bool infillingRecursive;         //flag to decide if non-filled regions inside infillings will be added to the list of contours, to try to fill them with medial axis and/or higher resolution processes
     bool differentiateSurfaceInfillings;
 
@@ -212,6 +220,11 @@ typedef struct PerProcessSpec {
 
 } PerProcessSpec;
 
+typedef struct StartState {
+    clp::IntPoint start_near;
+    bool notinitialized;
+} StartState;
+
 typedef struct MultiSpec {
     GlobalSpec global;
     StartState startState;
@@ -220,10 +233,7 @@ typedef struct MultiSpec {
 
     std::vector<PerProcessSpec> pp;
 
-    bool anyUseRadiusesRemoveCommon;
-    bool anyEnsureAttachmentOffset;
-
-    MultiSpec(GlobalSpec _global, size_t n = 0) : global(std::move(_global)), anyUseRadiusesRemoveCommon(false), anyEnsureAttachmentOffset(false) { if (n>0) initializeVectors(n); }
+    MultiSpec(GlobalSpec _global, size_t n = 0) : global(std::move(_global)) { if (n>0) initializeVectors(n); }
 
     void initializeVectors(size_t n) { numspecs = n; pp.resize(n); }
     bool validate();

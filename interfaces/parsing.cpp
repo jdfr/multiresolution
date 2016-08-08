@@ -264,8 +264,21 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             "If there are additional perimeters, this is the ratio of overlap between them (just like --infill-lineoverlap and --surface-infill-lineoverlap).")
         ("always-supported",
             po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
-            "If this option is specified, each contour segment is considered separately: if the contour segment does not overlap with any contour within a previous slice which is just next to this one in Z, it is not used. The rationale is that some 3D structures may have low-res blobs connected only by high-res bridges. Blindly printing all low-res blobs would print them in the void without any support. To decide if two slices are next to each other in Z, the criteria are the same as used in options --compute-surfaces-just-with-same-process and --compute-surfaces-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; both the previous slice and the contour segments will be offseted by that length before testing for overlappings"
-        )
+            "If this option is specified, each contour segment is considered separately: if the contour segment does not overlap with any contour within a previous slice which is just next to this one in Z, it is not used. The rationale is that some 3D structures may have low-res blobs connected only by high-res bridges. Blindly printing all low-res blobs would print them in the void without any support. To decide if two slices are next to each other in Z, the criteria are set using the option --always-supported-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; both the previous slice and the contour segments will be offseted by that length before testing for overlappings")
+        ("always-supported-extent-factor",
+            po::value<double>()->default_value(0.1)->value_name("ratio"),
+            "If --always-supported is specified, this option is used to determine which slices are immediately built before the slice to be supported. It works in exactly the same way as the option --compute-surfaces-extent-factor: the value of this option is a factor over the length of the slice that determines how near the slice another slice can be to be considered as support. Note, however, that there is no flag equivalent to '--compute-surfaces-just-with-same-process false', because high-res slices next to a low-res slice are computed AFTER it.")
+        ("start-overhangs-over-support",
+            po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
+            "If this option is specified, motion planning is modified to take into account the support from the previous layer(s): toolpaths are classified in overhang and supported (if a toolpath is partially overhang, it is divided into subtoolpaths completely in each category). Then, toolpaths are connected in such a way that they are started always from a supported end, if possible. The support is defined as the extent of the previous slices computed using the options --start-overhangs-just-with-same-process and --start-overhangs-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; the support is offseted by this length, in order to modulate this effect. It is particularly useful to use this option in conjunction with option --ensure-attachment-offset, because in this way they greatly increase the chances that overhanging toolpaths will not be written without any support. For now, this option is not compatible with toolpaths with clearance (i.e., not able to overlap)")
+        ("overhangs-do-not-start-from-edge-of-support",
+            "This is a suboption to modulate the behavior of --start-overhangs-over-support. If this option is specified, toolpaths that both start and end in overhang are partitioned in two in order to start drawing always from a supported area.")
+        ("start-overhangs-extent-factor",
+            po::value<double>()->default_value(0.1)->value_name("ratio"),
+            "If --start-overhangs-over-support is specified, this option is used to determine which slices are immediately built before the slice whose overhang is to be considered. It works in exactly the same way as the option --compute-surfaces-extent-factor: the value of this option is a factor over the length of the slice that determines how near the slice another slice can be to be considered as support. See also --start-overhangs-just-with-same-process")
+        ("start-overhangs-just-with-same-process",
+            po::value<bool>()->default_value(false)->value_name("true|false"),
+            "If --start-overhangs-over-support is specified, this flag is used to determine which slices are immediately built before the slice whose overhang is to be considered. It works in exactly the same way as the flag --compute-surfaces-just-with-same-process: if this flag is false, slices from all tools are considered, ut if it is true, only slices from the same tool are considered.")
         ("ensure-attachment-offset",
             po::value<double>()->default_value(0.0)->value_name("additional_offset"),
             "For slicing-scheduler or slicing-manual, high-res portions can overhang with relatively narrow and insecure attachments to low-res bulk elements. If the manufacturing processes allow for overlapping toolpaths (e.g. stereolithography), this option can be used to ensure a degree of overlapping between the processes. This option is incompatible with the use of --addsub or --radius-removecommon. Unfortunately, if this option is used, corners tend to be unnecesarily overwritten. This can be avoided (but not completely removed in all cases) with --ensure-attachment-cutoff-offset.")
@@ -928,7 +941,21 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].alwaysPreprocessing  = vm.count("always-preprocessing") != 0;
     spec.pp[k].computeToolpaths     = vm.count("no-toolpaths")         == 0;
     spec.pp[k].alwaysSupported      = vm.count("always-supported")     != 0;
-
+    
+    spec.pp[k].overhangAlwaysSupported = false;
+    if (vm.count("start-overhangs-over-support") != 0) {
+        if (spec.global.applyMotionPlanner) {
+            if (spec.pp[k].addInternalClearance) {
+                throw po::error(str("options --start-overhangs-over-support and --clearance were specified for process ", k, ". While they can be made compatible, currently they aren't (specifically, --start-overhangs-over-support and --overhangs-do-not-start-from-edge-of-support currently can cause some toolpaths to overlap at their ends"));
+            }
+            spec.pp[k].overhangAlwaysSupported = true;
+            spec.pp[k].overhangOffset          = (clp::cInt)(spec.pp[k].radius * vm["start-overhangs-over-support"].as<double>());
+            spec.pp[k].keepStartInsideSupport  = vm.count("overhangs-do-not-start-from-edge-of-support") != 0;
+        } else {
+            throw po::error(str("option --start-overhangs-over-support specified for process ", k, ", but global option --motion-planner is not specified!!!!"));
+        }
+    }
+    
     if (spec.pp[k].alwaysSupported) {
         spec.pp[k].supportOffset = (clp::cInt)(spec.pp[k].radius * vm["always-supported"].as<double>());
     }
@@ -961,8 +988,11 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
         spec.pp[k].infillingRecursive         = vm.count("infilling-recursive")    != 0;
     }
     spec.pp[k].differentiateSurfaceInfillings = usesurface;
-    spec.pp[k].differentiateSurfaceFactor                         = vm["compute-surfaces-extent-factor"].as<double>();
+    spec.pp[k].differentiateSurfaceExtentFactor                   = vm["compute-surfaces-extent-factor"].as<double>();
+    spec.pp[k].       alwaysSupportExtentFactor                   = vm["always-supported-extent-factor"].as<double>();
+    spec.pp[k].    considerOverhangExtentFactor                   = vm[ "start-overhangs-extent-factor"].as<double>();
     spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool = vm["compute-surfaces-just-with-same-process"].as<bool>();
+    spec.pp[k].      considerOverhangOnlyWithContoursFromSameTool = vm[ "start-overhangs-just-with-same-process"].as<bool>();
     spec.pp[k].perimeterLineOverlap    = vm["additional-perimeters-lineoverlap"].as<double>();
     spec.pp[k].numAdditionalPerimeters = vm["additional-perimeters"].as<int>();
     
@@ -970,11 +1000,6 @@ void parsePerProcess(MultiSpec &spec, MetricFactors &factors, int k, po::variabl
     spec.pp[k].ensureAttachmentUseMinimalOffset  = vm.count("ensure-attachment-cutoff-offset") != 0;
     if (spec.pp[k].ensureAttachmentUseMinimalOffset) {
         spec.pp[k].ensureAttachmentMinimalOffset = getScaled(vm["ensure-attachment-cutoff-offset"].as<double>(), scale, doscale);
-    }
-    
-    
-    if (spec.pp[k].alwaysSupported && !spec.pp[k].computeDifferentiationOnlyWithContoursFromSameTool) {
-        throw po::error(str("Process ", k, " has '--always-supported' and '--compute-surfaces-just-with-same-process false'. These options are not compatible: the first one requires supportting slices to be computed beforehand, while the second one instructs the system to also consider high-res supporting slices, which HAVE to be computed AFTER low-res neighboring slices. A possible way to solve this conundrum would be to implement an option to consider raw slices instead of computed contours."));
     }
 }
 
@@ -1090,8 +1115,8 @@ void ParserAllLocalAndGlobal::perProcessCallback(int k, po::variables_map &proce
 void ParserAllLocalAndGlobal::finishCallback() {
     std::string err = spec.populateParameters();
     if (!err.empty()) throw po::error(std::move(err));
-    if (spec.anyEnsureAttachmentOffset) {
-        if (spec.anyUseRadiusesRemoveCommon) {
+    if (spec.global.anyEnsureAttachmentOffset) {
+        if (spec.global.anyUseRadiusesRemoveCommon) {
             throw po::error("error: If any process uses --ensure-attachment-offset, no process can use --radius-removecommon!!!!");
         }
         if (spec.global.addsub.addsubWorkflowMode) {

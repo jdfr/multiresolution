@@ -1,4 +1,5 @@
 #include "pathsplitter.hpp"
+#include "motionPlanner.hpp"
 #include "showcontours.hpp"
 #include <cmath>
 

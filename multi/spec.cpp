@@ -25,14 +25,18 @@ std::string MultiSpec::populateParameters() {
     std::string result;
     global.anyDifferentiateSurfaceInfillings = false;
     global.anyAlwaysSupported                = false;
+    global.anyOverhangAlwaysSupported        = false;
+    global.anyUseRadiusesRemoveCommon        = false;
+    global.anyEnsureAttachmentOffset         = false;
     for (size_t k = 0; k<numspecs; ++k) {
+        
+        pp[k].useRadiusRemoveCommon              = pp[k].radiusRemoveCommon > 0;
         
         global.anyDifferentiateSurfaceInfillings = global.anyDifferentiateSurfaceInfillings || pp[k].differentiateSurfaceInfillings;
         global.anyAlwaysSupported                = global.anyAlwaysSupported                || pp[k].alwaysSupported;
-        
-        pp[k].useRadiusRemoveCommon    = pp[k].radiusRemoveCommon > 0;
-        anyUseRadiusesRemoveCommon     = anyUseRadiusesRemoveCommon || pp[k].useRadiusRemoveCommon;
-        anyEnsureAttachmentOffset      = anyEnsureAttachmentOffset || (pp[k].ensureAttachmentOffset != 0);
+        global.anyOverhangAlwaysSupported        = global.anyOverhangAlwaysSupported        || pp[k].overhangAlwaysSupported;
+        global.anyUseRadiusesRemoveCommon        = global.anyUseRadiusesRemoveCommon        || pp[k].useRadiusRemoveCommon;
+        global.anyEnsureAttachmentOffset         = global.anyEnsureAttachmentOffset         || (pp[k].ensureAttachmentOffset != 0);
 
         pp[k].internalInfilling.computeCUSTOMINFILLINGS();
         pp[k]. surfaceInfilling.computeCUSTOMINFILLINGS();

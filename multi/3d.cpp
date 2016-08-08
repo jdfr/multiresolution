@@ -291,6 +291,9 @@ bool ToolpathManager::computeContoursAboveAndBelow(ResultSingleTool &output, std
     if (onlyIfBothAboveAndBelow && !(hasAbove && hasBelow)) {
         return false;
     }
+    if ((output.contoursBelowAlreadyComputed || (!hasBelow)) && (output.contoursAboveAlreadyComputed || (!hasAbove))) {
+        return true;
+    }
     for (auto required : requiredContours) {
         clp::Clipper *clipper;
         if (required->z < output.z) {
@@ -317,10 +320,36 @@ bool ToolpathManager::computeContoursAboveAndBelow(ResultSingleTool &output, std
     return true;
 }
 
-bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours) {
+void clearContoursAboveBelow(ResultSingleTool &output) {
+    //this resets the memoization logic in computeContoursAboveAndBelow()
+    output.contoursAboveAlreadyComputed = false;
+    output.contoursBelowAlreadyComputed = false;
+    output.contoursAbove.clear();
+    output.contoursBelow.clear();
+}
+
+bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContoursOverhang, std::vector<ResultSingleTool*> requiredContoursSurface, bool recomputeRequiredAfterOverhang) {
     clp::Paths *internalParts = NULL;
-    if (spec->pp[output.ntool].differentiateSurfaceInfillings && !requiredContours.empty()) {
-        bool haveBeenComputed = computeContoursAboveAndBelow(output, requiredContours, true);
+    clp::Paths *support       = NULL;
+    if (!requiredContoursOverhang.empty()) {
+        computeContoursAboveAndBelow(output, requiredContoursOverhang, false);
+        support = spec->global.sliceUpwards ? &output.contoursBelow : &output.contoursAbove;
+        double overhangOffset = (double)spec->pp[output.ntool].overhangOffset;
+        if (overhangOffset!=0.0) {
+            res->offsetDo(auxEnsure, overhangOffset, *support, clp::jtRound, clp::etClosedPolygon);
+            support = &auxEnsure;
+        }
+        
+    }
+    if (recomputeRequiredAfterOverhang) {
+        if ((support!=NULL) && (support!=&auxEnsure)) {
+            auxEnsure = std::move(*support);
+            support   = &auxEnsure;
+        }
+        clearContoursAboveBelow(output);
+    }
+    if (!requiredContoursSurface.empty()) {
+        bool haveBeenComputed = computeContoursAboveAndBelow(output, requiredContoursSurface, true);
         if (haveBeenComputed) {
             res->clipperDo(auxInitial, clp::ctIntersection, output.contoursAbove, output.contoursBelow, clp::pftNonZero, clp::pftNonZero);
             //output.contoursAbove = clp::Paths();
@@ -330,8 +359,10 @@ bool ToolpathManager::processSlicePhase2(ResultSingleTool &output, std::vector<R
         }
         internalParts = &auxInitial;
     }
-    bool ret = multi.applyProcessPhase2(output, internalParts, output.contours_alreadyfilled, output.ntool);
+    bool ret = multi.applyProcessPhase2(output, internalParts, support, output.contours_alreadyfilled, output.ntool);
+    clearContoursAboveBelow(output);
     auxInitial.clear();
+    auxEnsure.clear();
     output.contours_alreadyfilled = clp::Paths();
     output.has_err = !output.err.empty();
     if (!ret) {
@@ -596,11 +627,13 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
         output[i].z = input[ii].z;
         output[i].ntool = input[ii].ntool;
         output[i].numSlicesRequiringThisOne = 0;
+        output[i].recomputeRequiredAfterSupport  = false;
+        output[i].recomputeRequiredAfterOverhang = false;
         input[ii].mapInputToOutput = i;
         ++num_output_by_tool[output[i].ntool];
     }
-    if (tm.spec->global.anyDifferentiateSurfaceInfillings || tm.spec->global.anyAlwaysSupported) {
-        typedef struct MinMax { double min, max, extent; MinMax(double mn, double mx, double factor) : min(mn), max(mx), extent((mx-mn)*factor) {} } MinMax;
+    if (tm.spec->global.anyDifferentiateSurfaceInfillings || tm.spec->global.anyAlwaysSupported || tm.spec->global.anyOverhangAlwaysSupported) {
+        typedef struct MinMax { double min, max, extent; MinMax(double mn, double mx) : min(mn), max(mx), extent(mx-mn) {} } MinMax;
         std::vector<MinMax> minmaxzs;
         size_t numouts = output.size();
         minmaxzs.reserve(numouts);
@@ -608,79 +641,146 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
             int ntool   = out.ntool;
             double minz = out.z - tm.spec->pp[ntool].profile->applicationPoint;
             double maxz = out.z + tm.spec->pp[ntool].profile->remainder;
-            minmaxzs.emplace_back(minz, maxz, tm.spec->pp[ntool].differentiateSurfaceFactor);
+            minmaxzs.emplace_back(minz, maxz);
         }
         //helpers to parametrize subloop direction (either downwards or upwards)
         int  for_inits[]      = {-1, +1};
         bool loop_is_upwards;
         auto loop_termination = [&loop_is_upwards, numouts](int  idx) { return loop_is_upwards ? idx < numouts : idx >= 0; };
         auto loop_next        = [&loop_is_upwards]         (int &idx) { if    (loop_is_upwards) { ++idx; } else { --idx; } };
+        //main business logic common to boths subloops
+        bool recordForSurfaces;
+        bool recordForAlwaysSupported;
+        bool recordForOverhangAlwaysSupported;
+        bool record_for_reasons_1_and_2;
+        bool record_for_reasons_2_and_3;
+        bool record_for_reasons_1_and_3_but_not_2;
+        bool recordForAnyReason;
+        bool computeDifferentiationOnlyWithContoursFromSameTool;
+        bool considerOverhangOnlyWithContoursFromSameTool;
+        auto recordSlices = [this, &recordForSurfaces, &recordForAlwaysSupported, &recordForOverhangAlwaysSupported, &record_for_reasons_1_and_2, &record_for_reasons_2_and_3, &record_for_reasons_1_and_3_but_not_2, &computeDifferentiationOnlyWithContoursFromSameTool, &considerOverhangOnlyWithContoursFromSameTool]
+                            (bool okSurface, bool okSupport, bool okOverhang, bool different_ntool, int k, int kk) {
+            /* BUSINESS LOGIC: record slice kk as prerequisite for slice k in any combination of three possible prerequisites
+             * 
+             * ACTUAL COMPUTATION ORDER: 
+             *     1. prerequisite requiredContoursForSupport  (either above or below, with same option as 2)
+             *     2. prerequisite requiredContoursForOverhang (either above or below, with same option as 1)
+             *     3. prerequisite requiredContoursForSurface  (both above and below)
+             * So, recomputation flags are set up if there are discrepancies after 1 or 2.
+             */
+            bool recordSupport      = recordForAlwaysSupported         && okSupport  && !(                                                      different_ntool);
+            bool recordOverhang     = recordForOverhangAlwaysSupported && okOverhang && !(      considerOverhangOnlyWithContoursFromSameTool && different_ntool);
+            bool recordSurface      = recordForSurfaces                && okSurface  && !(computeDifferentiationOnlyWithContoursFromSameTool && different_ntool);
+            
+            //record if necessary for each prerequisite
+            if (recordSurface) {
+                output[k].requiredContoursForSurface.push_back(kk);
+                ++output[kk].numSlicesRequiringThisOne;
+            }
+            if (recordOverhang) {
+                output[k].requiredContoursForOverhang.push_back(kk);
+                ++output[kk].numSlicesRequiringThisOne;
+            }
+            if (recordSupport) {
+                output[k].requiredContoursForSupport.push_back(kk);
+                ++output[kk].numSlicesRequiringThisOne;
+            }
+            
+            //recomputation is required in cases where (a) more than one prerequisite is being supported and (b) requirements are different for each prerequisite
+            if (!output[k].recomputeRequiredAfterSupport) {
+                if (record_for_reasons_1_and_2) /*(recordForAlwaysSupported && recordForOverhangAlwaysSupported)*/ {
+                    output[k].recomputeRequiredAfterSupport  = recordSupport != recordOverhang;
+                }
+            }
+            if (!output[k].recomputeRequiredAfterOverhang) {
+                if (record_for_reasons_2_and_3) /*(recordForOverhangAlwaysSupported && recordForSurfaces)*/ {
+                    output[k].recomputeRequiredAfterOverhang = recordOverhang != recordSurface;
+                }
+                //the case where all reasons are simulateneously true is already covered by if statements for record_for_reasons_1_and_2 and record_for_reasons_2_and_3 
+                if (record_for_reasons_1_and_3_but_not_2) /*(recordForAlwaysSupported && (!recordForOverhangAlwaysSupported) && recordForSurfaces)*/ {
+                    output[k].recomputeRequiredAfterOverhang = recordSupport != recordSurface;
+                }
+            }
+        };
+        //main loop
         for (int k = 0; k < numouts; ++k) {
             int ntool = output[k].ntool;
             auto &ppspec = tm.spec->pp[ntool];
+            computeDifferentiationOnlyWithContoursFromSameTool = ppspec.computeDifferentiationOnlyWithContoursFromSameTool;
+            considerOverhangOnlyWithContoursFromSameTool       = ppspec.considerOverhangOnlyWithContoursFromSameTool;
             
-            if (ppspec.differentiateSurfaceInfillings || ppspec.alwaysSupported) {
+            if (ppspec.differentiateSurfaceInfillings || ppspec.alwaysSupported || ppspec.overhangAlwaysSupported) {
                 //add the slices above and below this slice: first slices below, then slices above
                 //the code structure is almost identical for both cases (below and above), but it it has enough differences to make it quite
-                //confusing if we want to refactor them as a single loop parameterized on some intial values and conditions
+                //confusing if we want to refactor them as a single loop parameterized on some initial values and conditions. Instead, we use lambda recordSlices() for the common logic
+
+                //this heuristic is good enough for now: we loop until we have covered a Z extent at least a little bigger than the required to consider slices of same tool just above/below.
+                //TODO: take into account special cases when the heuristic may not be right
+                double maxFac = 1.0;
+                if (recordForSurfaces)                maxFac = std::max(maxFac, ppspec.differentiateSurfaceExtentFactor);
+                if (recordForAlwaysSupported)         maxFac = std::max(maxFac, ppspec.alwaysSupportExtentFactor);
+                if (recordForOverhangAlwaysSupported) maxFac = std::max(maxFac, ppspec.considerOverhangExtentFactor);
+                maxFac += 0.1;
                 
-                //ATTENTION: the memoization logic in computeContoursAboveAndBelow() REQUIRES requiredContoursForPhase1 to be a proper subset of requiredContoursForPhase2,
-                //           AND that requiredContoursForPhase1 is always exactly the subset of all above slices in requiredContoursForPhase2 (alternatively, exactly the subset of all below slices in requiredContoursForPhase2)
-                //if that condition were to be unmet, MAKE SURE that the logic in computeContoursAboveAndBelow() IS NO LONGER SAVING ALREADY COMPUTED VALUES, OR FIX IT MORE SUBTLY
+                /*ATTENTION: computeContoursAboveAndBelow() can be called up to 3 times. Its memoization logic works in the following way:
+                               * if required, compute contour from set of slices in requiredContoursForSupport, and save the result
+                               * if the sets requiredContoursForOverhang and requiredContoursForSupport are the same, reuse the result, otherwise recompute the contour and save it
+                               * the set requiredContoursForSurface is partitioned in two subsets, one for slices below and one for slices above. If one of these coincides with recomputeRequiredAfterOverhang, it can be reused, otherwise all is recomputed
+                             Flags recomputeRequired* are used to signal that recomputation is required*/
                 
                 //try to add slices below. When sliceUpwards is true, the subloop is downwards, and vice versa
-                bool recordForSurface   = ppspec.differentiateSurfaceInfillings;
-                bool recordForSupport   = sliceUpwards && ppspec.alwaysSupported;
-                bool recordForAnyReason = recordForSurface || recordForSupport;
+                recordForSurfaces                    = ppspec.differentiateSurfaceInfillings;  //phase 2
+                recordForAlwaysSupported             = sliceUpwards && ppspec.alwaysSupported; //phase 1
+                recordForOverhangAlwaysSupported     = sliceUpwards && ppspec.overhangAlwaysSupported; //phase 2
+                record_for_reasons_1_and_2           = recordForAlwaysSupported         & recordForOverhangAlwaysSupported;
+                record_for_reasons_2_and_3           = recordForOverhangAlwaysSupported & recordForSurfaces;
+                record_for_reasons_1_and_3_but_not_2 = recordForAlwaysSupported        && (!recordForOverhangAlwaysSupported) && recordForSurfaces;
+                recordForAnyReason                   = recordForAlwaysSupported         | recordForOverhangAlwaysSupported     | recordForSurfaces;
                 if (recordForAnyReason) {
-                    double floor        = minmaxzs[k].min - minmaxzs[k].extent;
+                    double floorSurface  = minmaxzs[k].min - minmaxzs[k].extent * ppspec.differentiateSurfaceExtentFactor;
+                    double floorSupport  = minmaxzs[k].min - minmaxzs[k].extent * ppspec.alwaysSupportExtentFactor;
+                    double floorOverhang = minmaxzs[k].min - minmaxzs[k].extent * ppspec.considerOverhangExtentFactor;
+                    double floorAbsolute = minmaxzs[k].min - minmaxzs[k].extent * maxFac;
                     loop_is_upwards     = !sliceUpwards;
                     for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
                         bool different_ntool = ntool!=output[kk].ntool;
-                        //do not use slices from different tools if instructed to do so
-                        if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
                         //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
                         if (different_ntool && ((minmaxzs[kk].max - minmaxzs[k].min) > minmaxzs[k].extent)) continue;
                         //keep adding slices while they are not too below us
-                        if (minmaxzs[kk].max > floor) {
-                            if (recordForSurface) {
-                                output[k].requiredContoursForPhase2.push_back(kk);
-                                ++output[kk].numSlicesRequiringThisOne;
-                            }
-                            if (recordForSupport) {
-                                output[k].requiredContoursForPhase1.push_back(kk);
-                                ++output[kk].numSlicesRequiringThisOne;
-                            }
-                        } else {
+                        bool okSurface  = minmaxzs[kk].max > floorSurface;
+                        bool okSupport  = minmaxzs[kk].max > floorSupport;
+                        bool okOverhang = minmaxzs[kk].max > floorOverhang;
+                        recordSlices(okSurface, okSupport, okOverhang, different_ntool, k, kk);
+                        if (!(minmaxzs[kk].max > floorAbsolute)) {
                             break;
                         }
                     }
                 }
                 
                 //try to add slices above. When sliceUpwards is true, the subloop is upwards, and vice versa
-                recordForSurface    = ppspec.differentiateSurfaceInfillings;
-                recordForSupport    = (!sliceUpwards) && ppspec.alwaysSupported;
-                recordForAnyReason  = recordForSurface || recordForSupport;
+                recordForSurfaces                    = ppspec.differentiateSurfaceInfillings;  //phase 2
+                recordForAlwaysSupported             = (!sliceUpwards) && ppspec.alwaysSupported; //phase 1
+                recordForOverhangAlwaysSupported     = (!sliceUpwards) && ppspec.overhangAlwaysSupported; //phase 2
+                record_for_reasons_1_and_2           = recordForAlwaysSupported         & recordForOverhangAlwaysSupported;
+                record_for_reasons_2_and_3           = recordForOverhangAlwaysSupported & recordForSurfaces;
+                record_for_reasons_1_and_3_but_not_2 = recordForAlwaysSupported        && (!recordForOverhangAlwaysSupported) && recordForSurfaces;
+                recordForAnyReason                   = recordForAlwaysSupported         | recordForOverhangAlwaysSupported     | recordForSurfaces;
                 if (recordForAnyReason) {
-                    double ceil     = minmaxzs[k].max + minmaxzs[k].extent;
+                    double ceilSurface  = minmaxzs[k].max + minmaxzs[k].extent * ppspec.differentiateSurfaceExtentFactor;
+                    double ceilSupport  = minmaxzs[k].max + minmaxzs[k].extent * ppspec.alwaysSupportExtentFactor;
+                    double ceilOverhang = minmaxzs[k].max + minmaxzs[k].extent * ppspec.considerOverhangExtentFactor;
+                    double ceilAbsolute = minmaxzs[k].min + minmaxzs[k].extent * maxFac;
                     loop_is_upwards = sliceUpwards;
                     for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
                         bool different_ntool = ntool!=output[kk].ntool;
-                        //do not use slices from different tools if instructed to do so
-                        if (ppspec.computeDifferentiationOnlyWithContoursFromSameTool && different_ntool)   continue;
                         //if such slices can be used, make sure that their Z extent does not overlap too much with our Z extent
                         if (different_ntool && ((minmaxzs[k].max - minmaxzs[kk].min) > minmaxzs[k].extent)) continue;
                         //keep adding slices while they are not too above us
-                        if (minmaxzs[kk].min < ceil) {
-                            if (recordForSurface) {
-                                output[k].requiredContoursForPhase2.push_back(kk);
-                                ++output[kk].numSlicesRequiringThisOne;
-                            }
-                            if (recordForSupport) {
-                                output[k].requiredContoursForPhase1.push_back(kk);
-                                ++output[kk].numSlicesRequiringThisOne;
-                            }
-                        } else {
+                        bool okSurface  = minmaxzs[kk].min < ceilSurface;
+                        bool okSupport  = minmaxzs[kk].min < ceilSupport;
+                        bool okOverhang = minmaxzs[kk].min < ceilOverhang;
+                        recordSlices(okSurface, okSupport, okOverhang, different_ntool, k, kk);
+                        if (!(minmaxzs[kk].min < ceilAbsolute)) {
                             break;
                         }
                     }
@@ -847,6 +947,8 @@ void SimpleSlicingScheduler::removeUnrequiredData(double z) {
       }
 }
 
+
+
 //method to consume all pending raw slices, doing phase 1 slicing computations (and phase 2 if possible)
 bool SimpleSlicingScheduler::processReadyRawSlices() {
     bool ok = true;
@@ -856,15 +958,15 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
             auto &this_output = output[this_output_idx];
             std::vector<ResultSingleTool*> recalleds;
             
-            if (!this_output.requiredContoursForPhase1.empty()) {
-                auto &requireds = this_output.requiredContoursForPhase1;
-                recalleds = getRequiredContours(requireds);
+            if (!this_output.requiredContoursForSupport.empty()) {
+               recalleds = getRequiredContours(this_output.requiredContoursForSupport);
                 has_err = recalleds.empty();
                 if (has_err) {
                     err = str("Error: slice with input_idx=", input_idx, " should be ready for phase 1 of processing, but it requires some other slices to have already passed phase 1 themselves, but not all of them already have. Currently, the scheduler is not designed to re-order the slices in the face of this eventuality, so the process just ends with this error. This is probably due to some hiccup in the order of slices if using --slicing-manual");
                     ok = false;
                     break;
                 }
+                anotateRequiredContoursAsUsed(recalleds);
             }
                 
             int idx_raw = input[input_idx].mapInputToRaw;
@@ -879,7 +981,8 @@ bool SimpleSlicingScheduler::processReadyRawSlices() {
                 ok  = false;
                 break;
             }
-            if (this_output.requiredContoursForPhase2.empty()) {
+            if (this_output.recomputeRequiredAfterSupport) clearContoursAboveBelow(*this_output.result);
+            if (this_output.requiredContoursForOverhang.empty() && this_output.requiredContoursForSurface.empty()) {
                 has_err = !tm.processSlicePhase2(*this_output.result);
                 if (has_err) {
                     err = tm.err;
@@ -910,27 +1013,38 @@ std::vector<ResultSingleTool*> SimpleSlicingScheduler::getRequiredContours(std::
     }
     if (recalleds.size()!=requireds.size()) {
         recalleds.clear();
-    } else {
-        for (auto recalled : recalleds) {
-            --output[recalled->idx].numSlicesRequiringThisOne;
-        }
     }
     return recalleds;
 }
 
+void SimpleSlicingScheduler::anotateRequiredContoursAsUsed(std::vector<ResultSingleTool*> &recalleds) {
+    for (auto recalled : recalleds) {
+        --output[recalled->idx].numSlicesRequiringThisOne;
+    }
+}
+
+
 //helper method for processReadySlicesPhase2(): do phase 2 slicing computations if the system is ready
 bool SimpleSlicingScheduler::tryToComputeSlicePhase2(ResultSingleTool &result) {
+    
+    auto &requiredsOverhang = output[result.idx].requiredContoursForOverhang;
+    std::vector<ResultSingleTool*> recalledsOverhang = getRequiredContours(requiredsOverhang);
+    if (!requiredsOverhang.empty() && recalledsOverhang.empty()) return true;
+                       
+    auto &requiredsSurface = output[result.idx].requiredContoursForSurface;
+    std::vector<ResultSingleTool*> recalledsSurface = getRequiredContours(requiredsSurface);
+    if (!requiredsSurface.empty() && recalledsSurface.empty()) return true;
+    
+    anotateRequiredContoursAsUsed(recalledsOverhang);
+    anotateRequiredContoursAsUsed(recalledsSurface);
+                       
     bool ok = true;
-    auto &requireds = output[result.idx].requiredContoursForPhase2;
-    std::vector<ResultSingleTool*> recalleds = getRequiredContours(requireds);
-    if (!recalleds.empty()) {
-        has_err = !tm.processSlicePhase2(result, std::move(recalleds));
-        if (has_err) {
-            err = tm.err;
-            ok = false;
-        }
-        output[result.idx].computed = true;
+    has_err = !tm.processSlicePhase2(result, std::move(recalledsOverhang), std::move(recalledsSurface), output[result.idx].recomputeRequiredAfterOverhang);
+    if (has_err) {
+        err = tm.err;
+        ok = false;
     }
+    output[result.idx].computed = true;
     return ok;
 }
 
@@ -950,7 +1064,7 @@ bool SimpleSlicingScheduler::processReadySlicesPhase2() {
 void SimpleSlicingScheduler::computeNextInputSlices() {
 //temporal arrangement until we are ready to drop the old method implementation
     if(!processReadyRawSlices()) return;
-    if (tm.spec->global.anyDifferentiateSurfaceInfillings) processReadySlicesPhase2();
+    if (tm.spec->global.anyDifferentiateSurfaceInfillings || tm.spec->global.anyOverhangAlwaysSupported) processReadySlicesPhase2();
     return;
 }
 

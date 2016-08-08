@@ -54,7 +54,10 @@ public:
     Multislicer multi;
     ToolpathManager(std::shared_ptr<ClippingResources> _res) : multi(std::move(_res)) { res = multi.res; spec = multi.res->spec; slicess.resize(spec->numspecs); }
     bool processSlicePhase1(std::vector<ResultSingleTool*> &requiredContours, clp::Paths &rawSlice, double z, int ntool, int output_index, ResultSingleTool *&result);
-    bool processSlicePhase2(ResultSingleTool &output, std::vector<ResultSingleTool*> requiredContours = std::vector<ResultSingleTool*>());
+    bool processSlicePhase2(ResultSingleTool &output,
+                            std::vector<ResultSingleTool*> requiredContoursOverhang = std::vector<ResultSingleTool*>(),
+                            std::vector<ResultSingleTool*> requiredContoursSurface  = std::vector<ResultSingleTool*>(),
+                            bool recomputeRequiredAfterOverhang = false);
     void removeUsedSlicesPastZ(double z, std::vector<OutputSliceData> &output);
     void removeAdditionalContoursPastZ(double z);
     void purgeAdditionalAdditiveContours() { additionalAdditiveContours.clear(); }
@@ -72,14 +75,19 @@ typedef struct InputSliceData {
 
 typedef struct OutputSliceData {
     ResultSingleTool* result;
-            std::vector<int> requiredContoursForPhase1;
-            std::vector<int> requiredContoursForPhase2;
+            std::vector<int> requiredContoursForSupport;
+            std::vector<int> requiredContoursForOverhang;
+            std::vector<int> requiredContoursForSurface;
             double z;
             int ntool;
             int mapOutputToInput; //one to one mapping
             int numSlicesRequiringThisOne;
             bool computed;
-            SERIALIZATION_DEFINITION(requiredContoursForPhase1, requiredContoursForPhase2, z, ntool, mapOutputToInput, numSlicesRequiringThisOne, computed)
+            bool recomputeRequiredAfterSupport;
+            bool recomputeRequiredAfterOverhang;
+            SERIALIZATION_DEFINITION(requiredContoursForSupport, requiredContoursForOverhang, requiredContoursForSurface,
+                                     z, ntool, mapOutputToInput, numSlicesRequiringThisOne, computed,
+                                     recomputeRequiredAfterSupport, recomputeRequiredAfterOverhang)
     OutputSliceData() : result(NULL) {}
 } OutputSliceData;
 
@@ -157,6 +165,7 @@ class SimpleSlicingScheduler {
     bool processReadySlicesPhase2();
     void post_deserialize_reconstruct();
     std::vector<ResultSingleTool*> getRequiredContours(std::vector<int> &requireds);
+    void anotateRequiredContoursAsUsed(std::vector<ResultSingleTool*> &recalleds);
 public:
     std::string err;
     bool has_err;

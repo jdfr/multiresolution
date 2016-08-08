@@ -68,13 +68,6 @@ Int128 Int128Mul(long64 lhs, long64 rhs)
 };
 #endif
 
-bool anyTrue(std::vector<bool> &valid) {
-    for (std::vector<bool>::const_iterator v = valid.begin(); v != valid.end(); ++v) {
-        if (*v) return true;
-    }
-    return false;
-}
-
 #define USE_INTRINSIC_128
 
 #ifdef USE_INTRINSIC_128
@@ -255,7 +248,7 @@ template <PathCloseMode mode> void verysimple_get_nearest_path(clp::IntPoint sta
 -consider the set VN of very near points, within Dn*smallfactor
 -select as the next point one from VN such as it is the closest within the general opposite direction where most points are
 */
-void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Paths &paths) {
+void verySimpleMotionPlannerHelper(StartState &startState, PathCloseMode mode, clp::Paths &paths, std::vector<bool> &valid, int &numvalid, clp::Paths &output) {
     if (paths.empty()) return;
 #ifdef BENCHMARK
     // ticks per second
@@ -270,25 +263,10 @@ void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Pa
 #endif  
     int idx;
     bool isfront;
-    std::vector<bool> valid(paths.size(), true);
-
-    //this hack is to enable the caller to use the same for input and output. It seems wasteful, but there is no way around copying
-    clp::Paths output;
-    output.reserve(paths.size());
-
-    //copying the paths *again* seems unnecesarily wasteful, but we require it because sonme paths may be reversed
-    //only if this library is interfaced with IO (iopaths.cpp), but NOT if it is interfaced with an API, the alternative is to codify the order and the reversions as a custom specification, and use it at the output time
-    //so it seems like it is better to do it right here
-    if (startState.notinitialized) {
-        startState.notinitialized = false;
-        valid[0] = false;
-        output.push_back(std::move(paths.front()));
-        startState.start_near = output.back().back();
-    }
-
+    
     auto nearest_path = mode == PathOpen ? verysimple_get_nearest_path<PathOpen> : verysimple_get_nearest_path<PathLoop>;
     BENCHGETTICK(t[0]);
-    while (anyTrue(valid)) {
+    while (numvalid>0) {
         //verysimple_get_nearest_path<mode>(startState.start_near, paths, valid, idx, isfront);
         nearest_path(startState.start_near, paths, valid, idx, isfront);
         if (idx < 0) {
@@ -296,6 +274,7 @@ void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Pa
             throw std::runtime_error("NEVER HAPPEN in verySimpleMotionPlanner()");
         }
         valid[idx] = false;
+        --numvalid;
         bool add   = true;
         clp::Path &path = paths[idx];
         if (!isfront)        clp::ReversePath(path);
@@ -311,7 +290,221 @@ void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Pa
     BENCHGETTICK(t[1]);
     SHOWBENCHMARK("TIME IN MOTION PLANNER LOOP: %f\n", t[0], t[1]);
     WAIT;
+}
 
+void verySimpleMotionPlanner(StartState &startState, PathCloseMode mode, clp::Paths &paths) {
+    std::vector<bool> valid(paths.size(), true);
+    int numvalid = (int)paths.size();
+    //this hack is to enable the caller to use the same for input and output. It seems wasteful, but there is no way around copying
+    //copying the paths *again* seems unnecesarily wasteful, but we require it because sonme paths may be reversed
+    //only if this library is interfaced with IO (iopaths.cpp), but NOT if it is interfaced with an API, the alternative is to codify the order and the reversions as a custom specification, and use it at the output time
+    //so it seems like it is better to do it right here
+    clp::Paths output;
+    output.reserve(paths.size());
+    
+    if (startState.notinitialized) {
+        startState.notinitialized = false;
+        valid[0] = false;
+        --numvalid;
+        output.push_back(std::move(paths.front()));
+        startState.start_near = output.back().back();
+    }
+    
+    verySimpleMotionPlannerHelper(startState, mode, paths, valid, numvalid, output);
+    
     paths = std::move(output);
 }
 
+bool almost_equal(clp::IntPoint &pointA, clp::IntPoint &pointB) {
+    const clp::cInt almost_equal_value = 3; //maybe TODO: make this a configuration value instead of a constant    
+    return (std::abs(pointA.X - pointB.X) <= almost_equal_value) &&
+           (std::abs(pointA.Y - pointB.Y) <= almost_equal_value);
+}
+
+bool SaferOverhangingVerySimpleMotionPlanner::tryToConcat(clp::Paths &paths, std::vector<bool> &valid, int &this_numvalid, int &idx, bool &isfront) {
+    nearest_path(startState.start_near, paths, valid, idx, isfront);
+    if (idx < 0) {
+        //this cannot possibly happen
+        throw std::runtime_error("NEVER HAPPEN in SaferOverhangingVerySimpleMotionPlanner::tryToConcat()");
+    }
+    clp::Path &path = paths[idx];
+    //TODO: right now, this code does not support clearance (i.e., toolpaths that cannot overlap)
+    // to support clearance, we should be able to erode the lines by one of their ends, and incorporate
+    //the logic to erode the lines instead of just laying them down to have coincident ends.
+    //Anyway, this would be a nice-to-have feature even for non-clearance toolpaths.
+    if (almost_equal(output.back().back(), isfront ? path.front() : path.back())) {
+        if (isfront) {
+            std::move(path. begin()+1, path. end(), std::back_inserter(output.back()));
+        } else {
+            std::move(path.rbegin()+1, path.rend(), std::back_inserter(output.back()));
+        }
+        startState.start_near = output.back().back();
+        valid[idx] = false;
+        --this_numvalid;
+        --numvalid;
+        return true;
+    }
+    return false;
+}
+
+void SaferOverhangingVerySimpleMotionPlanner::addInPath() {
+    clp::Path &path = in[idx_in];
+    if (!isfront_in) clp::ReversePath(path);
+    bool copyFullPath = true;
+    if (keepStartInsideSupport) {
+        //try to avoid situations where you will put an *in* toolpath whose start end is coincident with an *out* toolpath
+        int idx_out1, idx_out2;
+        bool isfront_out1, isfront_out2;
+        nearest_path(path.front(), out, valid_out, idx_out1, isfront_out1);
+        if ((idx_out1 < 0)) {
+            //this cannot possibly happen
+            throw std::runtime_error("NEVER HAPPEN in saferOverhangingVerySimpleMotionPlanner()");
+        }
+        clp::Path &path_out1 = out[idx_out1];
+        bool frontIsExtended = almost_equal(path.front(), isfront_out1 ? path_out1.front() : path_out1.back());
+        if (frontIsExtended) {
+            /*in this case, the front of the toolpath is extended in the *out* partition. Now:
+                  *   If the back of the toolpath is also extended, we divide the toolpath in two (by its representation midpoint,
+                      but it would be better to divide it according to the geometrical midpoint), in order to be able
+                      to write the overhangs starting entirely from already existing supported toolpaths
+                  *   Otherwise, we reverse the toolpath (even if this means violating the greedy ordering algorithm),
+                      to avoid later starting a toolpaths from the edge of the support
+            */
+            nearest_path(path.back(),  out, valid_out, idx_out2, isfront_out2);
+            if ((idx_out2 < 0)) {
+                //this cannot possibly happen
+                throw std::runtime_error("NEVER HAPPEN in saferOverhangingVerySimpleMotionPlanner()");
+            }
+            clp::Path &path_out2 = out[idx_out2];
+            bool  backIsExtended = almost_equal(path.back(),  isfront_out2 ? path_out2.front() : path_out2.back());
+            if (backIsExtended) {
+                copyFullPath = false;
+                //TODO: right now, this code does not support clearance (i.e., toolpaths that cannot overlap)
+                // to support clearance, we should be able to erode the lines by one of their ends, and incorporate
+                //the logic to erode the lines instead of just creating them to have coincident ends.
+                //Anyway, this would be a nice-to-have feature even for non-clearance toolpaths.
+                switch (path.size()) {
+                    case 0:
+                        throw std::runtime_error("inconsistent empty path in saferOverhangingVerySimpleMotionPlanner()");
+                    case 1:
+                        throw std::runtime_error("inconsistent point path in saferOverhangingVerySimpleMotionPlanner()");
+                    case 2: {
+                        output.push_back(clp::Path(2));
+                        clp::IntPoint meanPoint((path.front().X+path.back().X)/2, (path.front().Y+path.back().Y)/2); 
+                        output.back().front() = meanPoint;
+                        output.back().back()  = path.back();
+                        path.back() = meanPoint;
+                        break;
+                    } default: {
+                        int meanPoint = (int)path.size()/2;
+                        output.emplace_back();
+                        output.back().reserve(path.size()-meanPoint);
+                        std::move(path.begin()+meanPoint, path.end(), std::back_inserter(output.back()));
+                        path.resize(path.size()-output.back().size()+1);
+                    }
+                }
+            } else {
+                //in this case, violate motion planning. The other side of the path may be far away, but it is better to do it from here
+                //to avoid unnecesarily broken toolpaths
+                //TODO: modify this algorithm to try to pick another toolpath instead of insisting in applying this one
+                clp::ReversePath(path);
+            }
+        }
+    }
+    if (copyFullPath) {
+        output.push_back(std::move(path));
+        valid_in[idx_in] = false;
+        --numvalid_in;
+        --numvalid;
+    }
+    startState.start_near = output.back().back();
+}
+
+
+
+void SaferOverhangingVerySimpleMotionPlanner::saferOverhangingVerySimpleMotionPlanner(int ntool, clp::Paths &support, PathCloseMode mode, clp::Paths &paths) {
+    if (paths.empty()) return;
+
+    //compute partition of toolpaths into segments that are *in* and *out* of the support
+    {
+        clp::PolyTree pt;
+        res.clipper.AddPaths(support, clp::ptClip, true);
+        res.clipper.AddPaths(paths, clp::ptSubject, false);
+        res.clipper.Execute(clp::ctIntersection, pt, clp::pftNonZero, clp::pftNonZero);
+        OpenPathsFromPolyTree(pt, in);
+        pt.Clear();
+        res.clipper.Execute(clp::ctDifference,   pt, clp::pftNonZero, clp::pftNonZero);
+        OpenPathsFromPolyTree(pt, out);
+        pt.Clear();
+        res.clipper.Clear();
+        ClipperEndOperation(res.clipper);
+    }
+    
+    //if there are no toolpaths without support (or all toolpaths are without support), just use plain motion planning
+    if (out.empty() || in.empty()) {
+        verySimpleMotionPlanner(startState, mode, paths);
+        clear();
+        return;
+    }
+    
+    nearest_path = mode == PathOpen ? &verysimple_get_nearest_path<PathOpen> : &verysimple_get_nearest_path<PathLoop>;
+    keepStartInsideSupport = res.spec->pp[ntool].keepStartInsideSupport;
+    
+    valid_in .assign(in .size(), true);
+    valid_out.assign(out.size(), true);
+    numvalid_in  = (int)in .size();
+    numvalid_out = (int)out.size();
+    numvalid     = numvalid_in + numvalid_out;
+    
+    //this hack is to enable the caller to use the same for input and output. It seems wasteful, but keeping track of everything (ordering, reversed orientations, fused toolpaths, partially broken toolpaths, etc) may get hairy quite fast
+    output.reserve((paths.size()+paths.size()/10));
+    
+    //add first toolpath from the *in* partition
+    if (startState.notinitialized) {
+        //get just 
+        startState.notinitialized = false;
+        idx_in = 0;
+        isfront_in  = true;
+    } else {
+        nearest_path(startState.start_near, in, valid_in, idx_in, isfront_in);
+        if (idx_in < 0) {
+            //this cannot possibly happen
+            throw std::runtime_error("NEVER HAPPEN in saferOverhangingVerySimpleMotionPlanner()");
+        }
+    }
+    addInPath();
+    
+    bool tryoutfirst = true;
+    
+    //main loop: keep trying to concat to the current toolpath. If not possible, go to the next nearest toolpath in the *in* partition
+    while (numvalid>0) {
+        //when some of the two kinds of toolpaths is exhausted, just plan the motion of the rest
+        if (numvalid_in == 0) {
+            if (numvalid_out == 0) break;
+            verySimpleMotionPlannerHelper(startState, mode, out, valid_out, numvalid_out, output);
+            break;
+        }
+        if (numvalid_out == 0) {
+            verySimpleMotionPlannerHelper(startState, mode,  in, valid_in,  numvalid_in,  output);
+            break;
+        }
+        //try to concatenate a toolpath
+        if (tryoutfirst) {
+            tryoutfirst = false;
+            if (tryToConcat(out, valid_out, numvalid_out, idx_out, isfront_out)) continue;
+            tryoutfirst = true;
+            if (tryToConcat(in,  valid_in,  numvalid_in,  idx_in,  isfront_in))  continue;
+        } else {
+            tryoutfirst = true;
+            if (tryToConcat(in,  valid_in,  numvalid_in,  idx_in,  isfront_in))  continue;
+            tryoutfirst = false;
+            if (tryToConcat(out, valid_out, numvalid_out, idx_out, isfront_out)) continue;
+        }
+        //could not concatenate a toolpath: add the nearest path in the *in* partition (guaranteed to not be empty)
+        tryoutfirst = true;
+        addInPath();
+    }
+
+    paths = std::move(output);
+    clear();
+}

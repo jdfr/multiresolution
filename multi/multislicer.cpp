@@ -1,4 +1,5 @@
 #include "multislicer.hpp"
+#include "motionPlanner.hpp"
 #include "orientPaths.hpp"
 #include "medialaxis.hpp"
 #include "showcontours.hpp"
@@ -577,6 +578,10 @@ bool Infiller::processInfillingsConcentricRecursive(HoledPolygon &hp) {
 //MULTISLICING LOGIC
 /////////////////////////////////////////////////
 
+Multislicer::Multislicer(std::shared_ptr<ClippingResources> _res) : infiller(_res), res(std::move(_res)) { saferoverhangmp = new SaferOverhangingVerySimpleMotionPlanner(*res); }
+Multislicer::~Multislicer() { delete saferoverhangmp; }
+
+
 void setupAddsubFlags(GlobalSpec &global, int k, bool &nextProcessSameKind, bool &previousProcessSameKind) {
     if (k == 0) {
         nextProcessSameKind = !global.addsub.addsubWorkflowMode;
@@ -681,7 +686,7 @@ bool Multislicer::applyProcessPhase1(SingleProcessOutput &output, clp::Paths &co
 
 //applyProcess second phase: finish computing perimter toolpaths and compute infilling toolpaths,
 //apply motion planning, and arrange results in the output struct in the format expected by callers
-bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths *internalParts, clp::Paths &contours_alreadyfilled, int k) {
+bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths *internalParts, clp::Paths *support, clp::Paths &contours_alreadyfilled, int k) {
     //start boilerplate
 
     auto spec    = res->spec.get();
@@ -852,9 +857,15 @@ bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths *in
 
         if (global.applyMotionPlanner) {
             //IMPORTANT: this must be the LAST step in the processing of the toolpaths and contours. Any furhter processing will ruin this
-            if (!output.ptoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.ptoolpaths);
-            if (!output.stoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.stoolpaths);
-            if (!output.itoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.itoolpaths);
+            if (support == NULL) {
+                if (!output.ptoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.ptoolpaths);
+                if (!output.stoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.stoolpaths);
+                if (!output.itoolpaths.empty()) verySimpleMotionPlanner(spec->startState, PathOpen, output.itoolpaths);
+            } else {
+                if (!output.ptoolpaths.empty()) saferoverhangmp->saferOverhangingVerySimpleMotionPlanner(k, *support, PathOpen, output.ptoolpaths);
+                if (!output.stoolpaths.empty()) saferoverhangmp->saferOverhangingVerySimpleMotionPlanner(k, *support, PathOpen, output.stoolpaths);
+                if (!output.itoolpaths.empty()) saferoverhangmp->saferOverhangingVerySimpleMotionPlanner(k, *support, PathOpen, output.itoolpaths);
+            }
         }
     }
 
@@ -866,7 +877,7 @@ bool Multislicer::applyProcessPhase2(SingleProcessOutput &output, clp::Paths *in
 bool Multislicer::applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k) {
     if (!applyProcessPhase1(output, contours_tofill, k)) return false;
 
-    return applyProcessPhase2(output, NULL, contours_alreadyfilled, k);
+    return applyProcessPhase2(output, NULL, NULL, contours_alreadyfilled, k);
 }
 
 

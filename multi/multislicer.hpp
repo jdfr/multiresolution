@@ -141,19 +141,24 @@ protected:
     void processInfillingsRectilinear(PerProcessSpec &ppspec, clp::Paths &infillingAreas, BBox &bb, InfillingSpec &ispec);
 };
 
+class SaferOverhangingVerySimpleMotionPlanner;
+
 class Multislicer {
 protected:
     Infiller infiller;
+    //It is convenient that SaferOverhangingVerySimpleMotionPlanner has a reference to ClippingResources. To avoid placing the definition here (SaferOverhangingVerySimpleMotionPlanner belongs logically to motionPlanner.hpp) or doing a major header reorganization, we use a pointer
+    SaferOverhangingVerySimpleMotionPlanner *saferoverhangmp;
     //these variables are here to avoid recurring std::vector growing costs, but they are not intended to be used directly, but aliased as method parameters
     clp::Paths AUX1, AUX2, AUX3, AUX4, accumInfillingsHolder, accumInfillingsHolderSurface;
 public:
     std::shared_ptr<ClippingResources> res;
-    Multislicer(std::shared_ptr<ClippingResources> _res) : infiller(_res), res(std::move(_res)) { }
+    Multislicer(std::shared_ptr<ClippingResources> _res);
+    ~Multislicer();
     void clear() { AUX1.clear(); AUX2.clear(); AUX3.clear(); AUX4.clear(); accumInfillingsHolder.clear(); accumInfillingsHolderSurface.clear(); infiller.clear(); }
     //first half of applyProcess()
     bool applyProcessPhase1(SingleProcessOutput &output, clp::Paths &contours_tofill, int k);
     //second half of applyProcess()
-    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths *internalParts, clp::Paths &contours_alreadyfilled, int k);
+    bool applyProcessPhase2(SingleProcessOutput &output, clp::Paths *internalParts, clp::Paths *support, clp::Paths &contours_alreadyfilled, int k);
     bool applyProcess(SingleProcessOutput &output, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int k);
     int applyProcesses(std::vector<SingleProcessOutput*> &outputs, clp::Paths &contours_tofill, clp::Paths &contours_alreadyfilled, int kinit = -1, int kend = -1);
 };
