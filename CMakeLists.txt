@@ -289,8 +289,11 @@ if(NOT "${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
       #${BOOST_PROGRAMOPTIONS_DIR}/winmain.cpp
       #${BOOST_PROGRAMOPTIONS_DIR}/split.cpp
       )
-  if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
-    target_compile_options(miniboostlib PUBLIC "-fPIC" "-Wno-deprecated-declarations")
+  if (CMAKE_COMPILER_IS_GNUCC)
+    target_compile_options(miniboostlib PUBLIC "-Wno-deprecated-declarations")
+    if (NOT WIN32)
+      target_compile_options(miniboostlib PUBLIC "-fPIC")
+    endif()
   endif()
   set(Boost_LIBRARIES miniboostlib)
 endif()
