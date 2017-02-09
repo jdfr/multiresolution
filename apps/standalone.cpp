@@ -274,7 +274,6 @@ std::string readNextSlice(int nslice, ClippingResources &clipres, std::vector<st
         }
         clipres.clipper.Execute(clp::ctUnion, rawslice, clp::pftNonZero, clp::pftNonZero);
         clipres.clipper.Clear();
-        ClipperEndOperation(clipres.clipper);
     }
     return std::string();
 }

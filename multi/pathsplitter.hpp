@@ -57,7 +57,6 @@ protected:
     bool setupSquares(double z, double scaling);
     Configuration *cfg;
     SnapToGridSpec snapspec;
-    clp::PolyTree pt;
     double sinangle;
     bool setup_done;
     bool singlex, singley, justone;

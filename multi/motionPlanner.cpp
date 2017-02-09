@@ -427,17 +427,14 @@ void SaferOverhangingVerySimpleMotionPlanner::saferOverhangingVerySimpleMotionPl
 
     //compute partition of toolpaths into segments that are *in* and *out* of the support
     {
-        clp::PolyTree pt;
+        clp::PolyTree *pt;
         res.clipper.AddPaths(support, clp::ptClip, true);
         res.clipper.AddPaths(paths, clp::ptSubject, false);
         res.clipper.Execute(clp::ctIntersection, pt, clp::pftNonZero, clp::pftNonZero);
-        OpenPathsFromPolyTree(pt, in);
-        pt.Clear();
+        OpenPathsFromPolyTree(*pt, in);
         res.clipper.Execute(clp::ctDifference,   pt, clp::pftNonZero, clp::pftNonZero);
-        OpenPathsFromPolyTree(pt, out);
-        pt.Clear();
+        OpenPathsFromPolyTree(*pt, out);
         res.clipper.Clear();
-        ClipperEndOperation(res.clipper);
     }
     
     //if there are no toolpaths without support (or all toolpaths are without support), just use plain motion planning

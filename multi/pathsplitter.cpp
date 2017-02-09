@@ -3,26 +3,24 @@
 #include "showcontours.hpp"
 #include <cmath>
 
-void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::PolyTree &intermediate, clp::Paths &result) {
+void clipPaths(clp::Clipper &clipper, clp::Path &clip, clp::Paths &subject, bool subjectClosed, clp::Paths &result) {
     clipper.AddPath(clip, clp::ptClip, true);
     clipper.AddPaths(subject, clp::ptSubject, subjectClosed);
     if (subjectClosed) {
         clipper.Execute(clp::ctIntersection, result, clp::pftNonZero, clp::pftNonZero);
-        clipper.Clear();
     } else {
+        clp::PolyTree *intermediate;
         clipper.Execute(clp::ctIntersection, intermediate, clp::pftNonZero, clp::pftNonZero);
-        clipper.Clear();
-        OpenPathsFromPolyTree(intermediate, result);
-        intermediate.Clear();
+        OpenPathsFromPolyTree(*intermediate, result);
     }
-    ClipperEndOperation(clipper, !subjectClosed ? &intermediate : (clp::PolyTree*)NULL);
+    clipper.Clear();
 }
 
-void clipPaths(clp::Clipper &clipper, bool pathsClosed, clp::Paths &paths, Matrix<PathSplitter::EnclosedPaths> &buffer, clp::PolyTree &pt) {
+void clipPaths(clp::Clipper &clipper, bool pathsClosed, clp::Paths &paths, Matrix<PathSplitter::EnclosedPaths> &buffer) {
     for (int x = 0; x < buffer.numx; ++x) {
         for (int y = 0; y < buffer.numy; ++y) {
             auto &enclosed = buffer.at(x, y);
-            clipPaths(clipper, enclosed.actualSquare, paths, pathsClosed, pt, enclosed.paths);
+            clipPaths(clipper, enclosed.actualSquare, paths, pathsClosed, enclosed.paths);
         }
     }
 }
@@ -236,7 +234,7 @@ bool PathSplitter::processPaths(clp::Paths &paths, bool pathsClosed, double z, d
 
     if (!setupSquares(z, scaling)) return false;
 
-    clipPaths(res->clipper, pathsClosed, paths, buffer, pt);
+    clipPaths(res->clipper, pathsClosed, paths, buffer);
 
     //clipping messes with path ordering, so reapply motionPlanning
     if (config.applyMotionPlanning) applyMotionPlanning();

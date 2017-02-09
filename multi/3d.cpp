@@ -146,11 +146,9 @@ void ToolpathManager::updateInputWithProfilesFromPreviousSlices(clp::Paths &init
     //apply operations
     res->clipper.Execute(clp::ctDifference, initialContour, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
     res->clipper.Clear();
-    ClipperEndOperation(res->clipper);
     if (computeContoursAlreadyFilled) {
         res->clipper2.Execute(clp::ctUnion, contours_alreadyfilled, clp::pftNonZero, clp::pftNonZero); //clp::pftEvenOdd, clp::pftEvenOdd);
         res->clipper2.Clear();
-        ClipperEndOperation(res->clipper2);
     }
     //SHOWCONTOURS(*spec->global.config, "after_updating_initial_contour", &rawSlice, &initialContour);
     
@@ -310,13 +308,11 @@ bool ToolpathManager::computeContoursAboveAndBelow(ResultSingleTool &output, std
         res->clipper.Execute(clp::ctUnion, output.contoursBelow, clp::pftNonZero, clp::pftNonZero);
     }
     res->clipper.Clear();
-    ClipperEndOperation(res->clipper);
     if (hasAbove && !output.contoursAboveAlreadyComputed) {
         output.contoursAboveAlreadyComputed = true;
         res->clipper2.Execute(clp::ctUnion, output.contoursAbove, clp::pftNonZero, clp::pftNonZero);
     }
     res->clipper2.Clear();
-    ClipperEndOperation(res->clipper2);
     return true;
 }
 
@@ -852,7 +848,6 @@ clp::Paths *RawSlicesManager::getRawContour(int idx_raw, int input_idx) {
             }
             clipper.Execute(clp::ctIntersection, auxRawSlice, clp::pftNonZero, clp::pftNonZero);
             clipper.Clear();
-            ClipperEndOperation(clipper);
             return &auxRawSlice;*/
 
             //ADVANCED METHOD: OFFSET CONTOURS TO TAKE INTO ACCOUNT THE PROFILE OF THE VOXEL
