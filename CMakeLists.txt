@@ -26,6 +26,9 @@ set(INITIAL_ARENA_SIZE "52428800" CACHE STRING "Initial size for ArenaMemoryMana
 #1-5 MB: 1048576 2097152 3145728 4194304 5242880
 set(BIGCHUNK_ARENA_SIZE "2097152" CACHE STRING "Initial size for ArenaMemoryManager")
 
+set(BOOST_ROOT                "" CACHE PATH "path prefix to boost library")
+option(COMPILE_PROGRAMOPTIONS "if boost sources are in BOOST_ROOT, compile local version of boost::program_options (useful to avoid building boost twice if Slic3r is built with mingw and multiresolution with MSVS)" ON)
+
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 if(GENERATE_LIBRARY OR GENERATE_EXECUTABLE)
   set(GENERATE_LIBRARY_OR_EXECUTABLE ON)
@@ -106,19 +109,20 @@ if("${CLIPPER_BASE_DIR}" STREQUAL "")
   endif()
 endif()
 
-#as far as I understand, this will enable users of cmake-gui to set this directory
-set(Boost_INCLUDE_DIR "" CACHE PATH "path to boost library")
-if("${Boost_INCLUDE_DIR}" STREQUAL "")
-  #try to find boost! first, let's see if we have it in the parent directory
-  if(EXISTS ${SRC}/../boost/boost)
-    set(Boost_INCLUDE_DIR ${SRC}/../boost)
-  else()
-    #try to find it with find_package
-    find_package(Boost 1.55.0 QUIET COMPONENTS program_options)
-    if (NOT Boost_FOUND)
-      message(FATAL_ERROR "Error: please set the variable Boost_INCLUDE_DIR to the path to the Boost include directory (Boost 1.55.0 or higher required).")
-    endif()
-    set(BOOST_FINDPACKAGE_EXECUTED ON)
+PROJECT(multiresolution)
+
+set(DO_COMPILE_PROGRAMOPTIONS OFF)
+if(COMPILE_PROGRAMOPTIONS AND EXISTS ${BOOST_ROOT}/boost/program_options AND EXISTS ${BOOST_ROOT}/libs/program_options/src)
+  set(Boost_INCLUDE_DIRS ${BOOST_ROOT})
+  set(BOOST_PROGRAMOPTIONS_DIR ${BOOST_ROOT}/libs/program_options/src)
+  set(DO_COMPILE_PROGRAMOPTIONS ON)
+  #BOOST_ALL_NO_LIB: disable autolink feature in BOOST causing trouble because we are brewing outside of BOOST infrastructure just what we need
+  ADD_DEFINITIONS(-DBOOST_ALL_NO_LIB)
+endif()
+if(NOT DO_COMPILE_PROGRAMOPTIONS)      
+  find_package(Boost 1.59.0 QUIET COMPONENTS program_options)
+  if (NOT Boost_FOUND)
+    message(FATAL_ERROR "Could not find BOOST. You can set BOOST_ROOT to the base directory of BOOST to provide a hint of its location")
   endif()
 endif()
 
@@ -139,8 +143,6 @@ if(NOT EXISTS ${clipper_source} OR NOT EXISTS ${iopaths_source} OR NOT EXISTS ${
   message(FATAL_ERROR "tweaked clipper/iopaths base dir does not contain the expected files and directories!!!")
 endif()
 
-PROJECT(multiresolution)
-
 if(NOT(CMAKE_SIZEOF_VOID_P EQUAL 8))
   message(FATAL_ERROR "This code is designed only for x64 systems! Size of void pointer: " ${CMAKE_SIZEOF_VOID_P})
 endif()
@@ -153,8 +155,7 @@ endif()
 ADD_DEFINITIONS(-DCLIPPER_USE_INTRINSIC_128)
 if (MSVC)
   #_CRT_SECURE_NO_WARNINGS: disable annoying warnings
-  #BOOST_ALL_NO_LIB: disable autolink feature in BOOST causing trouble because we are brewing outside of BOOST infrastructure just what we need
-  ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DBOOST_ALL_NO_LIB)
+  ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
   if (FALSE)
     #The high amount of warnings while building with this block enabled
     #suggests that I currently do not know how to properly pass optimization
@@ -188,7 +189,7 @@ endif()
 set (INCLUDE_DIRS
   ${clipper_include_dir}
   ${iopaths_include_dir}
-  ${Boost_INCLUDE_DIR}
+  ${Boost_INCLUDE_DIRS}
   ${SRC}/multi
   ${SRC}/interfaces
   ${SRC}/python
@@ -253,30 +254,7 @@ if (USE_PYTHON_DEBUG)
     )
 endif()
 
-#as far as I understand, this will enable users of cmake-gui to set this directory
-set(BOOST_PROGRAMOPTIONS_DIR "" CACHE PATH "path to boost::program_options source files")
-if(NOT BOOST_FINDPACKAGE_EXECUTED)
-  set(Boost_LIBRARIES "" CACHE PATH "If BOOST_PROGRAMOPTIONS_DIR is empty, this must include the absolute path to the static library program_options")
-endif()
-
-if("${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
-  #try to find program_options's source code in a known locations
-  if(EXISTS ${Boost_INCLUDE_DIR}/libs/program_options/src)
-    set(BOOST_PROGRAMOPTIONS_DIR ${Boost_INCLUDE_DIR}/libs/program_options/src)
-  elseif(EXISTS ${SRC}/../boost/libs/program_options/src)
-    set(BOOST_PROGRAMOPTIONS_DIR ${SRC}/../boost/libs/program_options/src)
-  elseif(BOOST_FINDPACKAGE_EXECUTED)
-    if (NOT Boost_PROGRAM_OPTIONS_FOUND)
-      message(FATAL_ERROR "Error: could not find neither the sources of boost::program_options nor the compiled binaries!")
-    endif()
-  else()
-    if("${Boost_LIBRARIES}" STREQUAL "")
-      message(FATAL_ERROR "Error: we require boost::program_options in any of these forms: either the sources in BOOST_PROGRAMOPTIONS_DIR or the compiled static library in Boost_LIBRARIES")
-    endif()
-  endif()
-endif()
-
-if(NOT "${BOOST_PROGRAMOPTIONS_DIR}" STREQUAL "")
+if(DO_COMPILE_PROGRAMOPTIONS)
   ADD_LIBRARY(miniboostlib STATIC
       ${BOOST_PROGRAMOPTIONS_DIR}/cmdline.cpp
       #${BOOST_PROGRAMOPTIONS_DIR}/config_file.cpp
