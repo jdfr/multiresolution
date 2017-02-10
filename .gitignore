@@ -10,6 +10,10 @@ bin*
 buildr.bat
 loadenv.bat
 setpath.bat
+mkgw.bat
+mkvs.bat
+rmk-mingw.bat
+rmk-msvs.bat
 config*
 params*
 !config.template.txt
