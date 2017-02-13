@@ -9,6 +9,7 @@
 
 #include "orientPaths.hpp"
 #include <algorithm>
+#include <cmath>
 
 //adapted from a very readable and concise python implementation. sigh...
 
