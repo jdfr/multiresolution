@@ -122,7 +122,7 @@ void createCubesFromGrid(const char *cubeNameTemplate, PathSplitterConfigs &save
         }
         ++ntool;
     }
-    fprintf(stdout, "All %ld cubic meshes have been generated. Now, to partition a STL model with them, you can use the following commands (you will need meshlab and an appropriate version of cork):\n\n", prefixes.size());
+    fprintf(stdout, "All " FMTSIZET " cubic meshes have been generated. Now, to partition a STL model with them, you can use the following commands (you will need meshlab and an appropriate version of cork):\n\n", prefixes.size());
     fprintf(stdout, "meshlabserver -i mesh.stl -o mesh.off\n");
     for (auto &prefix : prefixes) {
       fprintf(stdout, "cork -isct mesh.off \"%s.off\" \"%s.output.off\"\n", prefix.c_str(), prefix.c_str());

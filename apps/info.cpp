@@ -16,7 +16,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
 
     if (verbose) {
         fprintf(stdout, "File name: %s\n", filename);
-        fprintf(stdout, "number of tools (processes): %d\n", fileheader.numtools);
+        fprintf(stdout, "number of tools (processes): %lld\n", fileheader.numtools);
         fprintf(stdout, "use Scheduling: %s\n", useSched ? "true" : "false");
         for (int k = 0; k < fileheader.numtools; ++k) {
             const char * padding = "\n   ";
@@ -32,14 +32,14 @@ std::string printPathInfo(const char * filename, bool verbose) {
     
     fprintf(stdout, "File version: %d\n", fileheader.version);
     if ((fileheader.version > 0) && (!fileheader.additional.empty())) {
-        fprintf(stdout, "Additional metadata: %ld words\n", fileheader.additional.size());
+        fprintf(stdout, "Additional metadata: " FMTSIZET " words\n", fileheader.additional.size());
         for (int i = 0; i < fileheader.additional.size(); ++i) {
-            fprintf(stdout, "  %d int64: %21ld, double: %.12f\n", i, fileheader.additional[i].i, fileheader.additional[i].d);
+            fprintf(stdout, "  %d int64: %21lld, double: %.12f\n", i, fileheader.additional[i].i, fileheader.additional[i].d);
         }
     }
     
     if (verbose) {
-        fprintf(stdout, "Number of Records: %d\n", fileheader.numRecords);
+        fprintf(stdout, "Number of Records: %lld\n", fileheader.numRecords);
         fprintf(stdout, "\n\n");
     }
 
@@ -54,18 +54,18 @@ std::string printPathInfo(const char * filename, bool verbose) {
             fprintf(stdout, "Record %d\n", currentRecord);
             switch (sliceheader.type) {
             case PATHTYPE_RAW_CONTOUR:        fprintf(stdout, "                  type: raw slice (sliced from mesh file)\n"); break;
-            case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "                  type: contours for tool %d\n", sliceheader.ntool); break;
-            case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "                  type: perimeter toolpaths for tool %d\n", sliceheader.ntool); break;
-            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "                  type: surface   toolpaths for tool %d\n", sliceheader.ntool); break;
-            case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "                  type: infilling toolpaths for tool %d\n", sliceheader.ntool); break;
-            default:                          fprintf(stdout, "                  type: unknown (%d) for tool %d\n", sliceheader.type, sliceheader.ntool);
+            case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "                  type: contours for tool %lld\n", sliceheader.ntool); break;
+            case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "                  type: perimeter toolpaths for tool %lld\n", sliceheader.ntool); break;
+            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "                  type: surface   toolpaths for tool %lld\n", sliceheader.ntool); break;
+            case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "                  type: infilling toolpaths for tool %lld\n", sliceheader.ntool); break;
+            default:                          fprintf(stdout, "                  type: unknown (%lld) for tool %lld\n", sliceheader.type, sliceheader.ntool);
             }
             fprintf(stdout, "                  z: %.20g\n", sliceheader.z);
             switch (sliceheader.saveFormat) {
             case PATHFORMAT_INT64:     fprintf(stdout, "     coordinate format: 64-bit integers\n"); break;
             case PATHFORMAT_DOUBLE:    fprintf(stdout, "     coordinate format: double floating point\n"); break;
             case PATHFORMAT_DOUBLE_3D: fprintf(stdout, "     coordinate format: double floating point (3D paths)\n"); break;
-            default:                   fprintf(stdout, "     coordinate format: unknown (%d)\n", sliceheader.saveFormat);
+            default:                   fprintf(stdout, "     coordinate format: unknown (%lld)\n", sliceheader.saveFormat);
             }
             fprintf(stdout, "      %s scaling: %.20g\n", sliceheader.saveFormat == PATHFORMAT_INT64 ? "original" : "        ", sliceheader.scaling);
             
@@ -80,11 +80,11 @@ std::string printPathInfo(const char * filename, bool verbose) {
             fprintf(stdout, "Record %d: ", currentRecord);
             switch (sliceheader.type) {
             case PATHTYPE_RAW_CONTOUR:        fprintf(stdout, "type=raw (from mesh file),        z=%.20g\n", sliceheader.z); break;
-            case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "type=contour,            ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
-            case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "type=perimeter toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
-            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "type=surface   toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
-            case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "type=infilling toolpath, ntool=%d, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
-            default:                          fprintf(stdout, "type=%D (unknown),        ntool=%d, z=%.20g\n", sliceheader.type, sliceheader.ntool, sliceheader.z);
+            case PATHTYPE_PROCESSED_CONTOUR:  fprintf(stdout, "type=contour,            ntool=%lld, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
+            case PATHTYPE_TOOLPATH_PERIMETER: fprintf(stdout, "type=perimeter toolpath, ntool=%lld, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
+            case PATHTYPE_TOOLPATH_SURFACE:   fprintf(stdout, "type=surface   toolpath, ntool=%lld, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
+            case PATHTYPE_TOOLPATH_INFILLING: fprintf(stdout, "type=infilling toolpath, ntool=%lld, z=%.20g\n", sliceheader.ntool, sliceheader.z); break;
+            default:                          fprintf(stdout, "type=%lld (unknown),        ntool=%lld, z=%.20g\n", sliceheader.type, sliceheader.ntool, sliceheader.z);
             }
         }
 

@@ -298,7 +298,7 @@ public:
     
     void doSave(SimpleSlicingScheduler &sched, int i) {
         int64 num = i;
-        fprintf(stderr, "BEFORE ITERATION %ld, SAVING STATE TO %s...\n", num, savefile.c_str());
+        fprintf(stderr, "BEFORE ITERATION %lld, SAVING STATE TO %s...\n", num, savefile.c_str());
         FILEOwner o(savefile.c_str(), "wb");
         if (!o.isopen()) throw std::runtime_error("Could not open serialization file for writing!");
         if (fwrite("SERIALST", 8, 1, o.f) != 1) throw std::runtime_error("Serialization error!");
@@ -315,7 +315,7 @@ public:
         deserialize(i.f, sched);
         if (fread(&numToSkipInLoad, sizeof(numToSkipInLoad), 1, i.f) != 1) throw std::runtime_error("Serialization error!");
         i.close();
-        fprintf(stderr, "      ->SKIPPING TO ITERATION %ld...\n", numToSkipInLoad);
+        fprintf(stderr, "      ->SKIPPING TO ITERATION %lld...\n", numToSkipInLoad);
         for (auto &slicer : slicers) if (!slicer->skipNextSlices((int)numToSkipInLoad)) throw std::runtime_error("Error while skipping slices!!!");
     }
     
@@ -751,11 +751,11 @@ int Main(int argc, const char** argv) {
             }
 
             if (dryrunOpt) {
-                printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
+                printf("dry run:\n\nThese are the " FMTSIZET " Z values of the required slices from the mesh file (raw slices), in request order:\n", rawZs.size());
                 for (const auto &z : rawZs) {
                     printf("%.20g\n", z);
                 }
-                printf("\nThese are the %d pairs of NTool number and Z value for the slices to be computed, in the required computing order:\n", sched.input.size());
+                printf("\nThese are the " FMTSIZET " pairs of NTool number and Z value for the slices to be computed, in the required computing order:\n", sched.input.size());
                 for (const auto &input : sched.input) {
                     printf("%d %.20g\n", input.ntool, input.z*factors.internal_to_input);
                 }
@@ -833,7 +833,7 @@ int Main(int argc, const char** argv) {
                         return -1;
                     }
                     if (saveContours) results.push_back(single);
-                    printf("received output slice %d/%d (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
+                    printf("received output slice %d/" FMTSIZET " (ntool=%d, z=%f)\n", single->idx, sched.output.size()-1, single->ntool, single->z);
                     double zscaled = single->z                           * factors.internal_to_input;
                     double rad     = multispec->pp[single->ntool].radius * factors.internal_to_input;
                     for (auto &pathwriter : pathwriters_toolpath) {
@@ -881,7 +881,7 @@ int Main(int argc, const char** argv) {
             }
 
             if (dryrunOpt) {
-                printf("dry run:\n\nThese are the %d Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
+                printf("dry run:\n\nThese are the " FMTSIZET " Z values of the required slices from the mesh file (raw slices), in request order:\n", zs.size());
                 for (const auto &z : zs) {
                     printf("%.20g\n", z);
                 }
@@ -904,7 +904,7 @@ int Main(int argc, const char** argv) {
             }
 
             for (int i = 0; i < numsteps; ++i) {
-                printf("processing raw slice %d/%d\n", i, numsteps - 1);
+                printf("processing raw slice %d/%lld\n", i, numsteps - 1);
 
                 rawslice.clear();
                 dummy.clear();

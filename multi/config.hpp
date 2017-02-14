@@ -6,6 +6,13 @@
 #include <string>
 #include <sstream>
 
+#if (defined(_MSC_VER) && (_MSC_VER  < 1900))
+// we are compiling only in 64b
+#  define FMTSIZET "%lu"
+#else
+#  define FMTSIZET "%zu"
+#endif
+
 //slurp file
 std::string get_file_contents(const char *filename, bool binary, bool &ok);
 

@@ -106,7 +106,7 @@ int main(int argc, const char** argv) {
         specs.push_back(Spec());
         err = specs.back().filterspec.readFromCommandLine(rd, -1, true);
         if (!err.empty()) {
-            fprintf(stderr, "Error while trying to read the %d-th filter specification: %s", specs.size(), err.c_str());
+            fprintf(stderr, "Error while trying to read the " FMTSIZET "-th filter specification: %s", specs.size(), err.c_str());
             return -1;
         }
 
@@ -114,7 +114,7 @@ int main(int argc, const char** argv) {
 
         err = specs.back().setspec.readFromCommandLine(rd, -1, true);
         if (!err.empty()) {
-            fprintf(stderr, "Error while trying to read the %d-th set specification: %s", specs.size(), err.c_str());
+            fprintf(stderr, "Error while trying to read the " FMTSIZET "-th set specification: %s", specs.size(), err.c_str());
             return -1;
         }
 

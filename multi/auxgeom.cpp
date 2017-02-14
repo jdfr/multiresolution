@@ -19,10 +19,10 @@ std::string handleClipperException(clp::clipperException &e) {
 
 //this function is useful to debug some problems
 void printClipperPaths(clp::Paths &paths, const char * name, FILE* f) {
-    fprintf(f, "ClipperPaths %s, numpaths=%d\n", name, paths.size());
+    fprintf(f, "ClipperPaths %s, numpaths=" FMTSIZET "\n", name, paths.size());
     int pa = 0;
     for (auto & path : paths) {
-        fprintf(f, "  path %d: numpoints=%d\n", pa++, path.size());
+        fprintf(f, "  path %d: numpoints=" FMTSIZET "\n", pa++, path.size());
         int po = 0;
         for (auto &point : path) {
             fprintf(f, "    %03d: X=%lld, Y=%lld\n", po++, point.X, point.Y);

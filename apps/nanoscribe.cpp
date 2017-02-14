@@ -256,7 +256,7 @@ int main(int argc, const char** argv) {
         int numtools = (int)multispec->numspecs;
 
         auto saveToolpaths = [&pathsplitter, numtools](FileHeader &fileheader, int idx, SliceHeader &header, clp::Paths &paths) {
-            fprintf(stdout, "  -> reading record %d/%ld...\n", idx, fileheader.numRecords);
+            fprintf(stdout, "  -> reading record %d/%lld...\n", idx, fileheader.numRecords);
             if (header.ntool < 0)         return str("Error: toolpath ", idx, " has negative ntool!\n");
             if (header.ntool >= numtools) return str("Error: toolpath ", idx, " has ntool ", header.ntool, "-th but command line arguments specified numtools=", numtools, "\n");
             if (!pathsplitter.writePaths(paths, (int)header.type, 0.0, (int)header.ntool, header.z, header.scaling, false)) return pathsplitter.err;
