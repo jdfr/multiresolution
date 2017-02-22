@@ -2,8 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8.9)
 
 option(ENABLE_SLICER_LOGGING "enable slicer debug output to file" ON) #this option has to be coordinated with the one used in the slicer!!!!
 
-option(USE_PYTHON_DEBUG      "add support for viewing contours in python for debugging" ON)
-option(USE_PYTHON_VIEWER     "add support for viewing slices in python" ON)
+option(USE_PYTHON_VIEWER     "add support for viewing contours in python, for debugging and visualizing results" ON)
 option(GENERATE_LIBRARY      "generate shared library"  ON)
 option(GENERATE_EXECUTABLE   "generate standalone executable"  ON)
 option(GENERATE_CS_INTERFACE "generate the C# client of the DLL shared library (only in Visual Studio)" ${GENERATE_LIBRARY})
@@ -60,26 +59,24 @@ endif()
 set(OUTPUTDIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
 set(PYTHON_EXECUTABLE "" CACHE PATH "vanilla python executable")
-set(PYTHON_EXECUTABLE_FOR_SETUP "" CACHE PATH "python executable for use with setup.py (if using WinPython, must be \"WinPython Interpreter.exe\"")
 
-if( ("${PYTHON_EXECUTABLE}" STREQUAL "") OR ("${PYTHON_EXECUTABLE_SETUP}" STREQUAL "") )
+if( ("${PYTHON_EXECUTABLE}" STREQUAL "") )
   find_program(PYTHON_EXECUTABLE_FOUND python)
   if(PYTHON_EXECUTABLE_FOUND)
-    if("${PYTHON_EXECUTABLE}" STREQUAL "")
-      set(PYTHON_EXECUTABLE "${PYTHON_EXECUTABLE_FOUND}")
-    endif()
-    if("${PYTHON_EXECUTABLE_SETUP}" STREQUAL "")
-      set(PYTHON_EXECUTABLE_SETUP "${PYTHON_EXECUTABLE_FOUND}")
-    endif()
+    set(PYTHON_EXECUTABLE "${PYTHON_EXECUTABLE_FOUND}")
   endif()
 endif()
 
 set(SHOW_RESULT_PARAMETERS "--show 2d" CACHE PATH "configuration option for the example param.txt file")
 set(INITIAL_MESH_FILE "PUT_HERE_YOUR_STL_FILE" CACHE PATH "configuration option for the example param.txt file")
 
-if (USE_PYTHON_DEBUG OR USE_PYTHON_VIEWER)
+
+if (USE_PYTHON_VIEWER AND NOT ("${PYTHON_EXECUTABLE}" STREQUAL ""))
   set(USE_PYTHON ON)
 else()
+  if (NOT ("${PYTHON_EXECUTABLE}" STREQUAL ""))
+    message(WARNING "Ooption USE_PYTHON_VIEWER was set, but could not find the path to the python executable. Please set it in the PYTHON_EXECUTABLE variable")
+  endif()
   set(USE_PYTHON OFF)
 endif()
 
@@ -246,7 +243,7 @@ set(CORESOURCES
   interfaces/subprocess.cpp
   )
 
-if (USE_PYTHON_DEBUG)
+if (USE_PYTHON)
   set(CORESOURCES
     ${CORESOURCES}
     python/showcontours.hpp
@@ -278,7 +275,7 @@ if(DO_COMPILE_PROGRAMOPTIONS)
 endif()
 
 ADD_LIBRARY(corelib STATIC ${CORESOURCES})
-if(USE_PYTHON_DEBUG)
+if(USE_PYTHON)
   set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
 endif()
 if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
@@ -349,7 +346,7 @@ set(EXECUTABLE_HEADERS apps/apputil.hpp)
   
 if(GENERATE_EXECUTABLE)
   set(EXECSOURCES apps/standalone.cpp)
-  if(USE_PYTHON_VIEWER)
+  if(USE_PYTHON)
     set(EXECSOURCES
       ${EXECSOURCES}
       python/sliceviewer.hpp
