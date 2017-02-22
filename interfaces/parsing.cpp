@@ -6,6 +6,22 @@
 #define PREFIXNANODESC(x) (GLOBAL ? x : "per-process " x)
 #define GET_GLOBALNAME_IN_LOCALCONTEXT(x) (x+sizeof(PER_PROCESS_NANOPREFIX)-1)
 
+//Boost 1.59 and newer require implicit values to be overriden with syntax --option=override. See https://github.com/boostorg/program_options/issues/25
+//This is a workaround to revert to the old behavior in these cases
+#if (BOOST_VERSION >= 105900)
+  template <typename T> struct greedy_implicit_value_impl : public po::typed_value<T> {
+    using base = po::typed_value<T>;
+    greedy_implicit_value_impl() : base(nullptr) {}
+    bool adjacent_tokens_only() const override { return false; }
+    unsigned max_tokens() const override { return 1; }
+  };
+  template <typename T> po::typed_value<T>* greedy_implicit_value() {
+    return new greedy_implicit_value_impl<T>();
+  }
+#else
+#  define greedy_implicit_value po::value
+#endif
+
 template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
     if (GLOBAL) {
         opts.add_options()
@@ -196,7 +212,7 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<int>()->required()->value_name("ntool"),
             "Multiple fabrication processes can be specified, each one with a series of parameters. Each process is identified by a number, starting from 0, without gaps (i.e., if processes with identifiers 0 and 2 are defined, process 1 should also be specified). Processes should be ordered by resolution, so higher-resolution processes should have bigger identifiers. All metric parameters below are specified in mesh units x 1000 (the factor can be modified in the config file) so, if mesh units are millimeters, these are specified in micrometers.")
         ("no-preprocessing",
-            po::value<double>()->implicit_value(0.0)->value_name("rad"),
+            greedy_implicit_value<double>()->implicit_value(0.0)->value_name("rad"),
             "If specified, the raw contours are not pre-processed before generating the toolpaths. If a non-zero value 'rad' is specified, two consecutive offsets are done, the first with '-rad', the second with 'rad'. Useful in some cases such as avoiding corner rounding in low-res processes, but may introduce errors in other cases")
         ("always-preprocessing",
             "If specified, the raw contours are *always* pre-processed before generating the toolpaths, even for the last process, *IF* not in add-sub mode (if add-sub mode is enabled, this is just ignored). Useful for smoothing unnecesary details out of contours and toolpaths (i.e. reducing possibly unnecesary intermediate points).")
@@ -263,13 +279,13 @@ po::options_description perProcessOptionsGenerator(AddNano useNano) {
             po::value<double>()->default_value(0.001)->value_name("ratio"),
             "If there are additional perimeters, this is the ratio of overlap between them (just like --infill-lineoverlap and --surface-infill-lineoverlap).")
         ("always-supported",
-            po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
+            greedy_implicit_value<double>()->implicit_value(0.0)->value_name("offset factor"),
             "If this option is specified, each contour segment is considered separately: if the contour segment does not overlap with any contour within a previous slice which is just next to this one in Z, it is not used. The rationale is that some 3D structures may have low-res blobs connected only by high-res bridges. Blindly printing all low-res blobs would print them in the void without any support. To decide if two slices are next to each other in Z, the criteria are set using the option --always-supported-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; both the previous slice and the contour segments will be offseted by that length before testing for overlappings")
         ("always-supported-extent-factor",
             po::value<double>()->default_value(0.1)->value_name("ratio"),
             "If --always-supported is specified, this option is used to determine which slices are immediately built before the slice to be supported. It works in exactly the same way as the option --compute-surfaces-extent-factor: the value of this option is a factor over the length of the slice that determines how near the slice another slice can be to be considered as support. Note, however, that there is no flag equivalent to '--compute-surfaces-just-with-same-process false', because high-res slices next to a low-res slice are computed AFTER it.")
         ("start-overhangs-over-support",
-            po::value<double>()->implicit_value(0.0)->value_name("offset factor"),
+            greedy_implicit_value<double>()->implicit_value(0.0)->value_name("offset factor"),
             "If this option is specified, motion planning is modified to take into account the support from the previous layer(s): toolpaths are classified in overhang and supported (if a toolpath is partially overhang, it is divided into subtoolpaths completely in each category). Then, toolpaths are connected in such a way that they are started always from a supported end, if possible. The support is defined as the extent of the previous slices computed using the options --start-overhangs-just-with-same-process and --start-overhangs-extent-factor. The argument of this option, if provided, is factor to be multiplied by the radius (--radx) to define an offset length; the support is offseted by this length, in order to modulate this effect. It is particularly useful to use this option in conjunction with option --ensure-attachment-offset, because in this way they greatly increase the chances that overhanging toolpaths will not be written without any support. For now, this option is not compatible with toolpaths with clearance (i.e., not able to overlap)")
         ("overhangs-do-not-start-from-edge-of-support",
             "This is a suboption to modulate the behavior of --start-overhangs-over-support. If this option is specified, toolpaths that both start and end in overhang are partitioned in two in order to start drawing always from a supported area.")
