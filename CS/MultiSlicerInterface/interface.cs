@@ -137,7 +137,7 @@ namespace MultiSlicerInterface {
                 minz = zbase;
             }
             List<double> zs = new List<double>();
-            for (double j = minz; j <= maxz; j += zstep) {
+            for (double j = minz + zstep / 2; j <= maxz; j += zstep) {
                 zs.Add(j);
             }
             double[] zsa = zs.ToArray();
