@@ -25,8 +25,8 @@ set(INITIAL_ARENA_SIZE "52428800" CACHE STRING "Initial size for ArenaMemoryMana
 #1-5 MB: 1048576 2097152 3145728 4194304 5242880
 set(BIGCHUNK_ARENA_SIZE "2097152" CACHE STRING "Initial size for ArenaMemoryManager")
 
-set(BOOST_ROOT                "" CACHE PATH "path prefix to boost library")
-option(COMPILE_PROGRAMOPTIONS "if boost sources are in BOOST_ROOT, compile local version of boost::program_options (useful to avoid building boost twice if Slic3r is built with mingw and multiresolution with MSVS)" ON)
+set(BOOST_ROOT_PATH            "" CACHE PATH "path prefix to boost library")
+option(COMPILE_PROGRAMOPTIONS "if boost sources are in BOOST_ROOT_PATH, compile local version of boost::program_options (useful to avoid building boost twice if Slic3r is built with mingw and multiresolution with MSVS)" ON)
 
 option(COMPILE_OPTIMIZATIONS "optimizations that may make the build process significantly slower" ON)
 if(GENERATE_LIBRARY OR GENERATE_EXECUTABLE)
@@ -107,17 +107,18 @@ endif()
 PROJECT(multiresolution)
 
 set(DO_COMPILE_PROGRAMOPTIONS OFF)
-if(COMPILE_PROGRAMOPTIONS AND EXISTS ${BOOST_ROOT}/boost/program_options AND EXISTS ${BOOST_ROOT}/libs/program_options/src)
-  set(Boost_INCLUDE_DIRS ${BOOST_ROOT})
-  set(BOOST_PROGRAMOPTIONS_DIR ${BOOST_ROOT}/libs/program_options/src)
+if(COMPILE_PROGRAMOPTIONS AND EXISTS ${BOOST_ROOT_PATH}/boost/program_options AND EXISTS ${BOOST_ROOT_PATH}/libs/program_options/src)
+  set(Boost_INCLUDE_DIRS ${BOOST_ROOT_PATH})
+  set(BOOST_PROGRAMOPTIONS_DIR ${BOOST_ROOT_PATH}/libs/program_options/src)
   set(DO_COMPILE_PROGRAMOPTIONS ON)
   #BOOST_ALL_NO_LIB: disable autolink feature in BOOST causing trouble because we are brewing outside of BOOST infrastructure just what we need
   ADD_DEFINITIONS(-DBOOST_ALL_NO_LIB)
 endif()
-if(NOT DO_COMPILE_PROGRAMOPTIONS)      
+if(NOT DO_COMPILE_PROGRAMOPTIONS)
+  set(BOOST_ROOT "${BOOST_ROOT_PATH}")      
   find_package(Boost 1.59.0 QUIET COMPONENTS program_options)
   if (NOT Boost_FOUND)
-    message(FATAL_ERROR "Could not find BOOST. You can set BOOST_ROOT to the base directory of BOOST to provide a hint of its location")
+    message(FATAL_ERROR "Could not find BOOST. You can set BOOST_ROOT_PATH to the base directory of BOOST to provide a hint of its location")
   endif()
 endif()
 
