@@ -39,11 +39,11 @@ FILESEP                      : ${FILESEP} ;
 PYPATH                       : ${PYTHON_EXECUTABLE} ;
 
 # config values for the showcontours debugging facilities (requires python)
-SHOWCONTOURS_SCRIPTPATH      : ${SHOWCONTOURS_SCRIPTPATH} ;
+SHOWCONTOURS_SCRIPTPATH      : ${PYTHONSCRIPTS_PATH} ;
 SHOWCONTOURS_SCRIPTNAME      : contourViewer.py ;
 
 # config values for the slice viewer (requires python)
-SLICEVIEWER_SCRIPTPATH       : ${SLICEVIEWER_SCRIPTPATH} ;
+SLICEVIEWER_SCRIPTPATH       : ${PYTHONSCRIPTS_PATH} ;
 SLICEVIEWER_SCRIPTNAME       : slicesViewer.py ;
 
 #this has to be a one liner, however long it may get!
