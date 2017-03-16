@@ -1,0 +1,1 @@
+cmake "$@" -P compare_tests.cmake

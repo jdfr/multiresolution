@@ -354,6 +354,14 @@ else()
 endif()
 set(PYTHONSCRIPTS_PATH "./pyclipper" CACHE PATH "Directory of the python scripts")
 
+if(GENERATE_TESTS)
+  #these variables should be in config.cmake, but they cannot be set to adequate default values from an file that can be included at different levels, so they have to be defined twice: once here and once in the parent's CmakeLists.txt
+  set(DATATEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../data_test" CACHE PATH "test STL files are fetched from this directory. It has to be an absolute path")
+  set(TEST_DIR     "${OUTPUTDIR}/../test"      CACHE PATH "directory where test artifacts are output. It has to be an absolute path")
+  set(TESTPREV_DIR "${OUTPUTDIR}/../testprev"  CACHE PATH "directory where test artifacts from a previous test run are preserved, to be compared with the ones created in TEST_DIR. It has to be an absolute path")
+  include(testing.cmake)
+endif()
+
 if (GENERATE_CONFIGURE_FILE AND (MAKEMR_LIBRARY OR MAKEMR_EXECUTABLE))
   if (NOT CONFIGURE_OUTPUT_PATH)
     set(CONFIGURE_OUTPUT_PATH ${OUTPUTDIR})

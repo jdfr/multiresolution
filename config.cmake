@@ -15,6 +15,9 @@ option(MAKEMR_FILEINFO      "make info dumper for paths files"  ON)
 option(MAKEMR_FILEUNION     "make tool to merge several paths files into one"  ON)
 option(MAKEMR_FILETOUCH     "make slice header setter for paths files"  ON)
 
+#test options
+option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS!!!!)" ON)
+
 #clipper configuration
 option(CLIPPER_USE_ARENA       "enable ArenaMemoryManager for ClipperLib" ON)
 set(CLIPPER_BASE_DIR           "" CACHE PATH "tweaked clipper/iopaths base dir")
