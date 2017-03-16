@@ -35,11 +35,13 @@
 #   -When invoked from the multiresolution directory, the script will require arguments to configure testing.cmake
 #   -When invoked outside the multiresolution directory, the script will require arguments to drive the tests.
 #    These will have to be provided:
-#          * REVA and REVB represent the git objects (branches/tags/commits/CURRENT state) to execute the tests
-#          * If the build system at revisions REVA and REVB are compatible, the builds can be run on the same
-#            directories, so in that case BUILDA and BUILDB can be the same, otherwise, they should be different.
-#            If BUILDA/BUILDB is empty, the build step will not be performed.
-#          * BINA and BINB are the binary output directories containing the executables for REVA and REVB, respectively.
+#          * multiresolutionREVA and multiresolutionREVB represent the git objects (branches/tags/commits/CURRENT state)
+#            to execute the tests
+#          * If the build system at revisions multiresolutionREVA and multiresolutionREVB are compatible, the builds
+#            can be run on the same directories, so in that case BUILDA and BUILDB can be the same, otherwise, they
+#            should be different. If BUILDA/BUILDB is empty, the build step will not be performed.
+#          * BINA and BINB are the binary output directories containing the executables for multiresolutionREVA
+#            and multiresolutionREVB, respectively.
 #            If GENA, GENB, BUILDA and BUILDB are empty, you can use BINA and BINB to compare two different instances
 #            that you have previously built.
 #          * If there is already a build directory with a build system compatible with one of the revisions,
@@ -52,8 +54,8 @@
 #            notably in clipper, pyclipper and the standalone slic3r. Normally, changes that break the interfaces
 #            are rare and far between, but it may be necessary to compare the test among such changes. For that
 #            purpose, REVCLIPPERA, REVCLIPPERB, REVPYCLIPPERA, REVPYCLIPPERB, REVSLIC3RA and REVSLIC3RB represent
-#            the revisions on each one of the other projects that have to be used together with REVA or REVB,
-#            respectively. Their default values are CURRENT in all cases.
+#            the revisions on each one of the other projects that have to be used together with multiresolutionREVA
+#            or multiresolutionREVB, respectively. Their default values are CURRENT in all cases.
 #   -When invoked outside the multiresolutino directory, it is quite difficult to set the arguments just right
 #    from the command line, because of issues with paths and double quotes.
 #    IT IS STRONGLY ADVISED TO EDIT THE FILE TO SET THE ARGUMENTS, INSTEAD OF PASSING THEM WITH -D ARG=VALUE.
@@ -64,10 +66,10 @@
 #             support for changing the state of the other repositories will be added.
 
 #By default, the script just changes the working copy and then rebuilds the project. However,
-#if the REVA and/or REVB versions of the working copy have changes to the build system that do
-#not play well with the cached build configuration, the builds may fail. To alleviate this,
-#the user can supply a command in GENA to generate "ex-novo" the build system for REVA (ditto
-#for GENB and REVB).
+#if the multiresolutionREVA and/or multiresolutionREVB versions of the working copy have changes
+#to the build system that do not play well with the cached build configuration, the builds may fail.
+#To alleviate this, the user can supply a command in GENA to generate "ex-novo" the build system for
+#multiresolutionREVA (ditto for GENB and multiresolutionREVB).
 
 #Why cmake? I work on this indistinctly in windows and linux environments; maintaining a *.bat and
 #a *.sh script to do the same is a PITA, and cmake provides a way to execute (somewhat) platform-independent
@@ -162,34 +164,37 @@ else()
       CACHE STRING       "master test directory where test scripts are copied before testing")
 
   #Variables to configure the execution and comparison of the tests, when we execute the script in MASTERDIR
-  option(NOEXECA "By default, REVA is gennerated/built/tested. However, if this option is ON, PREVDIR will be assumed to already contain tests, and only tests from REVB will be executed (also comparing with contents in PREVDIR" OFF)
+  option(NOEXECA "By default, multiresolutionREVA is gennerated/built/tested. However, if this option is ON, PREVDIR will be assumed to already contain tests, and only tests from multiresolutionREVB will be executed (also comparing with contents in PREVDIR" OFF)
   set(SRCDIR    "${CMAKE_CURRENT_SOURCE_DIR}/.."          CACHE STRING "base source directory; all projects should be subdirectories")
-  set(BUILDA    "${CMAKE_CURRENT_SOURCE_DIR}/../build"    CACHE STRING "build directory for REVA (build system must be already generated, unless GENA is nonempty). If this paramenter is empty, the build is supposed to be already done")
-  set(BUILDB    "${CMAKE_CURRENT_SOURCE_DIR}/../build"    CACHE STRING "build directory for REVB (build system must be already generated, unless GENB is nonempty). If this paramenter is empty, the build is supposed to be already done")
-  set(BINA      "${CMAKE_CURRENT_SOURCE_DIR}/../bin"      CACHE STRING "binary directory for REVA")
-  set(BINB      "${CMAKE_CURRENT_SOURCE_DIR}/../bin"      CACHE STRING "binary directory for REVB.")
-  set(GENA      ""                                        CACHE STRING "If nonempty, this command will be executed with the intention to generate the build system for REVA")
-  set(GENB      ""                                        CACHE STRING "If nonempty, this command will be executed with the intention to generate the build system for REVA")
+  set(BUILDA    "${CMAKE_CURRENT_SOURCE_DIR}/../build"    CACHE STRING "build directory for multiresolutionREVA (build system must be already generated, unless GENA is nonempty). If this paramenter is empty, the build is supposed to be already done")
+  set(BUILDB    "${CMAKE_CURRENT_SOURCE_DIR}/../build"    CACHE STRING "build directory for multiresolutionREVB (build system must be already generated, unless GENB is nonempty). If this paramenter is empty, the build is supposed to be already done")
+  set(BINA      "${CMAKE_CURRENT_SOURCE_DIR}/../bin"      CACHE STRING "binary directory for multiresolutionREVA")
+  set(BINB      "${CMAKE_CURRENT_SOURCE_DIR}/../bin"      CACHE STRING "binary directory for multiresolutionREVB.")
+  set(GENA      ""                                        CACHE STRING "If nonempty, this command will be executed with the intention to generate the build system for multiresolutionREVA")
+  set(GENB      ""                                        CACHE STRING "If nonempty, this command will be executed with the intention to generate the build system for multiresolutionREVA")
   set(TESTDIR   "${CMAKE_CURRENT_SOURCE_DIR}/../test"     CACHE STRING "test output directory")
-  set(PREVDIR   "${CMAKE_CURRENT_SOURCE_DIR}/../testprev" CACHE STRING "directory for previous test output (to compare both test runs during REVB testing)")
+  set(PREVDIR   "${CMAKE_CURRENT_SOURCE_DIR}/../testprev" CACHE STRING "directory for previous test output (to compare both test runs during multiresolutionREVB testing)")
   set(CONFIG    "Release"                                 CACHE STRING "build configuration (for MSVS)")
   set(SUBSET    "mini"                                    CACHE STRING "label regex to include tests (if empty, all tests will be done)")
-  set(OUTPUTA   "TEST.REVA.txt"                           CACHE STRING "Log file for the tests executed on revision REVA.")
-  set(OUTPUTB   "TEST.REVB.txt"                           CACHE STRING "Log file for the tests executed on revision REVB.")
+  set(OUTPUTA   "TEST.REVA.txt"                           CACHE STRING "Log file for the tests executed on revision multiresolutionREVA.")
+  set(OUTPUTB   "TEST.REVB.txt"                           CACHE STRING "Log file for the tests executed on revision multiresolutionREVB.")
   #In any of the following arguments: if it is 'CURRENT', then the current state of the working tree is used.
-  set(REVA          "CURRENT"                             CACHE STRING "first  branch/tag/commit for multiresolution project.")
-  set(REVB          ""                                    CACHE STRING "second branch/tag/commit for multiresolution project.")
-  set(REVCLIPPERA   "CURRENT"                             CACHE STRING "first branch/tag/commit for clipper project.")
-  set(REVCLIPPERB   "CURRENT"                             CACHE STRING "second branch/tag/commit for clipper project.")
-  set(REVPYCLIPPERA "CURRENT"                             CACHE STRING "first branch/tag/commit for pyclipper project.")
-  set(REVPYCLIPPERB "CURRENT"                             CACHE STRING "second branch/tag/commit for pyclipper project.")
-  set(REVSLIC3RA    "CURRENT"                             CACHE STRING "first branch/tag/commit for Slic3r project.")
-  set(REVSLIC3RB    "CURRENT"                             CACHE STRING "second branch/tag/commit for Slic3r project.")
+  set(multiresolutionREVA "CURRENT"                       CACHE STRING "first  branch/tag/commit for multiresolution project.")
+  set(multiresolutionREVB ""                              CACHE STRING "second branch/tag/commit for multiresolution project.")
+  set(clipperREVA         "CURRENT"                       CACHE STRING "first branch/tag/commit for clipper project.")
+  set(clipperREVB         "CURRENT"                       CACHE STRING "second branch/tag/commit for clipper project.")
+  set(pyclipperREVA       "CURRENT"                       CACHE STRING "first branch/tag/commit for pyclipper project.")
+  set(pyclipperREVB       "CURRENT"                       CACHE STRING "second branch/tag/commit for pyclipper project.")
+  set(Slic3rREVA          "CURRENT"                       CACHE STRING "first branch/tag/commit for Slic3r project.")
+  set(Slic3rREVB          "CURRENT"                       CACHE STRING "second branch/tag/commit for Slic3r project.")
 
 
   #problematic...
   #separate_arguments(GENA)
   #separate_arguments(GENB)
+  
+  #list of projects whose git history we are messing with
+  set(PROJECTLIST multiresolution clipper pyclipper Slic3r)
   
   MACRO(ERRNOTSET ARG)
     if ("${${ARG}}" STREQUAL "")
@@ -197,14 +202,10 @@ else()
     endif()
   ENDMACRO()
   
-  ERRNOTSET(REVB)
+  ERRNOTSET(multiresolutionREVB)
   ERRNOTSET(BINA)
   ERRNOTSET(BINB)
   
-  if ("${REVB}" STREQUAL "")
-    message(FATAL_ERROR "Please set the REVB argument!!!")
-  endif()
-
   find_program(GIT_FOUND git)
 
   if (NOT GIT_FOUND)
@@ -218,11 +219,11 @@ else()
   endif()
 
   #not strictly necessary, any non-defined variable will evaluate to empty...
-  set(STASH_EXECUTED_multiresolution OFF)
-  set(STASH_EXECUTED_clipper         OFF)
-  set(STASH_EXECUTED_pyclipper       OFF)
-  set(STASH_EXECUTED_Slic3r          OFF)
+  FOREACH(PROJECT ${PROJECTLIST})
+    set(STASH_EXECUTED_${PROJECT} OFF)
+  ENDFOREACH()
 
+  #this cumbersome set of macros STASH and UNSTASH are necessary because "git stash pop" must not be executed if "git stash" failed...
   MACRO(STASH PROJECT)
     set(STASH_EXECUTED_${PROJECT} ON)
     execute_process(COMMAND git rev-parse refs/stash
@@ -244,6 +245,7 @@ else()
     endif()
   ENDMACRO()
 
+  #helper for git "git checkout"
   MACRO(CHECKOUT PROJECT REV)
     execute_process(COMMAND git checkout ${REV}
                     WORKING_DIRECTORY ${SRCDIR}/${PROJECT}
@@ -257,11 +259,11 @@ else()
   ENDMACRO()
 
   #not strictly necessary, any non-defined variable will evaluate to empty...
-  set(NUM_RESTORE_multiresolution "")
-  set(NUM_RESTORE_clipper         "")
-  set(NUM_RESTORE_pyclipper       "")
-  set(NUM_RESTORE_Slic3r          "")
+  FOREACH(PROJECT ${PROJECTLIST})
+    set(NUM_RESTORE_${PROJECT} "")
+  ENDFOREACH()
   
+  #restore the state of the repository history (of course, the reflog remains modified...)
   MACRO(RESTORE_GIT PROJECT)
     if(NOT "${NUM_RESTORE_${PROJECT}}" STREQUAL "")
       CHECKOUTPREV(${PROJECT} ${NUM_RESTORE_${PROJECT}})
@@ -269,66 +271,66 @@ else()
       set(NUM_RESTORE_${PROJECT} "")
     endif()
   ENDMACRO()
-  
+ 
+  #execute this just before all times the script terminates
   MACRO(RESTORE_GIT_ALL)
-    RESTORE_GIT(multiresolution)
-    RESTORE_GIT(clipper)
-    RESTORE_GIT(pyclipper)
-    RESTORE_GIT(Slic3r)
+    FOREACH(PROJECT ${PROJECTLIST})
+      RESTORE_GIT(${PROJECT})
+    ENDFOREACH()
   ENDMACRO()
   
+  #execute this just before all times the script terminates, making extra-sure that RESTORE_GIT is invoked only if absolutely necessary
   MACRO(RESTORE_GIT_IF_NOT_CURRENT_ALL A_OR_B)
-    if (NOT "${REV${A_OR_B}}" STREQUAL "CURRENT")
-        RESTORE_GIT(multiresolution)
-    endif()
-    if (NOT "${REVCLIPPER${A_OR_B}}" STREQUAL "CURRENT")
-        RESTORE_GIT(clipper)
-    endif()
-    if (NOT "${REVPYCLIPPER${A_OR_B}}" STREQUAL "CURRENT")
-        RESTORE_GIT(pyclipper)
-    endif()
-    if (NOT "${REVSLIC3R${A_OR_B}}" STREQUAL "CURRENT")
-        RESTORE_GIT(Slic3r)
-    endif()
+    FOREACH(PROJECT ${PROJECTLIST})
+      if (NOT "${${PROJECT}REV${A_OR_B}}" STREQUAL "CURRENT")
+        RESTORE_GIT(${PROJECT})
+      endif()
+    ENDFOREACH()
   ENDMACRO()
   
   #safe checkout process, the first time we do it
-  MACRO(SAFECHECKOUTFIRST A_OR_B PROJECT REV_VAR)
-    if (NOT "${${REV_VAR}${A_OR_B}}" STREQUAL "CURRENT")
+  MACRO(SAFECHECKOUTFIRST A_OR_B PROJECT)
+    if (NOT "${${PROJECT}REV${A_OR_B}}" STREQUAL "CURRENT")
       STASH(${PROJECT})
-      CHECKOUT(${PROJECT} ${${REV_VAR}${A_OR_B}})
+      CHECKOUT(${PROJECT} ${${PROJECT}REV${A_OR_B}})
       if(NOT "${RES}" STREQUAL "0")
         UNSTASH(${PROJECT})
         RESTORE_GIT_ALL()
-       message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${REV_VAR}${A_OR_B}}>")
+        message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${PROJECT}REV${A_OR_B}}>")
       endif()
       #we only have checkout one revision, so to get the original checkout we'll have to go back in time one step to get the original checkout
       set(NUM_RESTORE_${PROJECT} -1)
     endif()
   ENDMACRO()
   
+  MACRO(SAFECHECKOUTFIRST_ALL A_OR_B)
+    FOREACH(PROJECT ${PROJECTLIST})
+      SAFECHECKOUTFIRST(${A_OR_B} ${PROJECT})
+    ENDFOREACH()
+  ENDMACRO()
+  
   #safe checkout process, the second time we do it
-  MACRO(SAFECHECKOUTSECOND PROJECT REV_VAR)
-    if ("${${REV_VAR}A}" STREQUAL "CURRENT")
-      if (NOT "${${REV_VAR}B}" STREQUAL "CURRENT")
+  MACRO(SAFECHECKOUTSECOND PROJECT)
+    if ("${${PROJECT}REVA}" STREQUAL "CURRENT")
+      if (NOT "${${PROJECT}REVB}" STREQUAL "CURRENT")
         STASH(${PROJECT})
-        CHECKOUT(${PROJECT} ${${REV_VAR}B})
+        CHECKOUT(${PROJECT} ${${PROJECT}REVB})
         if(NOT "${RES}" STREQUAL "0")
             UNSTASH(${PROJECT})
             RESTORE_GIT_ALL()
-            message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${REV_VAR}B}>")
+            message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${PROJECT}REVB}>")
         endif()
         #we only have checkout one revision, so to get the original checkout we'll have to go back in time one step to get the original checkout
         set(NUM_RESTORE_${PROJECT} -1)
       endif()
     else()
-      if ("${${REV_VAR}B}" STREQUAL "CURRENT")
+      if ("${${PROJECT}REVB}" STREQUAL "CURRENT")
         RESTORE_GIT(${PROJECT})
       else()
-        CHECKOUT(${PROJECT} ${${REV_VAR}B})
+        CHECKOUT(${PROJECT} ${${PROJECT}REVB})
         if(NOT "${RES}" STREQUAL "0")
           RESTORE_GIT_ALL()
-          message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${REV_VAR}B}>")
+          message(FATAL_ERROR "COULD NOT CHECKOUT ${PROJECT} <${${PROJECT}REVB}>")
         endif()
         #we have checkout two revisions, so to get the original checkout we'll have to go back in time two steps to get the original checkout
         set(NUM_RESTORE_${PROJECT} -2)
@@ -336,33 +338,33 @@ else()
     endif()
   ENDMACRO()
   
+  MACRO(SAFECHECKOUTSECOND_ALL)
+    FOREACH(PROJECT ${PROJECTLIST})
+      SAFECHECKOUTSECOND(${PROJECT})
+    ENDFOREACH()
+  ENDMACRO()
+  
   if (NOEXECA)
   
-    #IN THIS CASE, WE ONLY TEST REVB AND COMPARE ITS RESULTS AGAINST THE OUTPUT IN TESTPREV_DIR
+    #IN THIS CASE, WE ONLY TEST multiresolutionREVB AND COMPARE ITS RESULTS AGAINST THE OUTPUT IN TESTPREV_DIR
 
     #remove test outputs, if present
     file(REMOVE_RECURSE "${TESTDIR}")
 
     #git checkout REVB
-    SAFECHECKOUTFIRST(B multiresolution REV)
-    SAFECHECKOUTFIRST(B clipper         REVCLIPPER)
-    SAFECHECKOUTFIRST(B pyclipper       REVPYCLIPPER)
-    SAFECHECKOUTFIRST(B Slic3r          REVSLIC3R)
+    SAFECHECKOUTFIRST_ALL(B)
 
   else()
 
-    #IN THIS CASE, WE TEST FIRST REVA WITHOUT COMPARING; THEN TEST REVB AND COMPARE ITS RESULTS AGAINST REVA
+    #IN THIS CASE, WE TEST FIRST multiresolutionREVA WITHOUT COMPARING; THEN TEST multiresolutionREVB AND COMPARE ITS RESULTS AGAINST multiresolutionREVA
 
-    if (("${REVA}" STREQUAL "CURRENT") AND ("${REVB}" STREQUAL "CURRENT"))
-      #this is a sanity check, but it should be disabled if we want to compare revisions of the *other* projects: clipper, pyclipper, Slic3r
-      message(FATAL_ERROR "REVA and REVB cannot be both CURRENT at the same time!!!!")
+    if (("${multiresolutionREVA}" STREQUAL "CURRENT") AND ("${multiresolutionREVB}" STREQUAL "CURRENT"))
+      #this is a sanity check, but it should be disabled if we just want to compare revisions of the *other* projects
+      message(FATAL_ERROR "multiresolutionREVA and multiresolutionREVB cannot be both CURRENT at the same time!!!!")
     endif()
 
     #git checkout REVA
-    SAFECHECKOUTFIRST(A multiresolution REV)
-    SAFECHECKOUTFIRST(A clipper         REVCLIPPER)
-    SAFECHECKOUTFIRST(A pyclipper       REVPYCLIPPER)
-    SAFECHECKOUTFIRST(A Slic3r          REVSLIC3R)
+    SAFECHECKOUTFIRST_ALL(A)
     
     #generate build system for REVA
     if (NOT "${GENA}" STREQUAL "")
@@ -377,7 +379,7 @@ else()
                       RESULT_VARIABLE RES)
       if(NOT "${RES}" STREQUAL "0")
         RESTORE_GIT_IF_NOT_CURRENT_ALL(A)
-        message(FATAL_ERROR "COULD NOT GENERATE BUILD SYSTEM FOR <${REVA}>")
+        message(FATAL_ERROR "COULD NOT GENERATE BUILD SYSTEM FOR REVA: <${multiresolutionREVA}>")
       endif()
     endif()
     
@@ -388,7 +390,7 @@ else()
                       RESULT_VARIABLE RES)
       if(NOT "${RES}" STREQUAL "0")
         RESTORE_GIT_IF_NOT_CURRENT_ALL(A)
-        message(FATAL_ERROR "COULD NOT BUILD <${REVA}>")
+        message(FATAL_ERROR "COULD NOT BUILD REVA: <${multiresolutionREVA}>")
       endif()
     endif()
 
@@ -407,10 +409,7 @@ else()
     file(RENAME "${TESTDIR}" "${PREVDIR}")
 
     #checkout REVB
-    SAFECHECKOUTSECOND(multiresolution REV)
-    SAFECHECKOUTSECOND(clipper         REVCLIPPER)
-    SAFECHECKOUTSECOND(pyclipper       REVPYCLIPPER)
-    SAFECHECKOUTSECOND(Slic3r          REVSLIC3R)
+    SAFECHECKOUTSECOND_ALL()
     
   endif()
 
@@ -427,7 +426,7 @@ else()
                     RESULT_VARIABLE RES)
     if(NOT "${RES}" STREQUAL "0")
       RESTORE_GIT_IF_NOT_CURRENT_ALL(B)
-      message(FATAL_ERROR "COULD NOT GENERATE BUILD SYSTEM FOR <${REVB}>")
+      message(FATAL_ERROR "COULD NOT GENERATE BUILD SYSTEM FOR REVB: <${multiresolutionREVB}>")
     endif()
   endif()
 
