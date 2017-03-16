@@ -88,6 +88,7 @@ MACRO(WRITECMAKELISTS OUTPUTDIR)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
 set(OUTPUTDIR \"${OUTPUTDIR}\")
+set(PYTHONSCRIPTS_PATH \"${OUTPUTDIR}/pyclipper\")
 include(config.cmake)
 include(testing.cmake)
 ")
@@ -101,7 +102,6 @@ MACRO(WRITECMAKECONFIG)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
 set(PYTHON_EXECUTABLE  \"${PYTHON_EXECUTABLE}\")
-set(PYTHONSCRIPTS_PATH \"${PYTHONSCRIPTS_PATH}\")
 set(DATATEST_DIR       \"${DATATEST_DIR}\")
 set(TEST_DIR           \"${TEST_DIR}\")
 set(TESTPREV_DIR       \"${TESTPREV_DIR}\")
@@ -119,8 +119,6 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config.template.txt")
   #arguments necessary for testing.cmake
   set(PYTHON_EXECUTABLE  ""
       CACHE STRING       "path to python executable")
-  set(PYTHONSCRIPTS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../pyclipper"
-      CACHE STRING       "path to the required python scripts (pyclipper project)")
   set(DATATEST_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/../data_test"
       CACHE STRING       "path to STL test files")
   set(TEST_DIR           "${CMAKE_CURRENT_SOURCE_DIR}/../test"
@@ -398,7 +396,7 @@ else()
     file(REMOVE_RECURSE "${TESTDIR}")
 
     #test REVA
-    WRITECMAKELISTS("${BINA}") #we do not care to specify OUTPUTDIR the first time
+    WRITECMAKELISTS("${BINA}")
     execute_process(COMMAND ${CMAKE_COMMAND} .
                     WORKING_DIRECTORY ${MASTERDIR})
     execute_process(COMMAND ctest ${TESTARGS} -LE comp -C Release --output-log "${OUTPUTA}"
@@ -440,12 +438,12 @@ else()
                     RESULT_VARIABLE RES)
     if(NOT "${RES}" STREQUAL "0")
       RESTORE_GIT_IF_NOT_CURRENT_ALL(B)
-      message(FATAL_ERROR "COULD NOT BUILD <${REVB}>")
+      message(FATAL_ERROR "COULD NOT BUILD REVB: <${multiresolutionREVB}>")
     endif()
   endif()
 
   #test REVB
-  WRITECMAKELISTS("${BINB}") #we do not care to specify OUTPUTDIR the first time
+  WRITECMAKELISTS("${BINB}")
   execute_process(COMMAND ${CMAKE_COMMAND} .
                   WORKING_DIRECTORY ${MASTERDIR})
   execute_process(COMMAND ctest ${TESTARGS} -C Release --output-log "${OUTPUTB}"
