@@ -141,17 +141,25 @@ void ClippingResources::removeHighResDetails(size_t k, clp::Paths &contours, clp
     //RESULT IS RETURNED IN lowres
 }
 
+//with the current setup, this is executed only in add/sub mode for the first process
 void ClippingResources::overwriteHighResDetails(size_t k, clp::Paths &contours, clp::Paths &lowres, clp::Paths &aux1, clp::Paths &aux2) {
     auto &ppspec    = spec->pp[k];
     auto &fattening = spec->global.addsub.fattening;
 
     //remove high-res negative details.
     offset.ArcTolerance = (double)ppspec.arctolG;
-    double negativeHighResFactor = (double)ppspec.substep * 1.1; //minimal factor
+    //TODO: disabling the removal of high-res negative details is a stop-gap measure to avoid inconsistencies if pp[k].appysnap is false. It should be changed by enforcing the use of neg-closing in these cases
+    double negativeHighResFactor = (ppspec.applysnap) ? (double)ppspec.substep * 1.1 : 0; //minimal factor
     if (fattening.eraseHighResNegDetails && (((double)fattening.eraseHighResNegDetails_radius) > negativeHighResFactor)) {
         negativeHighResFactor = (double)fattening.eraseHighResNegDetails_radius;
     }
-    offsetDo2(lowres, negativeHighResFactor, -negativeHighResFactor, contours, aux1, clp::jtRound, clp::etClosedPolygon);
+    clp::Paths *source;
+    if (negativeHighResFactor != 0.0) {
+        offsetDo2(lowres, negativeHighResFactor, -negativeHighResFactor, contours, aux1, clp::jtRound, clp::etClosedPolygon);
+        source = &lowres;
+    } else {
+        source = &contours;
+    }
 
     if (fattening.useGradualFattening) {
         clp::Paths fat, thin, next;
@@ -160,9 +168,9 @@ void ClippingResources::overwriteHighResDetails(size_t k, clp::Paths &contours, 
             r *= 2;
         }
         //compute the low-res contours with a naive toolpath
-        offsetDo2(fat, -r, r, lowres, aux1, clp::jtRound, clp::etClosedPolygon);
+        offsetDo2(fat, -r, r, *source, aux1, clp::jtRound, clp::etClosedPolygon);
         //get the areas that are high-res
-        clipperDo(thin, clp::ctDifference, lowres, fat, clp::pftEvenOdd, clp::pftEvenOdd);
+        clipperDo(thin, clp::ctDifference, *source, fat, clp::pftEvenOdd, clp::pftEvenOdd);
         //TODO: expose smallNeg as a configurable parameter!!!
         double smallNeg = r*0.01; //remove spurious ultrathin components
         offsetDo2(thin, -smallNeg, smallNeg, thin, aux1, clp::jtRound, clp::etClosedPolygon);
@@ -225,6 +233,10 @@ void ClippingResources::overwriteHighResDetails(size_t k, clp::Paths &contours, 
         clipper2.Execute(clp::ctUnion, lowres, clp::pftNonZero, clp::pftNonZero);
         clipper2.Clear();
         //SHOWCONTOURS(*spec->global.config, "contour before and after overwriting", &old_lowres, &lowres);
+    } else {
+        if (source != &lowres) {
+            lowres = *source;
+        }
     }
 
     //RESULT IS RETURNED IN lowres
@@ -614,7 +626,9 @@ bool Multislicer::applyProcessPhase1(SingleProcessOutput &output, clp::Paths &co
                 if ((spec->numspecs > 1) && spec->pp[k - 1].applysnap) {
                     //if we applied snapping previously, we need to remove the small linings
                     res->offset.ArcTolerance = (double)ppspec.arctolG;
-                    res->offsetDo2(lowres, -(double)ppspec.dilatestep, (double)ppspec.dilatestep, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
+                    //TODO: using spec->pp[k - 1].dilatestep is a stop-gap measure to avoid inconsistencies if pp[k].appysnap is false. It should be changed by an appropriate config value
+                    double value = (spec->pp[k].applysnap) ? (double)ppspec.dilatestep : spec->pp[k - 1].dilatestep;
+                    res->offsetDo2(lowres, -value, value, contours_tofill, AUX3, clp::jtRound, clp::etClosedPolygon);
                 } else {
                     //lowres = contours_tofill; //this was needed only for doing a SHOWCONTOURS with &lowres after the big if statement
                     contourToProcess = &contours_tofill;

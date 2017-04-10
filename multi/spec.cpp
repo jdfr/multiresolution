@@ -44,6 +44,8 @@ std::string MultiSpec::populateParameters() {
         pp[k].any_InfillingJustContours = (pp[k].internalInfilling.infillingMode == InfillingJustContours) || (pp[k].surfaceInfilling.infillingMode == InfillingJustContours);
         pp[k].any_isnot_InfillingNone   = (pp[k].internalInfilling.infillingMode != InfillingNone)         || (pp[k].surfaceInfilling.infillingMode != InfillingNone);
 
+        //TODO: currently, we rely on testing applysnap before using gristep, substep, dilatestep or safestep.
+        //Because of the complex slicing logic, this is quite unsafe. Think of some way to avoid this without speed penalties...
         if (!pp[k].applysnap) continue;
 
         pp[k].substep    = pp[k].gridstep / 2.0;
