@@ -215,7 +215,7 @@ if(DO_COMPILE_PROGRAMOPTIONS)
       #${BOOST_PROGRAMOPTIONS_DIR}/winmain.cpp
       #${BOOST_PROGRAMOPTIONS_DIR}/split.cpp
       )
-  if (CMAKE_COMPILER_IS_GNUCC)
+  if (NOT MSVC)
     target_compile_options(miniboostlib PUBLIC "-Wno-deprecated-declarations")
     if (NOT WIN32)
       target_compile_options(miniboostlib PUBLIC "-fPIC")
@@ -228,7 +228,7 @@ ADD_LIBRARY(corelib STATIC ${CORESOURCES})
 if(USE_PYTHON)
   set_property(TARGET corelib APPEND PROPERTY COMPILE_DEFINITIONS "CORELIB_USEPYTHON")
 endif()
-if ((NOT WIN32) AND CMAKE_COMPILER_IS_GNUCC)
+if (NOT WIN32)
   target_compile_options(corelib PUBLIC "-fPIC")
 endif()
   
