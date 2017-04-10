@@ -104,24 +104,30 @@ endif()
 
 SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type")
 
+STRING(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_lowercase)
+IF (COMPILE_OPTIMIZATIONS AND NOT "${CMAKE_BUILD_TYPE_lowercase}" STREQUAL "debug")
+  SET(USE_COMPILE_OPTIMIZATIONS ON)
+ELSE()
+  SET(USE_COMPILE_OPTIMIZATIONS OFF)
+ENDIF()
+
 ADD_DEFINITIONS(-DCLIPPER_USE_INTRINSIC_128)
 if (MSVC)
   #_CRT_SECURE_NO_WARNINGS: disable annoying warnings
   ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
-  if(COMPILE_OPTIMIZATIONS)
+  if(USE_COMPILE_OPTIMIZATIONS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast /Ox /GF /Gy /GS- ")
+  endif()
+else()
+  ADD_DEFINITIONS(-std=c++11)
+  if(USE_COMPILE_OPTIMIZATIONS)
+    #WARNING: DO NOT USE -march=native if you are going to distribute the binaries!!!!!!
+    ADD_DEFINITIONS(-Ofast -ffast-math -march=native)
   endif()
 endif()
 
 #avoid exporting all symbols in shared libraries
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
-if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
-  ADD_DEFINITIONS(-std=c++11)
-  if(COMPILE_OPTIMIZATIONS)
-    ADD_DEFINITIONS(-Ofast -ffast-math -march=native)
-  endif()
-endif()
 
 if (ENABLE_SLICER_LOGGING)
     ADD_DEFINITIONS(-DSLICER_USE_DEBUG_FILE) #this is used by several subprojects
