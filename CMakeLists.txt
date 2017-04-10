@@ -119,13 +119,8 @@ if (MSVC)
   endif()
 endif()
 
-if (UNIX AND CMAKE_COMPILER_IS_GNUCC)
-  #no need to check GCC version, we already require it to compile c++11 anyway!
-  #execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-  #if (GCC_VERSION VERSION_GREATER 4.0 OR GCC_VERSION VERSION_EQUAL 4.0)
-    ADD_DEFINITIONS(-fvisibility=hidden)
-  #endif()
-endif()
+#avoid exporting all symbols in shared libraries
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 if(MINGW OR CMAKE_COMPILER_IS_GNUCC)
   ADD_DEFINITIONS(-std=c++11)
