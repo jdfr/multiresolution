@@ -108,14 +108,8 @@ ADD_DEFINITIONS(-DCLIPPER_USE_INTRINSIC_128)
 if (MSVC)
   #_CRT_SECURE_NO_WARNINGS: disable annoying warnings
   ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
-  if (FALSE)
-    #The high amount of warnings while building with this block enabled
-    #suggests that I currently do not know how to properly pass optimization
-    #flags to visual studio with cmake. Anyway, the output is reasonably
-    #fast, unlike non-explicitly optimized GCC
-    if(COMPILE_OPTIMIZATIONS)
-      set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} " /fp:fast /Ox /GF Gy /GS- ")
-    endif()
+  if(COMPILE_OPTIMIZATIONS)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast /Ox /GF /Gy /GS- ")
   endif()
 endif()
 
