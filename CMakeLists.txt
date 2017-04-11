@@ -126,9 +126,6 @@ else()
   endif()
 endif()
 
-#avoid exporting all symbols in shared libraries
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
 if (ENABLE_SLICER_LOGGING)
     ADD_DEFINITIONS(-DSLICER_USE_DEBUG_FILE) #this is used by several subprojects
 endif()
@@ -238,8 +235,11 @@ if(MAKEMR_LIBRARY)
     shared/multiresolution.cpp
     )
   ADD_LIBRARY(multiresolution_library SHARED ${LIBRARY_SOURCES})
-  set_target_properties(multiresolution_library PROPERTIES COMPILE_DEFINITIONS "LIBRARY_EXPORTS")
-  set_target_properties(multiresolution_library PROPERTIES OUTPUT_NAME multires)
+  set_target_properties(multiresolution_library PROPERTIES
+    COMPILE_DEFINITIONS "LIBRARY_EXPORTS"
+    OUTPUT_NAME multires
+    CXX_VISIBILITY_PRESET hidden #avoid exporting all symbols in shared libraries
+  )
   target_link_libraries(multiresolution_library corelib ${Boost_LIBRARIES})
 endif()
 
