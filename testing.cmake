@@ -54,27 +54,49 @@ MACRO(TEST_TEMPLATE TESTNAME WORKDIR)
            WORKING_DIRECTORY "${WORKDIR}")
 ENDMACRO()
 
+MACRO(TEST_TEMPLATE_LABEL THELABEL)
+  TEST_TEMPLATE(${ARGN})
+  set_tests_properties(PROPERTIES LABELS ${THELABEL})
+ENDMACRO()
+
 #Currently, the STL test files are fetched from another project. Ideally, instead, they should be generated programmatically
 #from as little binary data as possible (in principle, it is possible to generate similar files from around 1-5kb).
 #However, this is not implemented yet, so we are stuck for now fetching the files from elsewhere. Anyway, as the files will
 #eventually be generated, we do not copy them at generation time but at test time, so when we have the means to generate them
 #programmatically, we can just swap the instances of TEST_COPY_FILE by another macro, but keep the dependency tree intact.
-MACRO(TEST_COPY_FILE TESTNAME FILENAME)
-  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E copy_if_different "${DATATEST_DIR}/${FILENAME}" "${TEST_DIR}/${FILENAME}")
+MACRO(TEST_COPY_FILE THELABEL TESTNAME FILENAME)
+  TEST_TEMPLATE_LABEL(${THELABEL} ${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E copy_if_different "${DATATEST_DIR}/${FILENAME}" "${TEST_DIR}/${FILENAME}")
 ENDMACRO()
 
-MACRO(TEST_COMPARE TESTNAME THELABELS FILENAME1 FILENAME2)
+#test to compare two files
+MACRO(TEST_COMPARE TESTNAME THELABELS PREVTEST FILENAME1 FILENAME2)
   TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E compare_files "${FILENAME1}" "${FILENAME2}")
-  set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS}" REQUIRED_FILES "${FILENAME1};${FILENAME2}")
+  set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${FILENAME1};${FILENAME2}")
 ENDMACRO()
 
-MACRO(TEST_MULTIRES TESTNAME THELABELS_MULTIRES THELABELS_COMP PREVTEST INPUTFILE)
-  set(PRODUCT         "${TEST_DIR}/${TESTNAME}.paths")
-  set(PRODUCTPREV "${TESTPREV_DIR}/${TESTNAME}.paths")
-  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${multires} --load "${TEST_DIR}/${INPUTFILE}" --save "${PRODUCT}" ${ARGN})
-  TEST_COMPARE(COMPARE_${TESTNAME} "${THELABELS_COMP}" "${PRODUCT}" "${PRODUCTPREV}")
+#base macro to test the multires executable; highly generic, so it is somewhat cryptic... Best understood if you see how it is called by other macros
+MACRO(TEST_MULTIRES PRODUCT LOADFLAG SAVEFLAG PREVTEST INPUTFILE TESTNAME THELABELS_MULTIRES)
+  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${multires} ${LOADFLAG} "${TEST_DIR}/${INPUTFILE}" ${SAVEFLAG} "${PRODUCT}" ${ARGN})
   set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS_MULTIRES}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${TEST_DIR}/${INPUTFILE}")
-  set_tests_properties(COMPARE_${TESTNAME} PROPERTIES DEPENDS "${TESTNAME}")
+ENDMACRO()
+
+#complement to TEST_MULTIRES to add a test comparison of the output of the executable with the corresponding output from another test run
+MACRO(TEST_MULTIRES_COMPARE_CHOOSEFLAGS LOADFLAG SAVEFLAG PREVTEST INPUTFILE TESTNAME THELABELS_MULTIRES THELABELS_COMP)
+  set(PRODUCT "${TEST_DIR}/${TESTNAME}.paths")
+  TEST_MULTIRES(${PRODUCT} ${LOADFLAG} ${SAVEFLAG} ${PREVTEST} ${INPUTFILE} ${TESTNAME} ${THELABELS_MULTIRES} ${ARGN})
+  set(PRODUCTPREV "${TESTPREV_DIR}/${TESTNAME}.paths")
+  TEST_COMPARE(COMPARE_${TESTNAME} "${THELABELS_COMP}" "${TESTNAME}" "${PRODUCT}" "${PRODUCTPREV}")
+ENDMACRO()
+
+MACRO(TEST_MULTIRES_COMPARE)
+  TEST_MULTIRES_COMPARE_CHOOSEFLAGS(--load --save ${ARGN})
+ENDMACRO()
+
+#macro to repeat test/compare twice: once without snap, also with snap. To that end,
+#it must be supplied with a name of a macro that adds snapping to the configuration
+MACRO(TEST_MULTIRES_BOTHSNAP SNAPMACRONAME PREVTEST INPUTFILE TESTNAME)
+  TEST_MULTIRES_COMPARE(${PREVTEST} ${INPUTFILE} ${TESTNAME}_nosnap ${ARGN})
+  TEST_MULTIRES_COMPARE(${PREVTEST} ${INPUTFILE} ${TESTNAME}_snap   ${ARGN} ${${SNAPMACRONAME}})
 ENDMACRO()
 
 ###########################################################
@@ -107,19 +129,16 @@ add_custom_target(checkcompfull  COMMAND ctest --output-on-failure -L compfull)
 ###########################################################
 
 #STL files to copy
-TEST_COPY_FILE(put_mini mini.stl)
-TEST_COPY_FILE(put_mini_salient mini.salient.stl)
-TEST_COPY_FILE(put_full full.stl)
-TEST_COPY_FILE(put_full_dented full.dented.stl)
+TEST_COPY_FILE(putmini put_mini         mini.stl)
+TEST_COPY_FILE(putmini put_mini_salient mini.salient.stl)
+TEST_COPY_FILE(putfull put_full         full.stl)
+TEST_COPY_FILE(putfull put_full_dented  full.dented.stl)
 #STL file to generate
-TEST_TEMPLATE(put_full_salient "${PYTHONSCRIPTS_PATH}" "${PYTHON_EXECUTABLE}" mergestls.py "${TEST_DIR}/full.stl" "${DATATEST_DIR}/salient.stl" "${TEST_DIR}/full.salient.stl")
-set_tests_properties(put_mini put_mini_salient
-                     PROPERTIES LABELS "putmini")
-set_tests_properties(put_full put_full_dented put_full_salient
-                     PROPERTIES LABELS "putfull")
+TEST_TEMPLATE(put_full_salient "${OUTPUTDIR}/${PYTHONSCRIPTS_PATH}" "${PYTHON_EXECUTABLE}" "mergestls.py" "${TEST_DIR}/full.stl" "${TEST_DIR}/salient.stl" "${TEST_DIR}/full.salient.stl")
 set_tests_properties(put_full_salient PROPERTIES
-                     DEPENDS "put_full;put_full_dented"
-                     REQUIRED_FILES "${TEST_DIR}/full.stl;${DATATEST_DIR}/salient.stl")
+                     LABELS "putfull"
+                     DEPENDS "put_full;put_full_justsalient"
+                     REQUIRED_FILES "${TEST_DIR}/full.stl;${TEST_DIR}/salient.stl")
 
 ###########################################################
 ###### MINI TEST CASES
@@ -134,95 +153,100 @@ set(MINISTL        put_mini         mini.stl)
 set(MINISALIENTSTL put_mini_salient mini.salient.stl)
 set(NOSCHED --slicing-uniform 0.1 --save-contours --motion-planner)
 set(SCHED   --slicing-scheduler   --save-contours --motion-planner)
-set(MINI_DIMST0 --process 0 --radx 75 --gridstep 0.1 --tolerances 15 1  --smoothing 0.1)
-set(MINI_DIMST1 --process 1 --radx 10 --gridstep 0.1 --tolerances 2 0.1 --smoothing 0.1)
+set(MINI_DIMST0 --process 0 --radx 75 --tolerances 15 1  --smoothing 0.1)
+set(MINI_DIMST1 --process 1 --radx 10 --tolerances 2 0.1 --smoothing 0.1)
 set(MINI_SCHED0 --voxel-profile ellipsoid --voxel-z 75 67.5)
 set(MINI_SCHED1 --voxel-profile ellipsoid --voxel-z 10 9)
-set(CLRNCE --safestep --snap --clearance --medialaxis-radius 1.0)
+set(CLRNCE --clearance --medialaxis-radius 1.0)
+set(USEGRID --process 0 --gridstep 0.1 --process 1 --gridstep 0.1)
+set(SNAPTHICK ${USEGRID} --process 0 --snap --process 1 --snap)
+set(SNAPTHIN ${SNAPTHICK} --process 0 --safestep --process 1 --safestep)
 
-TEST_MULTIRES(mini_no3d_clearance_noinfilling ${MINILABELS} ${MINISTL}
-              ${NOSCHED}
-              ${MINI_DIMST0} ${CLRNCE}
-              ${MINI_DIMST1} ${CLRNCE}
-              )
-TEST_MULTIRES(mini_no3d_clearance_infillingconcentric ${MINILABELS} ${MINISTL}
-              ${NOSCHED} 
-              ${MINI_DIMST0} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5
-              ${MINI_DIMST1} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_no3d_clearance_infillinglines ${MINILABELS} ${MINISTL}
-              ${NOSCHED} 
-              ${MINI_DIMST0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
-              ${MINI_DIMST1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_no3d_clearance_infillingrecursive ${MINILABELS} ${MINISTL}
-              ${NOSCHED} 
-              ${MINI_DIMST0} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5 --infilling-recursive
-              ${MINI_DIMST1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_no3d_addsub_medialaxis ${MINILABELS} ${MINISTL}
-              ${NOSCHED} --addsub 
-              ${MINI_DIMST0} --safestep --snap --medialaxis-radius 0.05 --infill linesh
-              ${MINI_DIMST1} --safestep --snap --medialaxis-radius 0.5  --infill linesh
-              )
-TEST_MULTIRES(mini_no3d_addsub_negclosing_gradual ${MINILABELS} ${MINISTL}
-              ${NOSCHED} --addsub --neg-closing 40 --overwrite-gradual 0.9 0.5 0.4 0.6 0.2 0.8 0 1
-              ${MINI_DIMST0} --snap 
-              ${MINI_DIMST1} --snap --medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_dxf_justcontours ${MINILABELS} ${MINISTL}
-              ${NOSCHED} --dxf-contours "${TEST_DIR}/mini_dxf_justcontours" --dxf-format binary --dxf-by-tool #--dxf-by-z 
-              ${MINI_DIMST0} 
-              ${MINI_DIMST1} --no-toolpaths --no-preprocessing 2
-              )
-TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N0 compmini
-                  "${TEST_DIR}/mini_dxf_justcontours.N0.dxf"
-              "${TESTPREV_DIR}/mini_dxf_justcontours.N0.dxf"
-              )
-TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N1 compmini
-                  "${TEST_DIR}/mini_dxf_justcontours.N1.dxf"
-              "${TESTPREV_DIR}/mini_dxf_justcontours.N1.dxf"
-              )
-TEST_MULTIRES(mini_3d_clearance_noinfilling ${MINILABELS} ${MINISTL}
-              ${SCHED}
-              ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE}
-              ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE}
-              )
-TEST_MULTIRES(mini_3d_clearance_infilling ${MINILABELS} ${MINISTL}
-              ${SCHED}
-              ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
-              ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_3d_infilling_addperimeters ${MINILABELS} ${MINISTL}
-              ${SCHED}
-              ${MINI_DIMST0} ${MINI_SCHED0} --safestep --snap --infill linesv --infill-medialaxis-radius 0.5 --additional-perimeters 1
-              ${MINI_DIMST1} ${MINI_SCHED1} --safestep --snap --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2
-              )
-TEST_MULTIRES(mini_3d_infilling_withsurface ${MINILABELS} ${MINISTL}
-              ${SCHED}
-              ${MINI_DIMST0} ${MINI_SCHED0} --safestep --snap --infill linesvh --infill-medialaxis-radius 0.5
-              ${MINI_DIMST1} ${MINI_SCHED1} --safestep --snap --infill linesh --infill-static-mode --infill-lineoverlap -4 --surface-infill linesh --compute-surfaces-just-with-same-process false
-              )
-TEST_MULTIRES(mini_3d_clearance_vcorrection ${MINILABELS} ${MINISALIENTSTL}
-              ${SCHED} --vertical-correction
-              ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
-              ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_3d_clearance_infillingrec ${MINILABELS} ${MINISTL}
-              ${SCHED}
-              ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5 --infilling-recursive
-              ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_3d_addsub ${MINILABELS} ${MINISTL}
-              ${SCHED} --addsub
-              ${MINI_DIMST0} ${MINI_SCHED0} --safestep --snap --medialaxis-radius 0.1 0.05
-              ${MINI_DIMST1} ${MINI_SCHED1} --safestep --snap --medialaxis-radius 0.5
-              )
-TEST_MULTIRES(mini_3d_infilling_addsub ${MINILABELS} ${MINISTL}
-              ${SCHED} --addsub
-              ${MINI_DIMST0} ${MINI_SCHED0} --safestep --snap --medialaxis-radius 0.1 0.05 --infill linesh
-              ${MINI_DIMST1} ${MINI_SCHED1} --safestep --snap --medialaxis-radius 0.5 --infill linesh 
-              )
+#when SNAPTHICK is used instead of SNAPTHIN, it is because --safestep creates problems while snapping to grid, for the configuration in that test
 
-
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_noinfilling
+  ${MINILABELS} ${NOSCHED}
+  ${MINI_DIMST0} ${CLRNCE}
+  ${MINI_DIMST1} ${CLRNCE}
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_infillingconcentric
+  ${MINILABELS} ${NOSCHED}
+  ${MINI_DIMST0} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5
+  ${MINI_DIMST1} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_infillinglines
+  ${MINILABELS} ${NOSCHED}
+  ${MINI_DIMST0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
+  ${MINI_DIMST1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_infillingrecursive
+  ${MINILABELS} ${NOSCHED}
+  ${MINI_DIMST0} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5 --infilling-recursive
+  ${MINI_DIMST1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_addsub_medialaxis
+  ${MINILABELS} ${NOSCHED} --addsub
+  ${MINI_DIMST0} --medialaxis-radius 0.05 --infill linesh
+  ${MINI_DIMST1} --medialaxis-radius 0.5  --infill linesh
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHICK ${MINISTL} mini_no3d_addsub_negclosing_gradual
+  ${MINILABELS}
+  ${NOSCHED} --addsub --neg-closing 40 --overwrite-gradual 0.9 0.5 0.4 0.6 0.2 0.8 0 1
+  ${MINI_DIMST0}
+  ${MINI_DIMST1} --medialaxis-radius 0.5
+  )
+TEST_MULTIRES_COMPARE(${MINISTL} mini_dxf_justcontours
+  ${MINILABELS}
+  ${USEGRID} ${NOSCHED} --dxf-contours "${TEST_DIR}/mini_dxf_justcontours" --dxf-format binary --dxf-by-tool #--dxf-by-z 
+  ${MINI_DIMST0} 
+  ${MINI_DIMST1} --no-toolpaths --no-preprocessing 2
+  )
+TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N0 compmini mini_dxf_justcontours
+      "${TEST_DIR}/mini_dxf_justcontours.N0.dxf"
+  "${TESTPREV_DIR}/mini_dxf_justcontours.N0.dxf"
+  )
+TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N1 compmini mini_dxf_justcontours
+      "${TEST_DIR}/mini_dxf_justcontours.N1.dxf"
+  "${TESTPREV_DIR}/mini_dxf_justcontours.N1.dxf"
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_clearance_noinfilling
+  ${MINILABELS} ${SCHED}
+  ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE}
+  ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE}
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_clearance_infilling
+  ${MINILABELS} ${SCHED}
+  ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
+  ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_infilling_addperimeters
+  ${MINILABELS} ${SCHED}
+  ${MINI_DIMST0} ${MINI_SCHED0} --infill linesv --infill-medialaxis-radius 0.5 --additional-perimeters 1
+  ${MINI_DIMST1} ${MINI_SCHED1} --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_infilling_withsurface
+  ${MINILABELS} ${SCHED}
+  ${MINI_DIMST0} ${MINI_SCHED0} --infill linesvh --infill-medialaxis-radius 0.5
+  ${MINI_DIMST1} ${MINI_SCHED1} --infill linesh --infill-static-mode --infill-lineoverlap -4 --surface-infill linesh --compute-surfaces-just-with-same-process false
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISALIENTSTL} mini_3d_clearance_vcorrection
+  ${MINILABELS} ${SCHED} --vertical-correction
+  ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
+  ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_clearance_infillingrec
+  ${MINILABELS} ${SCHED}
+  ${MINI_DIMST0} ${MINI_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5 --infilling-recursive
+  ${MINI_DIMST1} ${MINI_SCHED1} ${CLRNCE} --infill linesv --infill-medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_addsub
+  ${MINILABELS} ${SCHED} --addsub
+  ${MINI_DIMST0} ${MINI_SCHED0} --medialaxis-radius 0.1 0.05
+  ${MINI_DIMST1} ${MINI_SCHED1} --medialaxis-radius 0.5
+  )
+TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_infilling_addsub
+  ${MINILABELS} ${SCHED} --addsub
+  ${MINI_DIMST0} ${MINI_SCHED0} --medialaxis-radius 0.1 0.05 --infill linesh
+  ${MINI_DIMST1} ${MINI_SCHED1} --medialaxis-radius 0.5 --infill linesh 
+  )
 
