@@ -332,6 +332,7 @@ public:
         
         if (save || saveEvery) {
             std::vector<std::string> args = std::move(vm[save ? "checkpoint-save" : "checkpoint-save-every"].as<std::vector<std::string>>());
+            if (args.size()<=1)       throw po::error(str("--checkpoint-save must have two arguments!!!\n"));
             savefile = std::move(args[0]);
             char *endptr;
             numToSkipInSave = strtoll(args[1].c_str(), &endptr, 10);
