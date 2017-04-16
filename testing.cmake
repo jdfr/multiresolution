@@ -95,6 +95,13 @@ add_custom_target(checkcomp      COMMAND ctest --output-on-failure -L comp)
 add_custom_target(checkcompmini  COMMAND ctest --output-on-failure -L compmini)
 add_custom_target(checkcompfull  COMMAND ctest --output-on-failure -L compfull)
 
+#invaluable resource to understand the black art of custom commands/targets in cmake, if we want to move to a more complex testing model:
+# https://samthursfield.wordpress.com/2015/11/21/cmake-dependencies-between-targets-and-files-and-custom-commands/
+# http://stackoverflow.com/questions/733475/cmake-ctest-make-test-doesnt-build-tests
+# https://cmake.org/cmake/help/v3.0/command/add_custom_target.html
+# https://cmake.org/cmake/help/v3.0/command/add_custom_command.html
+# http://stackoverflow.com/questions/15115075/how-to-run-ctest-after-building-my-project-with-cmake
+
 ###########################################################
 ###### DATA FILE COPY/GENERATION
 ###########################################################

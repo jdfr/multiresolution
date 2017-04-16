@@ -1,5 +1,5 @@
-#this is intended as a standalone script. However, it should not be used from the directory of
-#the multiresolution project, because it uses git to change the working copy, so the cmake scripts
+#this is intended as a standalone script (to be used with the -P flag). However, it should not be used from the
+#directory of the multiresolution project, because it uses git to change the working copy, so the cmake scripts
 #used in the test process may be changed or even removed from the working copy!
 #Instead, if you try to run it from its original location, it will look for a known file from
 #the repository and, if present, it will copy the test scripts to ../testmaster, and prompt the
@@ -79,6 +79,12 @@
 ###########################
 ### CODE STARTS HERE ######
 ###########################
+
+#It would be optimal to be able to use freestyle arguments, without -D, but cmake -P passes all arguments verbatim,
+#so processing them would be really cumbersome:
+#  http://public.kitware.com/pipermail/cmake/2012-November/052629.html
+#  https://cmake.org/cmake/help/v3.0/variable/CMAKE_ARGV0.html
+#  https://cmake.org/cmake/help/v3.0/variable/CMAKE_ARGC.html
 
 #Ideally, we should be able to write the CMakeLists.txt file once withut OUTPUTDIR, and then invoke cmake -D OUTPUTDIR="...",
 #but there is a catch: if the -D argument is enclosed in double quotes, so will be the value of the variable during the execution of the script,

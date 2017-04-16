@@ -347,7 +347,7 @@ if (WIN32)
 else()
   set(SLICER_EXEC "./slicer" CACHE PATH "Path to the slicer executable")
 endif()
-set(PYTHONSCRIPTS_PATH "./pyclipper" CACHE PATH "Directory of the python scripts")
+set(PYTHONSCRIPTS_PATH "./pyclipper" CACHE PATH "Directory of the python scripts (this HAS TO BE relative to the output binary dir!)")
 
 if(GENERATE_TESTS)
   #these variables should be in config.cmake, but they cannot be set to adequate default values from an file that can be included at different levels, so they have to be defined twice: once here and once in the parent's CmakeLists.txt
