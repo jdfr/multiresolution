@@ -175,9 +175,11 @@ MainSpec::MainSpec() {
         ("checkpoint-load",
             po::value<std::string>()->value_name("FILENAME"),
             "If specified, this option restores a computation state saved to file FILENAME with --checkpoint-save or --checkpoint-save-every. ATTENTION: read description of --checkpoint-save for a more complete description of this mechanism. If this option is used, it is recommended to use --load-raw, as a very big performance penalty will be incurred if using --load or --load-multi. Also, it does not work with --slicing-uniform. WARNING: to avoid undefined behavior, make sure that the application is called with exactly the same arguments as when using --checkpoint-save")
+#ifdef STANDALONE_USEPYTHON
         ("show",
             po::value<std::vector<std::string>>()->multitoken(),
             "show result options using a python script. The first value can be either '2d' or '3d' (the script will use matplotlib or mayavi, respecivey). The second value, if present, should be a python expression for specifying visual appearance of displayed elements for the python script (must be tailored to the show mode (2d or 3d)")
+#endif
         ("dry-run",
             "if this option is specified, the system only shows information about the slices. First, it displays the Z values of the slices to be received from the input mesh file (raw slices). This is useful for crafting feedback pathsfiles to be used with the --feedback option. Then, if --slicing-scheduler was specified, it displays the ordered sequence of slices to be computed, exactly in the same format as the arguments of --slicing-manual (pairs NTool and Z), so this can be used as input for this option. Finally, the application terminates without doing anything else.")
         ("just-save-raw",
@@ -454,6 +456,7 @@ int Main(int argc, const char** argv) {
 
         epsilon_meshunits = multispec->global.z_epsilon*factors.internal_to_input;
 
+#ifdef STANDALONE_USEPYTHON
         show = mainOpts.count("show") != 0;
         if (show) {
             const std::vector<std::string> &vals = mainOpts["show"].as<std::vector<std::string>>();
@@ -463,7 +466,9 @@ int Main(int argc, const char** argv) {
                 viewparams = std::move(vals[1]);
             }
         }
-
+#else
+        show = false;
+#endif
         saveFormat = PATHFORMAT_DOUBLE;
         if (save) {
             singleoutputfilename = std::move(mainOpts["save"].as<std::string>());
@@ -779,10 +784,12 @@ int Main(int argc, const char** argv) {
                 }
             }
 
+#ifdef STANDALONE_USEPYTHON
             if (show) {
                 numoutputs = alsoContours ? schednuminputslices + schednumoutputslices * (NUM_PATHTYPES - 1) : schednumoutputslices * (NUM_PATHTYPES - 2);
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
+#endif
 
             if (saveContours) {
                 results.reserve(schednumoutputslices);
@@ -899,10 +906,12 @@ int Main(int argc, const char** argv) {
                 results.reserve(numresults);
             }
 
+#ifdef STANDALONE_USEPYTHON
             if (show) {
                 numoutputs = alsoContours ? numsteps + numresults * (NUM_PATHTYPES - 1) : numresults * (NUM_PATHTYPES - 2);
                 pathwriter_viewer->setNumRecords(numoutputs);
             }
+#endif
 
             for (int i = 0; i < numsteps; ++i) {
                 printf("processing raw slice %d/%lld\n", i, numsteps - 1);
