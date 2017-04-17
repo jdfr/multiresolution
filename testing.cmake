@@ -54,9 +54,9 @@ MACRO(TEST_TEMPLATE TESTNAME WORKDIR)
            WORKING_DIRECTORY "${WORKDIR}")
 ENDMACRO()
 
-MACRO(TEST_TEMPLATE_LABEL THELABEL)
-  TEST_TEMPLATE(${ARGN})
-  set_tests_properties(PROPERTIES LABELS ${THELABEL})
+MACRO(TEST_TEMPLATE_LABEL THELABEL TESTNAME)
+  TEST_TEMPLATE(${TESTNAME} ${ARGN})
+  set_tests_properties(${TESTNAME} PROPERTIES LABELS ${THELABEL})
 ENDMACRO()
 
 #Currently, the STL test files are fetched from another project. Ideally, instead, they should be generated programmatically
