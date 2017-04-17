@@ -1,5 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0) #maybe it actually requires higher, but at most 3.5...
 
+SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type") #this has to be placed before the PROJECT() command...
+
 include(config.cmake)
 
 set(SRC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -101,8 +103,6 @@ set(common_header  ${iopaths_include_dir}/common.hpp)
 if(NOT EXISTS ${clipper_source} OR NOT EXISTS ${iopaths_source} OR NOT EXISTS ${clipper_header} OR NOT EXISTS ${iopaths_header} OR NOT EXISTS ${common_header} OR NOT EXISTS ${alloc_header})
   message(FATAL_ERROR "tweaked clipper/iopaths base dir does not contain the expected files and directories!!!")
 endif()
-
-SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Release type")
 
 STRING(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_lowercase)
 IF (COMPILE_OPTIMIZATIONS AND NOT "${CMAKE_BUILD_TYPE_lowercase}" STREQUAL "debug")
