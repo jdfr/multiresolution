@@ -127,7 +127,7 @@ po::options_description globalOptionsGenerator(AddNano useNano, AddResponseFile 
         ("motion-planner",
             "If this option is specified, a very simple motion planner will be used to order the toolpaths (in a greedy way, and without any optimization to select circular perimeter entry points). Please note: perimeters, surfaces and infillings are planned independently and sequentially. If you want to apply motion planning to perimeters, surfaces and infillings together, set the per-process options lump-*.")
         ("subtractive-box-mode",
-            po::value<std::vector<int>>()->multitoken()->value_name("lx [ly]"),
+            po::value<std::vector<double>>()->multitoken()->value_name("lx [ly]"),
             "If specified, it takes two numbers: LIMIT_X and LIMIT_Y, which are the semi-lengths in X and Y of a box centered on the origin of coordinates (if absent, LIMIT_Y WILL BE ASSUMED TO BE THE SAME AS LIMIT_X). Toolpaths will be generated in the box, EXCEPT for the input mesh file. This can be used as a crude way to generate a shape in a subtractive process. If the input mesh file is not contained within the limits, results are undefined.")
         ("slicing-uniform",
             po::value<double>()->value_name("z_step"),
@@ -716,16 +716,12 @@ void parseGlobal(GlobalSpec &spec, po::variables_map &vm, MetricFactors &factors
     }
 
     if (vm.count("subtractive-box-mode")) {
-        auto &vals = vm["subtractive-box-mode"].as<std::vector<int>>();
+        auto &vals = vm["subtractive-box-mode"].as<std::vector<double>>();
         if (vals.size() == 0) {
             throw po::error("subtractive-box-mode was specified without values!");
         } else {
-            spec.limitX = vals[0];
-            spec.limitY = vals.size() > 1 ? vals[1] : vals[0];
-            if (doscale) {
-                spec.limitX = (clp::cInt)(spec.limitX*scale);
-                spec.limitY = (clp::cInt)(spec.limitY*scale);
-            }
+            spec.limitX =                   (clp::cInt)getScaled(vals[0], scale, doscale);
+            spec.limitY = vals.size() > 1 ? (clp::cInt)getScaled(vals[1], scale, doscale) : spec.limitX;
         }
     } else {
         spec.limitX = spec.limitY = -1;

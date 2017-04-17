@@ -20,7 +20,7 @@ typedef struct InOuter {
         clp::cInt minx, maxx, miny, maxy;
         if (path.size()==0) return false;
         minx = maxx = path[0].X;
-        miny = maxy = path[0].X;
+        miny = maxy = path[0].Y;
         for (clp::Path::iterator point = path.begin()+1; point!=path.end(); ++point) {
             minx = std::min(minx, point->X);
             maxx = std::max(maxx, point->X);
