@@ -791,13 +791,13 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
 void RawSlicesManager::receiveNextRawSlice(clp::Paths &input) {
     raw[raw_idx].wasUsed = raw[raw_idx].inUse = true;
     raw[raw_idx].slice = std::move(input);
-    ++raw_idx;
     if (sched->tm.spec->global.substractiveOuter) {
         addOuter(raw[raw_idx].slice, sched->tm.spec->global.limitX, sched->tm.spec->global.limitY);
     }
     if (sched->tm.spec->global.correct || sched->tm.spec->global.substractiveOuter) {
         orientPaths(raw[raw_idx].slice);
     }
+    ++raw_idx;
 }
 
 bool RawSlicesManager::singleRawSliceReady(int raw_idx, int input_idx) {
