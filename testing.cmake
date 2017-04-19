@@ -179,12 +179,19 @@ add_custom_target(checkcompfull  COMMAND ctest ${CTEST_ARGS} -L compfull)
 ###########################################################
 
 #STL files to copy
-TEST_COPY_FILE(putmini put_mini             mini.stl)
-TEST_COPY_FILE(putmini put_mini_salient     mini.salient.stl)
-TEST_COPY_FILE(putfull put_full             full.stl)
-TEST_COPY_FILE(putfull put_full_justsalient salient.stl)
-TEST_COPY_FILE(putfull put_full_dented      full.dented.stl)
-TEST_COPY_FILE(putfull put_full_subtractive subtractive.stl)
+set(MINISTL        put_mini             mini.stl)
+set(MINISALIENTSTL put_mini_salient     mini.salient.stl)
+set(FULLSTL        put_full             full.stl)
+set(SALIENTSTL     put_full_justsalient salient.stl)
+set(FULLSALIENTSTL put_full_salient     full.salient.stl)
+set(FULLDENTEDSTL  put_full_dented      full.dented.stl)
+set(FULLSUBSTL     put_full_subtractive subtractive.stl)
+TEST_COPY_FILE(putmini ${MINISTL})
+TEST_COPY_FILE(putmini ${MINISALIENTSTL})
+TEST_COPY_FILE(putfull ${FULLSTL})
+TEST_COPY_FILE(putfull ${SALIENTSTL})
+TEST_COPY_FILE(putfull ${FULLDENTEDSTL})
+TEST_COPY_FILE(putfull ${FULLSUBSTL})
 #STL file to generate
 TEST_TEMPLATE(put_full_salient "${OUTPUTDIR}/${PYTHONSCRIPTS_PATH}" "${PYTHON_EXECUTABLE}" "mergestls.py" "${TEST_DIR}/full.stl" "${TEST_DIR}/salient.stl" "${TEST_DIR}/full.salient.stl")
 set_tests_properties(put_full_salient PROPERTIES
@@ -201,8 +208,6 @@ set_tests_properties(put_full_salient PROPERTIES
 #      --radx for quality output)
 
 set(MINILABELS execmini compmini)
-set(MINISTL        put_mini         mini.stl)
-set(MINISALIENTSTL put_mini_salient mini.salient.stl)
 set(NOSCHED --slicing-uniform 0.1 --save-contours --motion-planner)
 set(SCHED   --slicing-scheduler   --save-contours --motion-planner)
 set(MINI_DIMST0 --process 0 --radx 75 --tolerances 15 1  --smoothing 0.1)
@@ -314,11 +319,6 @@ TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_infilling_addsub
 ###########################################################
 
 set(FULLLABELS execfull compfull)
-set(FULLSTL        put_full             full.stl)
-set(FULLSUBSTL     put_full_subtractive subtractive.stl)
-set(FULLDENTEDSTL  put_full_dented      full.dented.stl)
-set(SALIENTSTL     put_full_justsalient salient.stl)
-set(FULLSALIENTSTL put_full_salient     full.salient.stl)
 set(NOSCHED --slicing-uniform 0.05 --save-contours --motion-planner)
 set(FULL_DIMST0 --process 0 --radx 75 --tolerances 0.75 0.01 --smoothing 0.1)
 set(FULL_DIMST1 --process 1 --radx 10 --tolerances 0.1  0.01 --smoothing 0.1)
