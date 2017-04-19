@@ -389,14 +389,33 @@ TEST_COMPARE(COMPARE_DXF_full_dxf_justcontours_N1 compfull full_dxf_justcontours
       "${TEST_DIR}/full_dxf_justcontours.N1.dxf"
   "${TESTPREV_DIR}/full_dxf_justcontours.N1.dxf"
   )
-set(ARGS_FOR_TESTRAWANDCHKPT ${FULLSTL} full_3d_clearance_noinfilling
-  ${FULLLABELS} ${SCHED} ${SNAPTHIN}
+#we are using this as a basis for test --slicing-manual, which has to be defined slightly differently, so we cannot include some of the arguments
+set(ARGS_FOR_MULTIPLE_TESTS
+  ${FULLLABELS} ${SNAPTHIN}
   ${FULL_DIMST0} ${FULL_SCHED0} ${CLRNCE}
   ${FULL_DIMST1} ${FULL_SCHED1} ${CLRNCE}
   )
-TEST_MULTIRES_COMPARE(          ${ARGS_FOR_TESTRAWANDCHKPT})
-TEST_MULTIRES_COMPARE_TESTRAW(  ${ARGS_FOR_TESTRAWANDCHKPT})
-TEST_MULTIRES_TESTCHECKPOINTING(${ARGS_FOR_TESTRAWANDCHKPT})
+TEST_MULTIRES_COMPARE(          ${FULLSTL} full_3d_clearance_noinfilling ${ARGS_FOR_MULTIPLE_TESTS} ${SCHED})
+TEST_MULTIRES_COMPARE_TESTRAW(  ${FULLSTL} full_3d_clearance_noinfilling ${ARGS_FOR_MULTIPLE_TESTS} ${SCHED})
+TEST_MULTIRES_TESTCHECKPOINTING(${FULLSTL} full_3d_clearance_noinfilling ${ARGS_FOR_MULTIPLE_TESTS} ${SCHED})
+TEST_MULTIRES_COMPARE(          ${FULLSTL} full_3d_slicing_manual        ${ARGS_FOR_MULTIPLE_TESTS}
+  --save-contours --motion-planner --slicing-manual
+    #these slice heights should be computed the same by --slicing-scheduler across different architectures and floating point settings
+    0 -0.0028361406922340392026
+    1 -0.061336140692234038252
+    1 -0.043336140692234043081
+    1 -0.025336140692234040972
+    1 -0.0073361406922340397299
+    1 0.010663859307765961512
+    1 0.028663859307765961887
+    1 0.046663859307765960527
+    1 0.064663859307765955697
+  )
+#make sure that --slicing-manual produces the same results as --slicing-scheduler if all other parameters remain the same
+TEST_COMPARE(full_3d_slicing_manual_compare execfull full_3d_clearance_noinfilling
+      "${TEST_DIR}/full_3d_clearance_noinfilling.paths"
+  "${TEST_DIR}/full_3d_slicing_manual.paths"
+  )
 TEST_MULTIRES_COMPARE(${FULLSTL} full_3d_clearance_infillinglines
   ${FULLLABELS} ${SCHED} ${SNAPTHIN}
   ${FULL_DIMST0} ${FULL_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
