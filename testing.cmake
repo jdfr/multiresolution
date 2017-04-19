@@ -454,3 +454,8 @@ TEST_MULTIRES_BOTHSNAP(SNAPTHICK ${FULLSTL} full_3d_addsub
   ${FULL_DIMST0} ${FULL_SCHED0} --medialaxis-radius 0.1 0.05
   ${FULL_DIMST1} ${FULL_SCHED1} --medialaxis-radius 0.5
   )
+TEST_MULTIRES_COMPARE(${FULLSUBSTL} full_3d_voxel_spec
+  ${FULLLABELS} ${SCHED} --slicing-zbase 0 --slicing-direction down ${SNAPTHIN}
+  --process 0 --voxel-profile interpolated --voxel-spec -36.5 50 -34 100 -31 123 -27 140 -20.5 157 -18.5 180 -13.5 206 3 256 10 285 15 300 41.5 362 --voxel-application-point 41.5 --voxel-zlimits -36.5 41.5 --smoothing 0.1
+  --process 1 --voxel-profile interpolated --voxel-spec -4 4.9 0 4.9 --voxel-application-point 0 --voxel-zlimits -5 0 --smoothing 0.1 --infill linesh --infill-medialaxis-radius 1.0 0.5
+  )
