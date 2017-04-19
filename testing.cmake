@@ -184,6 +184,7 @@ TEST_COPY_FILE(putmini put_mini_salient     mini.salient.stl)
 TEST_COPY_FILE(putfull put_full             full.stl)
 TEST_COPY_FILE(putfull put_full_justsalient salient.stl)
 TEST_COPY_FILE(putfull put_full_dented      full.dented.stl)
+TEST_COPY_FILE(putfull put_full_subtractive subtractive.stl)
 #STL file to generate
 TEST_TEMPLATE(put_full_salient "${OUTPUTDIR}/${PYTHONSCRIPTS_PATH}" "${PYTHON_EXECUTABLE}" "mergestls.py" "${TEST_DIR}/full.stl" "${TEST_DIR}/salient.stl" "${TEST_DIR}/full.salient.stl")
 set_tests_properties(put_full_salient PROPERTIES
@@ -219,6 +220,11 @@ TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_noinfilling
   ${MINILABELS} ${NOSCHED}
   ${MINI_DIMST0} ${CLRNCE}
   ${MINI_DIMST1} ${CLRNCE}
+  )
+TEST_MULTIRES_COMPARE(${MINISTL} mini_no3d_substractive_box
+  ${MINILABELS} ${NOSCHED} ${SNAPTHIN} --subtractive-box-mode 6000.0 5000.0
+  ${MINI_DIMST0} ${CLRNCE}
+  ${MINI_DIMST1}
   )
 TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_no3d_clearance_infillingconcentric
   ${MINILABELS} ${NOSCHED}
@@ -309,6 +315,7 @@ TEST_MULTIRES_BOTHSNAP(SNAPTHIN ${MINISTL} mini_3d_infilling_addsub
 
 set(FULLLABELS execfull compfull)
 set(FULLSTL        put_full             full.stl)
+set(FULLSUBSTL     put_full_subtractive subtractive.stl)
 set(FULLDENTEDSTL  put_full_dented      full.dented.stl)
 set(SALIENTSTL     put_full_justsalient salient.stl)
 set(FULLSALIENTSTL put_full_salient     full.salient.stl)
@@ -328,6 +335,11 @@ set(ARGS_FOR_TESTRAW ${FULLSTL} full_no3d_clearance_noinfilling
   )
 TEST_MULTIRES_COMPARE(        ${ARGS_FOR_TESTRAW})
 TEST_MULTIRES_COMPARE_TESTRAW(${ARGS_FOR_TESTRAW})
+TEST_MULTIRES_COMPARE(${FULLSTL} full_no3d_substractive_box
+  ${FULLLABELS} ${NOSCHED} ${SNAPTHICK} --subtractive-box-mode 6000.0 5000.0
+  ${FULL_DIMST0} ${FULL_SCHED0}
+  ${FULL_DIMST1} ${FULL_SCHED1}
+  )
 TEST_MULTIRES_COMPARE(${FULLSTL} full_no3d_clearance_infillingconcentric
   ${FULLLABELS} ${NOSCHED} ${SNAPTHIN}
   ${FULL_DIMST0} ${CLRNCE} --infill concentric --infill-medialaxis-radius 0.5
