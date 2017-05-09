@@ -184,7 +184,7 @@ set(MINISALIENTSTL put_mini_salient     mini.salient.stl)
 set(FULLSTL        put_full             full.stl)
 set(SALIENTSTL     put_full_justsalient salient.stl)
 set(FULLSALIENTSTL put_full_salient     full.salient.stl)
-set(FULLDENTEDSTL  put_full_dented      full.dented.stl)
+set(FULLDENTEDSTL  put_full_dented      third.dented.stl)
 set(FULLSUBSTL     put_full_subtractive subtractive.stl)
 TEST_COPY_FILE(putmini ${MINISTL})
 TEST_COPY_FILE(putmini ${MINISALIENTSTL})
@@ -441,8 +441,8 @@ TEST_MULTIRES_COMPARE(              ${FULLSALIENTSTL}        ${ARGS_FOR_TESTLOAD
 TEST_MULTIRES_COMPARE_TESTLOADMULTI(${FULLSTL} ${SALIENTSTL} ${ARGS_FOR_TESTLOADMULTI})
 TEST_MULTIRES_COMPARE(${FULLSTL} full_3d_clearance_infillingrecursive
   ${FULLLABELS} ${SCHED} ${SNAPTHIN}
-  ${FULL_DIMST0} ${FULL_SCHED0} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5 --infilling-recursive
-  ${FULL_DIMST1} ${FULL_SCHED1} ${CLRNCE} --infill linesh --infill-medialaxis-radius 0.5
+  ${FULL_DIMST0} ${FULL_SCHED0} ${CLRNCE} --infill linesh --infilling-recursive
+  ${FULL_DIMST1} ${FULL_SCHED1} ${CLRNCE} --infill linesh
   )
 TEST_MULTIRES_COMPARE(${FULLSTL} full_3d_addsub_infillinglines
   ${FULLLABELS} ${SCHED} --addsub ${SNAPTHICK}
