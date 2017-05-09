@@ -35,6 +35,38 @@ endif()
 ###### TEST MACROS
 ###########################################################
 
+#PRETTY PRINTER FOR OPTION FILES.
+#
+# So, why all this trouble to pretty-print argument lists?
+# Wouldn't it be far easier to just have the argument files separately?
+# Several reasons: huge amounts of repetition, parametrization, and having all of it centralized here in this file.
+#
+# BEWARE:
+#   * ARGN SHOULD NOT BE EMPTY!!!
+#   * semicolons cannot be included (they will be replaced by spaces, even if we do not use this sophisticated pretty printer
+#   * arguments cannot contain double quotes (it may be possible to include them with some kind of escaping, but just keep it simple, OK?)
+#   * comments (strings prefixed with #) MUST NOT be multiline
+#   * comments cannot contain semicolons, either.
+#   * comments cannot be inserted between an options and its arguments, or between several option arguments. Only between options or an option's final argument and the next option
+MACRO(WRITE_ARG_FILE FILENAME)
+  #--process options are unindented
+  string(REPLACE ";--process" "\"\n\"--process" ARGUMENTS "${ARGN}")
+  #any other option is indented (ideally, we should unindent global options, but it is just easier this way)
+  string(REPLACE ";--" "\"\n    \"--" ARGUMENTS "${ARGUMENTS}")
+  #comments are also indented
+  string(REPLACE ";#" "\"\n    \"#" ARGUMENTS "${ARGUMENTS}")
+  #option arguments go after its option
+  string(REPLACE ";" "\" \"" ARGUMENTS "${ARGUMENTS}")
+  #add initial and final double quotes (this is the reason ARGN should not be empty!!!)
+  set(ARGUMENTS "    \"${ARGUMENTS}\"")
+  #remove double quotes surrounding comments
+  #string(REGEX REPLACE "\"#([^\"]*)\" " "#\\1\n" ARGUMENTS "${ARGUMENTS}") #this would be necessary to avoid problems if comments are allowed before the end of option arguments...
+  string(REGEX REPLACE "\"#([^\"]*)\"" "#\\1" ARGUMENTS "${ARGUMENTS}")
+  #double quotes are necessary only for tokens with witespace. Remove unnecessary ones
+  string(REGEX REPLACE "\"([^ \"]+)\"" "\\1" ARGUMENTS "${ARGUMENTS}")
+  FILE(WRITE "${FILENAME}" "${ARGUMENTS}")
+ENDMACRO()
+
 MACRO(PREPARE_COMMAND_NAME NM)
     if(WIN32)
         set(${NM} "${OUTPUTDIR}/${NM}.exe")
@@ -76,7 +108,15 @@ ENDMACRO()
 
 #base macro to test the multires executable; highly generic, so it is somewhat cryptic... Best understood if you see how it is called by other macros
 MACRO(TEST_MULTIRES PRODUCT LOADFLAG SAVEFLAG PREVTEST INPUTFILE TESTNAME THELABELS_MULTIRES)
-  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${multires} ${LOADFLAG} "${TEST_DIR}/${INPUTFILE}" ${SAVEFLAG} "${PRODUCT}" ${ARGN})
+  #the following is a hack to have automatically generated argument files in the test directory,
+  #for didactic purposes.By commenting the following lines and uncommenting the commented
+  #TEST_TEMPLATE, the code can be reverted to put all arguments inside add_test commands in the
+  #file CTestTestfile.cmake
+  set(PARAMSFILE "${TEST_DIR}/${TESTNAME}.params.txt")
+  WRITE_ARG_FILE("${PARAMSFILE}" ${LOADFLAG} "${TEST_DIR}/${INPUTFILE}" ${SAVEFLAG} "${PRODUCT}" ${ARGN})
+  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${multires} --response-file "${PARAMSFILE}")
+  #old, simple way: just shove all arguments into add_test
+  #TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${multires} ${LOADFLAG} "${TEST_DIR}/${INPUTFILE}" ${SAVEFLAG} "${PRODUCT}" ${ARGN})
   set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS_MULTIRES}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${TEST_DIR}/${INPUTFILE}")
 ENDMACRO()
 
