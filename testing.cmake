@@ -43,7 +43,7 @@ endif()
 #
 # BEWARE:
 #   * ARGN SHOULD NOT BE EMPTY!!!
-#   * semicolons cannot be included (they will be replaced by spaces, even if we do not use this sophisticated pretty printer
+#   * semicolons cannot be included (they will be replaced by spaces, even if we do not use this pretty printer
 #   * arguments cannot contain double quotes (it may be possible to include them with some kind of escaping, but just keep it simple, OK?)
 #   * comments (strings prefixed with #) MUST NOT be multiline
 #   * comments cannot contain semicolons, either.
@@ -61,9 +61,9 @@ MACRO(WRITE_ARG_FILE FILENAME)
   set(ARGUMENTS "    \"${ARGUMENTS}\"")
   #remove double quotes surrounding comments
   #string(REGEX REPLACE "\"#([^\"]*)\" " "#\\1\n" ARGUMENTS "${ARGUMENTS}") #this would be necessary to avoid problems if comments are allowed before the end of option arguments...
-  string(REGEX REPLACE "\"#([^\"]*)\"" "#\\1" ARGUMENTS "${ARGUMENTS}")
+  string(REGEX REPLACE "\"#([^\"\n]*)\"" "#\\1" ARGUMENTS "${ARGUMENTS}")
   #double quotes are necessary only for tokens with witespace. Remove unnecessary ones
-  string(REGEX REPLACE "\"([^ \"]+)\"" "\\1" ARGUMENTS "${ARGUMENTS}")
+  string(REGEX REPLACE "\"([^ \"\n]+)\"" "\\1" ARGUMENTS "${ARGUMENTS}")
   FILE(WRITE "${FILENAME}" "${ARGUMENTS}")
 ENDMACRO()
 
