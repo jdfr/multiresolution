@@ -62,7 +62,7 @@ template<typename T, typename INFLATEDACCUM> void ClippingResources::operateInfl
         }
     }
     clipper.Execute(mode, res, clp::pftEvenOdd, clp::pftNonZero);
-    if (!std::is_same<T, clp::PolyTree>::value) clipper.Clear();
+    if (!std::is_same<T, clp::PolyTree*>::value) clipper.Clear();
 }
 
 template<typename T, typename INFLATEDACCUM> void ClippingResources::operateInflatedLinesAndContours(clp::ClipType mode, T &res, clp::Paths &contours, clp::Paths &lines, double radius, clp::Paths *aux, INFLATEDACCUM* inflated_acumulator) {
@@ -74,7 +74,7 @@ template<typename Output, typename... Inputs> inline void ClippingResources::uni
     char dummy[sizeof...(Inputs)] = { (AddPaths(inputs, clp::ptSubject, true), (char)0)... };
     //maybe clp::pftPositive is better?
     clipper.Execute(clp::ctUnion, output, clp::pftNonZero, clp::pftNonZero);
-    if (!std::is_same<Output, clp::PolyTree>::value) clipper.Clear();
+    if (!std::is_same<Output, clp::PolyTree*>::value) clipper.Clear();
 }
 
 template<typename Output, typename Input> void ClippingResources::offsetDo2(Output &output, double delta1, double delta2, Input &input, clp::Paths &aux, clp::JoinType jointype, clp::EndType endtype) {
@@ -83,7 +83,7 @@ template<typename Output, typename Input> void ClippingResources::offsetDo2(Outp
     offset.Clear();
     offset.AddPaths(aux, jointype, endtype);
     offset.Execute(output, delta2);
-    if (!std::is_same<Output, clp::PolyTree>::value) offset.Clear();
+    if (!std::is_same<Output, clp::PolyTree*>::value) offset.Clear();
 }
 
 
