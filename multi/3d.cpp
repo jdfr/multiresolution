@@ -747,7 +747,8 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
                         bool okSupport  = minmaxzs[kk].max > floorSupport;
                         bool okOverhang = minmaxzs[kk].max > floorOverhang;
                         recordSlices(okSurface, okSupport, okOverhang, different_ntool, k, kk);
-                        if (!(minmaxzs[kk].max > floorAbsolute)) {
+                        //This way to break the loop is not optimal
+                        if (output[kk].ntool==0 && !(minmaxzs[kk].max > floorAbsolute)) {
                             break;
                         }
                     }
@@ -776,7 +777,8 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
                         bool okSupport  = minmaxzs[kk].min < ceilSupport;
                         bool okOverhang = minmaxzs[kk].min < ceilOverhang;
                         recordSlices(okSurface, okSupport, okOverhang, different_ntool, k, kk);
-                        if (!(minmaxzs[kk].min < ceilAbsolute)) {
+                        //This way to break the loop is not optimal
+                        if (output[kk].ntool==0 && !(minmaxzs[kk].min < ceilAbsolute)) {
                             break;
                         }
                     }
