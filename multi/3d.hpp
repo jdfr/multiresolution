@@ -123,7 +123,7 @@ public:
     void receiveNextRawSlice(clp::Paths &input); //this method has to trust that the input slice will be according to the list of Z input values
 };
 
-enum SchedulingMode { ScheduleTwoPhotonSimple, ScheduleLaserSimple };
+enum SchedulingMode { ScheduleSimple };
 
 /*This scheduler controls the main workflow. It is quite complex,
 because of the need to keep track of a heck of a lot of things:

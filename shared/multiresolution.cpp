@@ -340,7 +340,7 @@ LIBRARY_API Slices3DSpecInfo computeSlicesZs(StateHandle state, double zmin, dou
         voidSlices3DSpecInfo(ret);
         return ret;
     }
-    state->sched->createSlicingSchedule(zmin, zmax, state->spec->global.z_epsilon, ScheduleTwoPhotonSimple);
+    state->sched->createSlicingSchedule(zmin, zmax, state->spec->global.z_epsilon, ScheduleSimple);
     if (state->sched->has_err) {
         state->err = state->sched->err;
         voidSlices3DSpecInfo(ret);

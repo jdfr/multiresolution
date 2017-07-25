@@ -741,7 +741,7 @@ int Main(int argc, const char** argv) {
                 }
             }
 
-            sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec->global.z_epsilon, ScheduleTwoPhotonSimple);
+            sched.createSlicingSchedule(minz*factors.input_to_internal, maxz*factors.input_to_internal, multispec->global.z_epsilon, ScheduleSimple);
 
             if (sched.has_err) {
                 fprintf(stderr, "Error while trying to create the slicing schedule: %s\n", sched.err.c_str());

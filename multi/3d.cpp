@@ -419,10 +419,7 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
     zmin = minz;
     zmax = maxz;
     switch (mode) {
-    case ScheduleLaserSimple:
-        throw std::runtime_error("option ScheduleLaserSimple not implemented!!!!");
-        break;
-    case ScheduleTwoPhotonSimple:
+    case ScheduleSimple:
         if (tm.spec->global.schedMode==ManualScheduling) {
             input.reserve(tm.spec->global.schedSpec.size());
             for (auto pair = tm.spec->global.schedSpec.begin(); pair != tm.spec->global.schedSpec.end(); ++pair) {
@@ -452,6 +449,9 @@ void SimpleSlicingScheduler::createSlicingSchedule(double minz, double maxz, dou
             computeSimpleOutputOrderForInputSlices();
             pruneInputZsAndCreateRawZs(epsilon);
         }
+        break;
+    default:
+        throw std::runtime_error("option not implemented!!!!");
     }
 }
 
