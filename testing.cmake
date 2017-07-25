@@ -72,7 +72,7 @@ ENDMACRO()
 #test to compare two files
 MACRO(TEST_COMPARE TESTNAME THELABELS PREVTEST FILENAME1 FILENAME2)
   TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E compare_files "${FILENAME1}" "${FILENAME2}")
-  set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${FILENAME1};${FILENAME2}")
+  set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${FILENAME1};${FILENAME2}" ${ARGN})
 ENDMACRO()
 
 #base macro to test the multires executable; highly generic, so it is somewhat cryptic...
@@ -175,6 +175,7 @@ add_custom_target(checkcompfull  COMMAND ctest ${CTEST_ARGS} -L compfull)
 set(MINISTL        "put_mini;${TEST_DIR}/mini.stl")
 set(MINISALIENTSTL "put_mini_salient;${TEST_DIR}/mini.salient.stl")
 set(FULLSTL        "put_full;${TEST_DIR}/full.stl")
+set(FULLFATSTL     "put_full_fat;${TEST_DIR}/full.fat.stl")
 set(SALIENTSTL     "put_full_justsalient;${TEST_DIR}/salient.stl")
 set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl")
 set(FULLDENTEDSTL  "put_full_dented;${TEST_DIR}/third.dented.stl")
@@ -182,6 +183,7 @@ set(FULLSUBSTL     "put_full_subtractive;${TEST_DIR}/subtractive.stl")
 TEST_COPY_FILE(putmini ${MINISTL})
 TEST_COPY_FILE(putmini ${MINISALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLSTL})
+TEST_COPY_FILE(putfull ${FULLFATSTL})
 TEST_COPY_FILE(putfull ${SALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLDENTEDSTL})
 TEST_COPY_FILE(putfull ${FULLSUBSTL})
@@ -557,17 +559,26 @@ TEST_MULTIRES_BOTHSNAP("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
 ${FULL_SCHED0}
   --infill linesv --infill-medialaxis-radius 0.5 --additional-perimeters 1
 ${FULL_SCHED1}
-  --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2"
+  --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2 --additional-perimeters-lineoverlap 0.2"
 SNAPTHICK)
 
-set(TESTNAME full_3d_clearance_withsurface_infillingcrisscrosslines)
-TEST_MULTIRES_BOTHSNAP("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
-"${SCHED}
+MACRO(TEMPLATE_surfacesWithSameProcess TESTNAME DIFFERENCE)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLFATSTL}
+"--load \"${TEST_DIR}/full.fat.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED}
 ${FULL_SCHED0}
   --infill linesvh --infill-medialaxis-radius 0.5
 ${FULL_SCHED1}
-  --infill linesh --infill-static-mode --infill-lineoverlap -4 --surface-infill linesh --compute-surfaces-just-with-same-process false"
-SNAPTHICK)
+  --infill linesh --infill-static-mode --infill-lineoverlap -4 --surface-infill linesh
+  --compute-surfaces-extent-factor 0.6 ${DIFFERENCE}
+${USEGRID}")
+ENDMACRO()
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true")
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false")
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses execfull "full_3d_clearance_withsurface_allprocesses;full_3d_clearance_withsurface_betweenprocesses"
+  "${TEST_DIR}/full_3d_clearance_withsurface_allprocesses.paths"
+  "${TEST_DIR}/full_3d_clearance_withsurface_betweenprocesses.paths"
+  WILL_FAIL true) #the results MUST be different
 
 set(TESTNAME full_3d_clearance_vcorrection_infillinglines)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSALIENTSTL}
