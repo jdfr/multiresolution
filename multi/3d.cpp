@@ -766,7 +766,7 @@ void SimpleSlicingScheduler::computeSimpleOutputOrderForInputSlices() {
                     double ceilSurface  = minmaxzs[k].max + minmaxzs[k].extent * ppspec.differentiateSurfaceExtentFactor;
                     double ceilSupport  = minmaxzs[k].max + minmaxzs[k].extent * ppspec.alwaysSupportExtentFactor;
                     double ceilOverhang = minmaxzs[k].max + minmaxzs[k].extent * ppspec.considerOverhangExtentFactor;
-                    double ceilAbsolute = minmaxzs[k].min + minmaxzs[k].extent * maxFac;
+                    double ceilAbsolute = minmaxzs[k].max + minmaxzs[k].extent * maxFac;
                     loop_is_upwards = sliceUpwards;
                     for (int kk = k+for_inits[loop_is_upwards]; loop_termination(kk); loop_next(kk)) {
                         bool different_ntool = ntool!=output[kk].ntool;
