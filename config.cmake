@@ -16,7 +16,8 @@ option(MAKEMR_FILEUNION     "make tool to merge several paths files into one"  O
 option(MAKEMR_FILETOUCH     "make slice header setter for paths files"  ON)
 
 #test options
-option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS!!!!)" ON)
+option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS, USE THE check* TARGETS!!!!)" ON)
+option(USE_GCOV             "compile with gcov support, useful for analyzing test code coverage with lcov (automatically added when executing check* targets, output on subdirectory lcov_report in the subproject's build directory)" OFF)
 
 #clipper configuration
 option(CLIPPER_USE_ARENA       "enable ArenaMemoryManager for ClipperLib" ON)

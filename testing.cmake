@@ -19,6 +19,8 @@
 #    directory were the tests will put the generated files
 #  TESTPREV_DIR
 #    directory where the generated files from a previous test run are located, to be compared with the generated files from the current run
+#  USE_GCOV, LCOVPATH, GENHTMLPATH
+#    to use lcov to generate code coverage reports after doing test targets
 
 enable_testing()
 
@@ -150,15 +152,24 @@ else()
   set(CBT "${CMAKE_BUILD_TYPE}")
 endif()
 set(CTEST_ARGS -C ${CBT} --output-on-failure)
-add_custom_target(check          COMMAND ctest ${CTEST_ARGS})
-add_custom_target(checkmini      COMMAND ctest ${CTEST_ARGS} -L mini)
-add_custom_target(checkfull      COMMAND ctest ${CTEST_ARGS} -L full)
-add_custom_target(checkncomp     COMMAND ctest ${CTEST_ARGS}         -LE comp)
-add_custom_target(checkncompmini COMMAND ctest ${CTEST_ARGS} -L mini -LE comp)
-add_custom_target(checkncompfull COMMAND ctest ${CTEST_ARGS} -L full -LE comp)
-add_custom_target(checkcomp      COMMAND ctest ${CTEST_ARGS} -L comp)
-add_custom_target(checkcompmini  COMMAND ctest ${CTEST_ARGS} -L compmini)
-add_custom_target(checkcompfull  COMMAND ctest ${CTEST_ARGS} -L compfull)
+if(USE_GCOV)
+  #these commands work because they are executed in the build directory of the current subproject
+  set(PRETEST  COMMAND ${LCOVPATH} --directory . --zerocounters)
+  set(POSTTEST COMMAND ${LCOVPATH} --capture --directory . --output-file coverage.info
+               COMMAND ${GENHTMLPATH} coverage.info --output-directory lcov_report)
+else()
+  set(PRETEST )
+  set(POSTTEST )
+endif()
+add_custom_target(check          ${PRETEST} COMMAND ctest ${CTEST_ARGS}                  ${POSTTEST})
+add_custom_target(checkmini      ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L mini          ${POSTTEST})
+add_custom_target(checkfull      ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L full          ${POSTTEST})
+add_custom_target(checkncomp     ${PRETEST} COMMAND ctest ${CTEST_ARGS}         -LE comp ${POSTTEST})
+add_custom_target(checkncompmini ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L mini -LE comp ${POSTTEST})
+add_custom_target(checkncompfull ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L full -LE comp ${POSTTEST})
+add_custom_target(checkcomp      ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L comp          ${POSTTEST})
+add_custom_target(checkcompmini  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compmini      ${POSTTEST})
+add_custom_target(checkcompfull  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compfull      ${POSTTEST})
 
 #invaluable resource to understand the black art of custom commands/targets in cmake, if we want to move to a more complex testing model:
 # https://samthursfield.wordpress.com/2015/11/21/cmake-dependencies-between-targets-and-files-and-custom-commands/
