@@ -112,10 +112,10 @@ ENDMACRO()
 #it must be supplied with a name of a macro that adds snapping to the configuration
 MACRO(TEST_MULTIRES_BOTHSNAP PRODUCTFILENAME TESTNAME THELABELS_MULTIRES THELABELS_COMP PREVTEST INPUTFILE COMMONARGS SNAPMACRONAME)
   TEST_MULTIRES_COMPARE("${PRODUCTFILENAME}" "${TESTNAME}_nosnap" "${THELABELS_MULTIRES}" "${THELABELS_COMP}" "${PREVTEST}" "${INPUTFILE}"
-"--load ${INPUTFILE} --save \"${TEST_DIR}/${TESTNAME}_nosnap.paths\"
+"--load \"${INPUTFILE}\" --save \"${TEST_DIR}/${TESTNAME}_nosnap.paths\"
 ${COMMONARGS}")
   TEST_MULTIRES_COMPARE("${PRODUCTFILENAME}" "${TESTNAME}_snap"   "${THELABELS_MULTIRES}" "${THELABELS_COMP}" "${PREVTEST}" "${INPUTFILE}"
-"--load ${INPUTFILE} --save \"${TEST_DIR}/${TESTNAME}_snap.paths\"
+"--load \"${INPUTFILE}\" --save \"${TEST_DIR}/${TESTNAME}_snap.paths\"
 ${COMMONARGS}
 ${${SNAPMACRONAME}}")
 ENDMACRO()
@@ -184,33 +184,24 @@ add_custom_target(checkcompfull  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compf
 ###########################################################
 
 #STL files to copy
-set(MINISTL        "put_mini;${TEST_DIR}/mini.stl")
-set(MINISALIENTSTL "put_mini_salient;${TEST_DIR}/mini.salient.stl")
-set(FULLSTL        "put_full;${TEST_DIR}/full.stl")
-set(FULLOUTERSTL   "put_full_outer;${TEST_DIR}/full.outer.stl")
-set(FULLFATSTL     "put_full_fat;${TEST_DIR}/full.fat.stl")
-set(TOWERSTL       "put_full_tower;${TEST_DIR}/tower.stl")
-set(BIGRIDSTL      "put_full_bigrid;${TEST_DIR}/bigrid.stl")
-set(FILTERSTL      "put_full_filter;${TEST_DIR}/filter.stl")
-set(STAIRSASTL     "put_full_stairsA;${TEST_DIR}/stairs.A.stl")
-set(STAIRSBSTL     "put_full_stairsB;${TEST_DIR}/stairs.B.stl")
-set(SALIENTSTL     "put_full_justsalient;${TEST_DIR}/salient.stl")
-set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl")
-set(FULLDENTEDSTL  "put_full_dented;${TEST_DIR}/third.dented.stl")
-set(FULLSUBSTL     "put_full_subtractive;${TEST_DIR}/subtractive.stl")
-TEST_COPY_FILE(putmini ${MINISTL})
-TEST_COPY_FILE(putmini ${MINISALIENTSTL})
-TEST_COPY_FILE(putfull ${FULLSTL})
-TEST_COPY_FILE(putfull ${FULLOUTERSTL})
-TEST_COPY_FILE(putfull ${FULLFATSTL})
-TEST_COPY_FILE(putfull ${TOWERSTL})
-TEST_COPY_FILE(putfull ${BIGRIDSTL})
-TEST_COPY_FILE(putfull ${FILTERSTL})
-TEST_COPY_FILE(putfull ${STAIRSASTL})
-TEST_COPY_FILE(putfull ${STAIRSBSTL})
-TEST_COPY_FILE(putfull ${SALIENTSTL})
-TEST_COPY_FILE(putfull ${FULLDENTEDSTL})
-TEST_COPY_FILE(putfull ${FULLSUBSTL})
+MACRO(DEFINESTL LABEL VARNAME TESTNAME OUTPUTFILE)
+  set(${VARNAME}  "${TESTNAME};${OUTPUTFILE}")
+  TEST_COPY_FILE(${LABEL} ${${VARNAME}})
+ENDMACRO()
+DEFINESTL(putmini MINISTL        put_mini             "${TEST_DIR}/mini.stl")
+DEFINESTL(putmini MINISALIENTSTL put_mini_salient     "${TEST_DIR}/mini.salient.stl")
+DEFINESTL(putfull FULLSTL        put_full             "${TEST_DIR}/full.stl")
+DEFINESTL(putfull FULLOUTERSTL   put_full_outer       "${TEST_DIR}/full.outer.stl")
+DEFINESTL(putfull FULLFATSTL     put_full_fat         "${TEST_DIR}/full.fat.stl")
+DEFINESTL(putfull TOWERSTL       put_full_tower       "${TEST_DIR}/tower.stl")
+DEFINESTL(putfull BIGRIDSTL      put_full_bigrid      "${TEST_DIR}/bigrid.stl")
+DEFINESTL(putfull FILTERSTL      put_full_filter      "${TEST_DIR}/filter.stl")
+DEFINESTL(putfull STAIRSASTL     put_full_stairsA     "${TEST_DIR}/stairs.A.stl")
+DEFINESTL(putfull STAIRSBSTL     put_full_stairsB     "${TEST_DIR}/stairs.B.stl")
+DEFINESTL(putfull SALIENTSTL     put_full_justsalient "${TEST_DIR}/salient.stl")
+DEFINESTL(putfull FULLDENTEDSTL  put_full_dented      "${TEST_DIR}/third.dented.stl")
+DEFINESTL(putfull FULLSUBSTL     put_full_subtractive "${TEST_DIR}/subtractive.stl")
+set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl") #this one is different from the above
 #STL file to generate
 TEST_TEMPLATE(put_full_salient "${OUTPUTDIR}/${PYTHONSCRIPTS_PATH}" "${PYTHON_EXECUTABLE}" "mergestls.py" "${TEST_DIR}/full.stl" "${TEST_DIR}/salient.stl" "${TEST_DIR}/full.salient.stl")
 set_tests_properties(put_full_salient PROPERTIES
