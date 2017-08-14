@@ -189,6 +189,11 @@ set(MINISALIENTSTL "put_mini_salient;${TEST_DIR}/mini.salient.stl")
 set(FULLSTL        "put_full;${TEST_DIR}/full.stl")
 set(FULLOUTERSTL   "put_full_outer;${TEST_DIR}/full.outer.stl")
 set(FULLFATSTL     "put_full_fat;${TEST_DIR}/full.fat.stl")
+set(TOWERSTL       "put_full_tower;${TEST_DIR}/tower.stl")
+set(BIGRIDSTL      "put_full_bigrid;${TEST_DIR}/bigrid.stl")
+set(FILTERSTL      "put_full_filter;${TEST_DIR}/filter.stl")
+set(STAIRSASTL     "put_full_stairsA;${TEST_DIR}/stairs.A.stl")
+set(STAIRSBSTL     "put_full_stairsB;${TEST_DIR}/stairs.B.stl")
 set(SALIENTSTL     "put_full_justsalient;${TEST_DIR}/salient.stl")
 set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl")
 set(FULLDENTEDSTL  "put_full_dented;${TEST_DIR}/third.dented.stl")
@@ -198,6 +203,11 @@ TEST_COPY_FILE(putmini ${MINISALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLSTL})
 TEST_COPY_FILE(putfull ${FULLOUTERSTL})
 TEST_COPY_FILE(putfull ${FULLFATSTL})
+TEST_COPY_FILE(putfull ${TOWERSTL})
+TEST_COPY_FILE(putfull ${BIGRIDSTL})
+TEST_COPY_FILE(putfull ${FILTERSTL})
+TEST_COPY_FILE(putfull ${STAIRSASTL})
+TEST_COPY_FILE(putfull ${STAIRSBSTL})
 TEST_COPY_FILE(putfull ${SALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLDENTEDSTL})
 TEST_COPY_FILE(putfull ${FULLSUBSTL})
@@ -722,4 +732,146 @@ ${SCHED} --slicing-zbase 0 --slicing-direction down
 --process 1 --voxel-profile interpolated --voxel-spec -4 4.9 0 4.9 --voxel-application-point 0 --voxel-zlimits -5 0
   --smoothing 0.1 --infill linesh --infill-medialaxis-radius 1.0 0.5
 ${SNAPTHIN}")
+
+
+set(FULL_NANOA0 "--process 0 --radx 0.1 --voxel-profile constant --voxel-z 0.75 0.75   --always-preprocessing --smoothing 0.001 --tolerances 0.001 0.001")
+set(FULL_NANOA1 "--process 1 --radx 0.1 --voxel-profile constant --voxel-z 0.375 0.375 --always-preprocessing --smoothing 0.001 --tolerances 0.001 0.001")
+
+MACRO(TEMPLATE_bigrid_alwaysSupported TESTNAME DIFFERENCE)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${BIGRIDSTL}  
+"--load \"${TEST_DIR}/bigrid.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --vertical-correction
+${FULL_NANOA0}
+  --infill linesavh ${DIFFERENCE}
+${FULL_NANOA1}
+  --infill linesavh")
+ENDMACRO()
+TEMPLATE_bigrid_alwaysSupported(full_3d_bigrid_alwaysSupported "--always-supported --always-supported-extent-factor 0.1")
+TEMPLATE_bigrid_alwaysSupported(full_3d_bigrid_notalwaysSupported "")
+TEST_COMPARE(COMPARE_NOTEQUAL_full_3d_bigrid_alwaysSupported execfull "full_3d_bigrid_alwaysSupported;full_3d_bigrid_notalwaysSupported"
+  "${TEST_DIR}/full_3d_bigrid_alwaysSupported.paths"
+  "${TEST_DIR}/full_3d_bigrid_notalwaysSupported.paths"
+  WILL_FAIL true) #the results MUST be different
+
+set(FULL_NANOA0 "--process 0 --radx 0.2 --voxel-profile constant --voxel-z 0.75 0.75   --always-preprocessing --smoothing 0.001 --tolerances 0.001 0.001")
+set(FULL_NANOA1 "--process 1 --radx 0.1 --voxel-profile constant --voxel-z 0.375 0.375 --always-preprocessing --smoothing 0.001 --tolerances 0.001 0.001")
+set(NANOCOMMONPARAMS
+"--nano-global --nano-global-file-begin
+\"%$scalingtool0 and $scalingtool1 determine the laser power for the low and high resolution toolpaths, respectively.
+var $scalingtool0 = 1.45
+var $scalingtool1 = 0.6
+% $scalingtoolI is the scaling for the first layer. We know the first layer is low res, so its scaling should be $scalingtool0,
+% but the interface reflects a sizable amount of the laser power back, so it ends up being irradiated at almost twice the power.
+% This is a hack to avoid this problem.
+var $scalingtoolI = 1 
+
+ContinuousMode
+ConnectPointsOn
+TiltCorrectionOff
+GalvoScanMode
+ScanSpeed 10000
+LaserPower 40
+FindInterfaceAt 0
+XOffset 0
+YOffset 0
+ZOffset -0.3
+\"
+--nano-file-afterbegin
+\"AddZOffset -0.75
+PowerScaling $scalingtoolI
+\"
+--nano-file-afterfirstzchange \"PowerScaling $scalingtool0 %afterfirstzchange\" --nano-gridstep 0.02
+--process 0 --pp-nano-tool-begin \"PowerScaling $scalingtool0\" --pp-nano-tool-end \"%end PowerScaling $scalingtool0\"
+--process 1 --pp-nano-tool-begin \"PowerScaling $scalingtool1\" --pp-nano-tool-end \"%end PowerScaling $scalingtool1\"")
+
+
+
+set(TESTNAME full_nanoscribe_ensureAttachment)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${TOWERSTL}  
+"--load \"${TEST_DIR}/tower.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --vertical-correction
+${FULL_NANOA0}
+  --infill linesavh --infill-static-mode --infilling-perimeter-overlap 0.45
+${FULL_NANOA1}
+  --infill linesv --medialaxis-radius 0.5  --infill-static-mode --infilling-perimeter-overlap 0.45 --ensure-attachment-offset 0.3 --ensure-attachment-cutoff-offset 0.095
+--nanoscribe \"${TEST_DIR}/${TESTNAME}\"
+#Since we are using GalvoScanMode in the global GWL file, we should also use --nano-scanmode galvo. We switch to piezo to test mode code paths
+--nano-scanmode piezo
+${NANOCOMMONPARAMS}
+--nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
+")
+TEST_COMPARE(COMPARE_GWL_${TESTNAME}_MASTER compfull ${TESTNAME}
+      "${TEST_DIR}/${TESTNAME}.gwl"
+  "${TESTPREV_DIR}/${TESTNAME}.gwl")
+TEST_COMPARE(COMPARE_GWL_${TESTNAME}_SUB compfull ${TESTNAME}
+      "${TEST_DIR}/${TESTNAME}.N0.0.0.gwl"
+  "${TESTPREV_DIR}/${TESTNAME}.N0.0.0.gwl")
+
+MACRO(TEMPLATE_startOverhangsOverSupport TESTNAME STLTEST STLNAME DIFFERENCE)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${STLTEST} ${STLNAME}  
+"--load \"${STLNAME}\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --vertical-correction
+${FULL_NANOA0}
+  --infill linesavh --infill-static-mode
+${FULL_NANOA1}
+  --infill linesv --medialaxis-radius 0.5 ${DIFFERENCE}
+--nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
+--nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
+")
+ENDMACRO()
+TEMPLATE_startOverhangsOverSupport(full_nanoscribe_NO_startOverhangsOverSupport ${STAIRSASTL} "")
+TEMPLATE_startOverhangsOverSupport(full_nanoscribe_startOverhangsOverSupport ${STAIRSASTL}
+  "--start-overhangs-over-support --start-overhangs-extent-factor 0.5 --start-overhangs-just-with-same-process false")
+TEMPLATE_startOverhangsOverSupport(full_nanoscribe_startOverhangsOverSupport_notwork ${STAIRSASTL}
+  "--start-overhangs-over-support --start-overhangs-extent-factor 0.5 --start-overhangs-just-with-same-process true")
+TEMPLATE_startOverhangsOverSupport(full_nanoscribe_startOverhangsOverSupport_notfromedge ${STAIRSASTL}
+  "--start-overhangs-over-support --start-overhangs-extent-factor 0.5 --start-overhangs-just-with-same-process false --overhangs-do-not-start-from-edge-of-support")
+TEST_COMPARE(COMPARE_NOTEQUAL_full_nanoscribe_startOverhangsOverSupport_1 execfull "full_nanoscribe_startOverhangsOverSupport;full_nanoscribe_NO_startOverhangsOverSupport"
+  "${TEST_DIR}/full_nanoscribe_startOverhangsOverSupport.paths"
+  "${TEST_DIR}/full_nanoscribe_NO_startOverhangsOverSupport.paths"
+  WILL_FAIL true) #the results MUST be different
+TEST_COMPARE(COMPARE_NOTEQUAL_full_nanoscribe_startOverhangsOverSupport_2 execfull "full_nanoscribe_startOverhangsOverSupport;full_nanoscribe_startOverhangsOverSupport_notwork"
+  "${TEST_DIR}/full_nanoscribe_startOverhangsOverSupport.paths"
+  "${TEST_DIR}/full_nanoscribe_startOverhangsOverSupport_notwork.paths"
+  WILL_FAIL true) #the results MUST be different
+TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_startOverhangsOverSupport_3 execfull "full_nanoscribe_NO_startOverhangsOverSupport;full_nanoscribe_startOverhangsOverSupport_notwork"
+  "${TEST_DIR}/full_nanoscribe_NO_startOverhangsOverSupport.paths"
+  "${TEST_DIR}/full_nanoscribe_startOverhangsOverSupport_notwork.paths") #the results MUST be equal
+
+#this test is not strictly necessary (except for a codepath activated when testing --infill lines* with --infill-byregion and without --infill-static-mode), but it is instructive to see slicings of more sophisticated shapes
+set(TESTNAME full_nanoscribe_filter)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FILTERSTL}  
+"--load \"${TEST_DIR}/filter.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --vertical-correction
+${FULL_NANOA0}
+  --infill linesavh --infill-byregion --infilling-perimeter-overlap 0.45
+${FULL_NANOA1}
+  --infill linesv --medialaxis-radius 0.5  --infill-byregion --infilling-perimeter-overlap 0.45
+  --ensure-attachment-offset 0.3 --ensure-attachment-cutoff-offset 0.095
+  --start-overhangs-over-support --start-overhangs-extent-factor 0.5 --overhangs-do-not-start-from-edge-of-support
+--nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
+--nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
+")
+
+MACRO(TEMPLATE_nanoscribe_multidomain TESTNAME STLTEST STLNAME DIFFERENCE)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${STLTEST} ${STLNAME}  
+"--load \"${STLNAME}\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --vertical-correction
+${FULL_NANOA0}
+  --infill linesavh --infill-static-mode
+${FULL_NANOA1}
+  --infill linesv
+--nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
+${DIFFERENCE}
+")
+ENDMACRO()
+TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_90 ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300")
+TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_60 ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-angle 60")
+TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_90_abs ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-origin 0 0")
+TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_multidomain_1 execfull "full_nanoscribe_multidomain_90;full_nanoscribe_multidomain_60"
+  "${TEST_DIR}/full_nanoscribe_multidomain_90.paths"
+  "${TEST_DIR}/full_nanoscribe_multidomain_60.paths")
+TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_multidomain_2 execfull "full_nanoscribe_multidomain_90;full_nanoscribe_multidomain_90_abs"
+  "${TEST_DIR}/full_nanoscribe_multidomain_90.paths"
+  "${TEST_DIR}/full_nanoscribe_multidomain_90_abs.paths")
 
