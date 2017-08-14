@@ -345,7 +345,7 @@ TEST_MULTIRES_BOTHSNAP("" ${TESTNAME} ${MINILABELS} ${MINISTL}
 ${MINI_SCHED0}
   --infill linesv --infill-medialaxis-radius 0.5 --additional-perimeters 1
 ${MINI_SCHED1}
-  --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2"
+  --infill linesh --infill-medialaxis-radius 0.5 --additional-perimeters 2 --additional-perimeters-lineoverlap 0.2"
 SNAPTHIN)
 
 set(TESTNAME mini_3d_infilling_withsurface)
