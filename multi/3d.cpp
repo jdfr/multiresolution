@@ -1111,7 +1111,7 @@ std::string applyFeedbackFromFile(Configuration &config, MetricFactors &factors,
             return str("Error: the scalingFactor from the slicer is ", feedbackSlicer->getScalingFactor(), " while the factor from the configuration is different: ", slicer_to_input, "!!!\n");
         }
 
-        if (!feedbackSlicer->sendZs(std::move(zs))) {
+        if (!feedbackSlicer->sendZs(zs)) {
                 std::string err = feedbackSlicer->getErrorMessage();
                 feedbackSlicer->terminate();
                 return str("Error while trying to send Z values to the feedback slicer manager: ", err, "!!!\n");
