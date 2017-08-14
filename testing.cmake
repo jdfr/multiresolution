@@ -49,6 +49,7 @@ ENDMACRO()
 #with ADD_TEST(multiresolution_executable) and ADD_TEST(${multires}), but the second one 
 #also works when used standalone, which is the mode configured in compare_tests.cmake
 PREPARE_COMMAND_NAME(multires)
+PREPARE_COMMAND_NAME(filterp)
 
 MACRO(TEST_TEMPLATE TESTNAME WORKDIR)
   ADD_TEST(NAME ${TESTNAME}
@@ -186,6 +187,7 @@ add_custom_target(checkcompfull  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compf
 set(MINISTL        "put_mini;${TEST_DIR}/mini.stl")
 set(MINISALIENTSTL "put_mini_salient;${TEST_DIR}/mini.salient.stl")
 set(FULLSTL        "put_full;${TEST_DIR}/full.stl")
+set(FULLOUTERSTL   "put_full_outer;${TEST_DIR}/full.outer.stl")
 set(FULLFATSTL     "put_full_fat;${TEST_DIR}/full.fat.stl")
 set(SALIENTSTL     "put_full_justsalient;${TEST_DIR}/salient.stl")
 set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl")
@@ -194,6 +196,7 @@ set(FULLSUBSTL     "put_full_subtractive;${TEST_DIR}/subtractive.stl")
 TEST_COPY_FILE(putmini ${MINISTL})
 TEST_COPY_FILE(putmini ${MINISALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLSTL})
+TEST_COPY_FILE(putfull ${FULLOUTERSTL})
 TEST_COPY_FILE(putfull ${FULLFATSTL})
 TEST_COPY_FILE(putfull ${SALIENTSTL})
 TEST_COPY_FILE(putfull ${FULLDENTEDSTL})
@@ -551,6 +554,20 @@ ${COMMONARGS}")
 ${COMMONARGS}")
   #make sure that --slicing-manual produces the same results as --slicing-scheduler if all other parameters remain the same
   TEST_COMPARE(${TESTNAME}_compare_slicingmanual execfull ${TESTNAME}_slicingmanual "${TEST_DIR}/${TESTNAME}.paths" "${TEST_DIR}/${TESTNAME}_slicingmanual.paths")
+#Test feedback with mesh
+TEST_MULTIRES_COMPARE("" ${TESTNAME}_feedback_mesh ${FULLLABELS} "put_full;put_full_outer" "${TEST_DIR}/full.stl"
+"--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}_feedback_mesh.paths\" --feedback mesh \"${TEST_DIR}/full.outer.stl\"
+${SCHED}
+${COMMONARGS}")
+#To test the feedback with paths, first we will extract the toolpaths for the low-res tool
+TEST_TEMPLATE(${TESTNAME}_prepare_feedback_paths "${OUTPUTDIR}" ${filterp} "${TEST_DIR}/${TESTNAME}.paths" "${TEST_DIR}/${TESTNAME}_prepare_feedback_paths.paths" type contour ntool 0 z -0.0028361406922340392026)
+set_tests_properties(${TESTNAME}_prepare_feedback_paths PROPERTIES LABELS "execfull" DEPENDS "${TESTNAME}" REQUIRED_FILES "${TEST_DIR}/${TESTNAME}.paths")
+#Now, to the proper test
+TEST_MULTIRES_COMPARE("" ${TESTNAME}_feedback_paths ${FULLLABELS} "put_full;${TESTNAME}_prepare_feedback_paths" "${TEST_DIR}/full.stl"
+"--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}_feedback_paths.paths\" --feedback paths \"${TEST_DIR}/${TESTNAME}_prepare_feedback_paths.paths\"
+#In this test, we do just one high-res slice at the same height as the feedback, to avoid quite a bunch of tedious transformations with touchp and unionp
+--save-contours --motion-planner --slicing-manual 1 -0.0028361406922340392026
+${COMMONARGS}")
 
 set(TESTNAME full_3d_clearance_infillinglines)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
