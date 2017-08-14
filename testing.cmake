@@ -581,6 +581,14 @@ TEST_MULTIRES_COMPARE("" ${TESTNAME}_feedback_paths ${FULLLABELS} "put_full;${TE
 --save-contours --motion-planner --slicing-manual 1 -0.0028361406922340392026
 ${COMMONARGS}")
 
+set(TESTNAME full_3d_substractive_box)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
+"--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED} --subtractive-box-mode 6000.0 5000.0
+${FULL_SCHED0}
+${FULL_SCHED1}
+${SNAPTHICK}")
+
 set(TESTNAME full_3d_clearance_infillinglines)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
 "--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
