@@ -603,11 +603,31 @@ ${USEGRID}")
 ENDMACRO()
 TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true")
 TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false")
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses execfull "full_3d_clearance_withsurface_allprocesses;full_3d_clearance_withsurface_betweenprocesses"
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_surf_to_per "--lump-surfaces-to-perimeters")
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_surf_to_inf "--lump-surfaces-to-infillings")
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_all         "--lump-all-toolpaths-together")
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_1 execfull "full_3d_clearance_withsurface_allprocesses;full_3d_clearance_withsurface_betweenprocesses"
   "${TEST_DIR}/full_3d_clearance_withsurface_allprocesses.paths"
   "${TEST_DIR}/full_3d_clearance_withsurface_betweenprocesses.paths"
   WILL_FAIL true) #the results MUST be different
-
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_2 execfull "full_3d_clearance_withsurface_lump_surf_to_per;full_3d_clearance_withsurface_lump_surf_to_inf"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_per.paths"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_inf.paths"
+  WILL_FAIL true) #the results MUST be different
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_3 execfull "full_3d_clearance_withsurface_lump_surf_to_per;full_3d_clearance_withsurface_lump_all"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_per.paths"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
+  WILL_FAIL true) #the results MUST be different
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_4 execfull "full_3d_clearance_withsurface_lump_all;full_3d_clearance_withsurface_lump_surf_to_inf"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_inf.paths"
+  WILL_FAIL true) #the results MUST be different
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_5 execfull "full_3d_clearance_withsurface_lump_all;full_3d_clearance_withsurface_allprocesses"
+  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
+  "${TEST_DIR}/full_3d_clearance_withsurface_allprocesses.paths"
+  WILL_FAIL true) #the results MUST be different
+#we do not write all combinations because it is pointless to be so exhaustive...
+  
 set(TESTNAME full_3d_clearance_vcorrection_infillinglines)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSALIENTSTL}
 "--load \"${TEST_DIR}/full.salient.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
