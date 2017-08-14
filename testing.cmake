@@ -619,14 +619,22 @@ ${FULL_SCHED0}
   --infill linesvh --infill-medialaxis-radius 0.5
 ${FULL_SCHED1}
   --infill linesh --infill-static-mode --infill-lineoverlap -4 --surface-infill linesh
-  --compute-surfaces-extent-factor 0.6 ${DIFFERENCE}
-${USEGRID}")
+  --compute-surfaces-extent-factor 0.6 ${DIFFERENCE}")
 ENDMACRO()
-TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true")
-TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false")
-TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_per "--lump-surfaces-to-perimeters")
-TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_inf "--lump-surfaces-to-infillings")
-TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_all         "--lump-all-toolpaths-together")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true
+${USEGRID}")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false
+${USEGRID}")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_per "--lump-surfaces-to-perimeters
+${USEGRID}")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_inf "--lump-surfaces-to-infillings
+${USEGRID}")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_all         "--lump-all-toolpaths-together
+${USEGRID}")
+TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_allprocesses "--medialaxis-radius 0.5 --compute-surfaces-just-with-same-process true
+-- process 0 ${CLRNCE}
+-- process 1 ${CLRNCE}
+${SNAPTHICK}")
 TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_1 execfull "full_3d_withsurface_allprocesses;full_3d_withsurface_betweenprocesses"
   "${TEST_DIR}/full_3d_withsurface_allprocesses.paths"
   "${TEST_DIR}/full_3d_withsurface_betweenprocesses.paths"
