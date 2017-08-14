@@ -486,6 +486,7 @@ ${FULL_DIMST0}
 ${FULL_DIMST1}
   ${CLRNCE}
   --infill linesh --infill-medialaxis-radius 0.5 --radius-removecommon 0.1
+  --infilling-recursive #technically, using recursive infilling in the last high-res process is unnecessary and wasteful, but it helps to boost code coverage
 ${SNAPTHIN}")
 
 set(TESTNAME full_no3d_addsub_medialaxis)
