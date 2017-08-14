@@ -421,6 +421,18 @@ ${FULL_DIMST1}
   ${CLRNCE}
 ${SNAPTHIN}")
 
+set(TESTNAME full_no3d_save_in_grid)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
+"--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}\"
+${NOSCHED} --save-in-grid 3000 100
+${FULL_DIMST0}
+${FULL_DIMST1}
+${SNAPTHICK}")
+TEST_COMPARE(COMPARE_SAVEINGRID_${TESTNAME} compfull ${TESTNAME}
+      "${TEST_DIR}/${TESTNAME}.N0.0.0.paths"
+  "${TESTPREV_DIR}/${TESTNAME}.N0.0.0.paths"
+  )
+
 set(TESTNAME full_no3d_substractive_box)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
 "--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
