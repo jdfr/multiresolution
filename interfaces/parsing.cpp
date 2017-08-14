@@ -87,7 +87,7 @@ template<bool GLOBAL> void nanoOptionsGenerator(po::options_description &opts) {
             PREFIXNANODESC("nanoscribe scan mode, either 'piezo' or 'galvo'. Default value is 'galvo'"))
         (PREFIXNANONAME("nano-galvocenter"),
             po::value<std::string>()->value_name("always|minimize"),
-            PREFIXNANODESC("nanoscribe galvo centering mode, either 'always' or 'minimize'. Default value is 'always'."))
+            PREFIXNANODESC("nanoscribe galvo centering mode, either 'always' or 'minimize'. Default value is 'always', which always re-centers the galvo for each new layer/writing subdomain. 'minimize' will re-center only if the toolpaths cannot be printed within the current writing subdomain. The subdomain or addressable area is a square of size --nano-maxsquarelen (or --pp-nano-maxsquarelen, if used)."))
         (PREFIXNANONAME("nano-angle"),
             po::value<double>()->value_name("angle"),
             PREFIXNANODESC("stitching angle (IN DEGREES) between blocks. Default is 90."))
