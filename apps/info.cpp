@@ -3,7 +3,7 @@
 #include "apputil.hpp"
 #include <limits>
 
-std::string printPathInfo(const char * filename, bool verbose) {
+std::string printPathInfo(const char * filename, int verbose) {
     FILEOwner i(filename, "rb");
     if (!i.isopen()) { return str("Could not open input file ", filename); }
     IOPaths iop_f(i.f);
@@ -14,7 +14,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
     bool useSched = fileheader.useSched != 0;
 
 
-    if (verbose) {
+    if (verbose>0) {
         fprintf(stdout, "File name: %s\n", filename);
         fprintf(stdout, "number of tools (processes): %lld\n", fileheader.numtools);
         fprintf(stdout, "use Scheduling: %s\n", useSched ? "true" : "false");
@@ -38,7 +38,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
         }
     }
     
-    if (verbose) {
+    if (verbose>0) {
         fprintf(stdout, "Number of Records: %lld\n", fileheader.numRecords);
         fprintf(stdout, "\n\n");
     }
@@ -50,7 +50,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
         const int usual = 7;
         if (sliceheader.alldata.size() < usual) { return str("Error reading ", currentRecord, "-th slice header: header is too short!"); }
 
-        if (verbose) {
+        if (verbose>0) {
             fprintf(stdout, "Record %d\n", currentRecord);
             switch (sliceheader.type) {
             case PATHTYPE_RAW_CONTOUR:        fprintf(stdout, "                  type: raw slice (sliced from mesh file)\n"); break;
@@ -88,7 +88,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
             }
         }
 
-        if (verbose) {
+        if (verbose>0) {
             int numpaths;
             if (sliceheader.saveFormat == PATHFORMAT_INT64) {
                 clp::Paths paths;
@@ -100,6 +100,20 @@ std::string printPathInfo(const char * filename, bool verbose) {
                 fprintf(stdout, "          bounding box:\n");
                 fprintf(stdout, "       X: min=%.20g, max=%.20g\n", bb.minx*sliceheader.scaling, bb.maxx*sliceheader.scaling);
                 fprintf(stdout, "       Y: min=%.20g, max=%.20g\n", bb.miny*sliceheader.scaling, bb.maxy*sliceheader.scaling);
+                if (verbose > 1) {
+                    int ipath = 0;
+                    for (auto &path : paths) {
+                        fprintf(stdout, "          path %d/%d:\n", ipath, paths.size());
+                        int ipoint = 0;
+                        for (auto &point : path) {
+                            fprintf(stdout, "            point %d/%d:\n", ipoint, path.size());
+                            fprintf(stdout, "              X: %lld\n", point.X);
+                            fprintf(stdout, "              Y: %lld\n", point.Y);
+                            ++ipoint;
+                        }
+                        ++ipath;
+                    }
+                }
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE) {
                 DPaths paths;
                 if (!iop_f.readDoublePaths(paths)) {
@@ -121,6 +135,20 @@ std::string printPathInfo(const char * filename, bool verbose) {
                 fprintf(stdout, "          bounding box:\n");
                 fprintf(stdout, "       X: min=%.20g, max=%.20g\n", minx, maxx);
                 fprintf(stdout, "       Y: min=%.20g, max=%.20g\n", miny, maxy);
+                if (verbose > 1) {
+                    int ipath = 0;
+                    for (auto &path : paths) {
+                        fprintf(stdout, "          path %d/%d:\n", ipath, paths.size());
+                        int ipoint = 0;
+                        for (auto &point : path) {
+                            fprintf(stdout, "            point %d/%d:\n", ipoint, path.size());
+                            fprintf(stdout, "              X: %.20g\n", point.X);
+                            fprintf(stdout, "              Y: %.20g\n", point.Y);
+                            ++ipoint;
+                        }
+                        ++ipath;
+                    }
+                }
             } else if (sliceheader.saveFormat == PATHFORMAT_DOUBLE_3D) {
                 Paths3D paths;
                 if (!read3DPaths(iop_f, paths)) {
@@ -150,7 +178,7 @@ std::string printPathInfo(const char * filename, bool verbose) {
 const char *ERR =
 "\nArguments: PATHSFILENAME_INPUT [verbose]\n\n"
 "    -PATHSFILENAME_INPUT is the paths file name.\n\n"
-"    -'verbose' if more information is to be printed.\n\n";
+"    -'v' or 'vv' if more information is to be printed ('v' for summary, 'vv' for full output).\n\n";
 
 void printError(ParamReader &rd) {
     rd.fmt << ERR;
@@ -170,11 +198,14 @@ int main(int argc, const char** argv) {
 
     if (!rd.readParam(pathsfilename_input, "PATHSFILENAME_INPUT"))           { printError(rd); return -1; }
     
-    bool verbose = false;
+    int verbose = 0;
     if (rd.readParam(verbose_input, "VERBOSE_INPUT")) {
-        verbose = (tolower(verbose_input[0]) == 'v');
-        if (!verbose) {
-            fprintf(stderr, "if present, las argument must be 'verbose' (or at least start with 'v'), but it was <%s>\n", verbose_input);
+        if (strcmp(verbose_input, "v") == 0) {
+            verbose = 1;
+        } else if (strcmp(verbose_input, "vv") == 0) {
+            verbose = 2;
+        } else {
+            fprintf(stderr, "if present, las argument must be either 'v' or 'vv', but it was <%s>\n", verbose_input);
             return -1;
         }
     }
