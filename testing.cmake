@@ -581,7 +581,7 @@ ${FULL_SCHED1}
   --infill linesv --infill-medialaxis-radius 0.5
 ${SNAPTHIN}")
 
-set(TESTNAME full_3d_clearance_infillinglines_addperimeters)
+set(TESTNAME full_3d_infillinglines_addperimeters)
 TEST_MULTIRES_BOTHSNAP("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
 "${SCHED}
 ${FULL_SCHED0}
@@ -601,30 +601,30 @@ ${FULL_SCHED1}
   --compute-surfaces-extent-factor 0.6 ${DIFFERENCE}
 ${USEGRID}")
 ENDMACRO()
-TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true")
-TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false")
-TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_surf_to_per "--lump-surfaces-to-perimeters")
-TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_surf_to_inf "--lump-surfaces-to-infillings")
-TEMPLATE_surfacesWithSameProcess(full_3d_clearance_withsurface_lump_all         "--lump-all-toolpaths-together")
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_1 execfull "full_3d_clearance_withsurface_allprocesses;full_3d_clearance_withsurface_betweenprocesses"
-  "${TEST_DIR}/full_3d_clearance_withsurface_allprocesses.paths"
-  "${TEST_DIR}/full_3d_clearance_withsurface_betweenprocesses.paths"
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_allprocesses     "--compute-surfaces-just-with-same-process true")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_betweenprocesses "--compute-surfaces-just-with-same-process false")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_per "--lump-surfaces-to-perimeters")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_surf_to_inf "--lump-surfaces-to-infillings")
+TEMPLATE_surfacesWithSameProcess(full_3d_withsurface_lump_all         "--lump-all-toolpaths-together")
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_1 execfull "full_3d_withsurface_allprocesses;full_3d_withsurface_betweenprocesses"
+  "${TEST_DIR}/full_3d_withsurface_allprocesses.paths"
+  "${TEST_DIR}/full_3d_withsurface_betweenprocesses.paths"
   WILL_FAIL true) #the results MUST be different
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_2 execfull "full_3d_clearance_withsurface_lump_surf_to_per;full_3d_clearance_withsurface_lump_surf_to_inf"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_per.paths"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_inf.paths"
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_2 execfull "full_3d_withsurface_lump_surf_to_per;full_3d_withsurface_lump_surf_to_inf"
+  "${TEST_DIR}/full_3d_withsurface_lump_surf_to_per.paths"
+  "${TEST_DIR}/full_3d_withsurface_lump_surf_to_inf.paths"
   WILL_FAIL true) #the results MUST be different
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_3 execfull "full_3d_clearance_withsurface_lump_surf_to_per;full_3d_clearance_withsurface_lump_all"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_per.paths"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_3 execfull "full_3d_withsurface_lump_surf_to_per;full_3d_withsurface_lump_all"
+  "${TEST_DIR}/full_3d_withsurface_lump_surf_to_per.paths"
+  "${TEST_DIR}/full_3d_withsurface_lump_all.paths"
   WILL_FAIL true) #the results MUST be different
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_4 execfull "full_3d_clearance_withsurface_lump_all;full_3d_clearance_withsurface_lump_surf_to_inf"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_surf_to_inf.paths"
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_4 execfull "full_3d_withsurface_lump_all;full_3d_withsurface_lump_surf_to_inf"
+  "${TEST_DIR}/full_3d_withsurface_lump_all.paths"
+  "${TEST_DIR}/full_3d_withsurface_lump_surf_to_inf.paths"
   WILL_FAIL true) #the results MUST be different
-TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_5 execfull "full_3d_clearance_withsurface_lump_all;full_3d_clearance_withsurface_allprocesses"
-  "${TEST_DIR}/full_3d_clearance_withsurface_lump_all.paths"
-  "${TEST_DIR}/full_3d_clearance_withsurface_allprocesses.paths"
+TEST_COMPARE(COMPARE_NOTEQUAL_withsurface_allprocesses_5 execfull "full_3d_withsurface_lump_all;full_3d_withsurface_allprocesses"
+  "${TEST_DIR}/full_3d_withsurface_lump_all.paths"
+  "${TEST_DIR}/full_3d_withsurface_allprocesses.paths"
   WILL_FAIL true) #the results MUST be different
 #we do not write all combinations because it is pointless to be so exhaustive...
   
