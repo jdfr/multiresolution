@@ -414,6 +414,20 @@ SNAPTHIN)
 ###### FULL-FLEDGED TEST CASES
 ###########################################################
 
+#these test cases aim to cover most functionality on the standalone executable, but for a codebase as complex as ours,
+#with such a high cyclomatic complexity and such a high degree of coupling between many command-line options, it is 
+#very difficult to test all relevant code paths. Even full coverage (even disregarding error handling and trivial edge
+#cases) is difficult to achieve. Some command-line options are not tested at all, for many possible reasons: they would
+#require user interaction, or do a very similar thing to another option, or are not a primary concern, or would require
+#another style of testing to validate them, even taking into account the comparison tests.
+#
+#flags not tested:
+#  standalone.cpp: --pp-save-in-grid --help --config --save-format --checkpoint-save-every --show --dry-run --dxf-toolpaths --dxf-separate-toolpaths --dxf-by-z
+#  parsing.cpp: --correct-input --z-epsilon
+#  parsing.cpp, nanoscribe section: --nano-by-tool --nano-by-z --nano-file-begin --pp-nano-file-begin --pp-nano-file-afterbegin --pp-nano-file-afterfirstzchange --nano-file-end --pp-nano-file-end --pp-nano-global-file-begin --nano-global-file-end --pp-nano-global-file-end --nano-perimeters-begin --pp-nano-perimeters-begin --nano-perimeters-end --pp-nano-perimeters-end --nano-surfaces-begin --pp-nano-surfaces-begin --nano-surfaces-end --pp-nano-surfaces-end --nano-infillings-begin --pp-nano-infillings-begin --nano-infillings-end --pp-nano-infillings-end --pp-nano-scanmode --nano-galvocenter --pp-nano-galvocenter --pp-nano-angle --pp-nano-spacing --pp-nano-margin --pp-nano-maxsquarelen --pp-nano-origin --pp-nano-gridstep
+#  parsing.cpp, infill section: --infill-maxconcentric --surface-infill-maxconcentric --surface-infill-lineoverlap --surface-infill-byregion --surface-infill-static-mode --surface-infill-medialaxis-radius 
+  
+
 set(FULLLABELS execfull compfull)
 set(NOSCHED
 "#configure the multislicer in simple (non-scheduling) mode
