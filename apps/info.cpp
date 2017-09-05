@@ -103,10 +103,10 @@ std::string printPathInfo(const char * filename, int verbose) {
                 if (verbose > 1) {
                     int ipath = 0;
                     for (auto &path : paths) {
-                        fprintf(stdout, "          path %d/%d:\n", ipath, paths.size());
+                        fprintf(stdout, "          path %d/%lld:\n", ipath, paths.size());
                         int ipoint = 0;
                         for (auto &point : path) {
-                            fprintf(stdout, "            point %d/%d:\n", ipoint, path.size());
+                            fprintf(stdout, "            point %d/%lld:\n", ipoint, path.size());
                             fprintf(stdout, "              X: %lld\n", point.X);
                             fprintf(stdout, "              Y: %lld\n", point.Y);
                             ++ipoint;
@@ -138,10 +138,10 @@ std::string printPathInfo(const char * filename, int verbose) {
                 if (verbose > 1) {
                     int ipath = 0;
                     for (auto &path : paths) {
-                        fprintf(stdout, "          path %d/%d:\n", ipath, paths.size());
+                        fprintf(stdout, "          path %d/%lld:\n", ipath, paths.size());
                         int ipoint = 0;
                         for (auto &point : path) {
-                            fprintf(stdout, "            point %d/%d:\n", ipoint, path.size());
+                            fprintf(stdout, "            point %d/%lld:\n", ipoint, path.size());
                             fprintf(stdout, "              X: %.20g\n", point.X);
                             fprintf(stdout, "              Y: %.20g\n", point.Y);
                             ++ipoint;
