@@ -97,7 +97,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
 set(OUTPUTDIR \"${OUTPUTDIR}\")
 set(PYTHONSCRIPTS_PATH \"${OUTPUTDIR}/pyclipper\")
-include(config.cmake)
+include(config.test.cmake)
 include(testing.cmake)
 ")
 ENDMACRO()
@@ -105,7 +105,7 @@ ENDMACRO()
 #the contents of this file are available only when we execute in the multiresolution directory, so we put them in a different file,
 #as CMakeLists will be regenerated every time we need to change OUTPUTDIR
 MACRO(WRITECMAKECONFIG)
-  file(WRITE "${MASTERDIR}/config.cmake"
+  file(WRITE "${MASTERDIR}/config.test.cmake"
 "
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
