@@ -3,4 +3,4 @@ mkgw.bat
 mkvs.bat
 rmk-mingw.bat
 rmk-msvs.bat
-sln*
+_ide_*
