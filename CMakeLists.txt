@@ -361,6 +361,10 @@ if(GENERATE_TESTS)
   set(DATATEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../data_test" CACHE PATH "test STL files are fetched from this directory. It has to be an absolute path")
   set(TEST_DIR     "${OUTPUTDIR}/../test"      CACHE PATH "directory where test artifacts are output. It has to be an absolute path")
   set(TESTPREV_DIR "${OUTPUTDIR}/../testprev"  CACHE PATH "directory where test artifacts from a previous test run are preserved, to be compared with the ones created in TEST_DIR. It has to be an absolute path")
+  #these variables do not really belong to multiresolution's config.cmake, so we repeat them here as well as in the parent's CmakeLists.txt
+  set(SLIC3RPERL_DIR       "${OUTPUTDIR}/Slic3r" CACHE PATH "test STL files are fetched from this directory. It has to be an absolute path")
+  set(SLIC3RPERL_TOUCHFILE slic3r_perl.built     CACHE STRING "this is the touchfile from another target, but it is required for testing")
+  option(BUILD_SLIC3RPERL "build slic3r (the perl application) without sudo" ON)
   include(testing.cmake)
 endif()
 

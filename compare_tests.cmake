@@ -96,7 +96,6 @@ MACRO(WRITECMAKELISTS OUTPUTDIR)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
 set(OUTPUTDIR \"${OUTPUTDIR}\")
-set(PYTHONSCRIPTS_PATH \"${OUTPUTDIR}/pyclipper\")
 include(config.test.cmake)
 include(testing.cmake)
 ")
@@ -109,11 +108,15 @@ MACRO(WRITECMAKECONFIG)
 "
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 project(TESTMASTER NONE)
-set(CMAKE_BUILD_TYPE   \"Release\" CACHE STRING \"Release type\")
-set(PYTHON_EXECUTABLE  \"${PYTHON_EXECUTABLE}\")
-set(DATATEST_DIR       \"${DATATEST_DIR}\")
-set(TEST_DIR           \"${TEST_DIR}\")
-set(TESTPREV_DIR       \"${TESTPREV_DIR}\")
+set(CMAKE_BUILD_TYPE     \"Release\" CACHE STRING \"Release type\")
+set(PYTHON_EXECUTABLE    \"${PYTHON_EXECUTABLE}\")
+set(PYTHONSCRIPTS_PATH   \"${PYTHONSCRIPTS_PATH}\")
+set(DATATEST_DIR         \"${DATATEST_DIR}\")
+set(TEST_DIR             \"${TEST_DIR}\")
+set(TESTPREV_DIR         \"${TESTPREV_DIR}\")
+set(SLIC3RPERL_DIR       \"\${OUTPUTDIR}/${SLIC3RPERL_SUBDIR}\")
+set(SLIC3RPERL_TOUCHFILE \"${SLIC3RPERL_TOUCHFILE}\")
+option(BUILD_SLIC3RPERL   "to set up tests for Slic3r Perl"  ${BUILD_SLIC3RPERL})
 ")
 ENDMACRO()
 
@@ -128,12 +131,19 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config.template.txt")
   #arguments necessary for testing.cmake
   set(PYTHON_EXECUTABLE  ""
       CACHE STRING       "path to python executable")
+  set(PYTHONSCRIPTS_PATH "./pyclipper"
+      CACHE STRING       "subpath of the binary dir to the pyclipper scripts")
   set(DATATEST_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/../data_test"
       CACHE STRING       "path to STL test files")
   set(TEST_DIR           "${CMAKE_CURRENT_SOURCE_DIR}/../test"
       CACHE STRING       "directory were the tests will put the generated files")
   set(TESTPREV_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/../testprev"
       CACHE STRING       "directory where the generated files from a previous test run are located, to be compared with the generated files from the current run")
+  option(BUILD_SLIC3RPERL "build slic3r (the perl application) without sudo" ON)
+  set(SLIC3RPERL_SUBDIR   "Slic3r"
+      CACHE STRING        "subdirectory of the binary directory where Slic3r will be built")
+  set(SLIC3RPERL_TOUCHFILE slic3r_perl.built
+      CACHE STRING       "Perl Slic3r build process takes *FOREVER*, and is likely to require manual corrections. To avoid costly recompilations, if BUILD_SLIC3RPERL is specified, this file will be created after perl Slic3r is succesfully built (remove it to allow for recompilation)")
 
   #copy/generate test files
   file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/compare_tests.cmake" DESTINATION "${MASTERDIR}")

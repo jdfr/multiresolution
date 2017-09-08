@@ -32,6 +32,12 @@
 #    directory were the tests will put the generated files
 #  TESTPREV_DIR
 #    directory where the generated files from a previous test run are located, to be compared with the generated files from the current run
+#  SLIC3RPERL_DIR
+#    directory where Perl Slic3r is located
+#  BUILD_SLIC3RPERL
+#    option to build Perl Slic3r (some tests only make sense if this has been built)
+#  SLIC3RPERL_TOUCHFILE
+#    file that signals that Perl Slic3r has been successfully built.
 #  USE_GCOV, LCOVPATH, GENHTMLPATH
 #    to use lcov to generate code coverage reports after doing test targets
 
@@ -213,6 +219,7 @@ DEFINESTL(putfull STAIRSASTL     put_full_stairsA     "${TEST_DIR}/stairs.A.stl"
 DEFINESTL(putfull STAIRSBSTL     put_full_stairsB     "${TEST_DIR}/stairs.B.stl")
 DEFINESTL(putfull SALIENTSTL     put_full_justsalient "${TEST_DIR}/salient.stl")
 DEFINESTL(putfull FULLDENTEDSTL  put_full_dented      "${TEST_DIR}/third.dented.stl")
+DEFINESTL(putfull FULLDENTEDBSTL put_full_dented_big  "${TEST_DIR}/full.dented.big.stl")
 DEFINESTL(putfull FULLSUBSTL     put_full_subtractive "${TEST_DIR}/subtractive.stl")
 set(FULLSALIENTSTL "put_full_salient;${TEST_DIR}/full.salient.stl") #this one is different from the above
 #STL file to generate
@@ -897,3 +904,50 @@ TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_multidomain_2 execfull "full_nanoscri
   "${TEST_DIR}/full_nanoscribe_multidomain_90.paths"
   "${TEST_DIR}/full_nanoscribe_multidomain_90_abs.paths")
 
+
+###########################################################
+###### TEST CASES FOR GENERATING G-CODE WITH SLIC3R FOR MULTI-EXTRUDER 3D PRINTERS
+###########################################################
+
+if(BUILD_SLIC3RPERL)
+  TEST_COPY_FILE(putfull put_slic3r_config "${TEST_DIR}/config.slic3r.multiextruder.ini")
+  
+  set(TESTNAME full_slic3r)
+  TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLDENTEDBSTL}  
+"--load \"${TEST_DIR}/full.dented.big.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${SCHED}
+--process 0
+    --voxel-profile interpolated
+    --voxel-spec -440 305 0 305
+    --voxel-application-point 0
+    --voxel-zlimits -450 0
+    --gridstep 0.1
+    --snap
+    --smoothing 10
+    --tolerances 10 1
+    --safestep
+    --clearance
+--process 1
+    --voxel-profile interpolated
+    --voxel-spec -140 100 0 100
+    --voxel-application-point 0
+    --voxel-zlimits -150 0
+    --no-preprocessing
+    --no-toolpaths
+    --gridstep 0.1
+    --snap
+    --smoothing 1
+    --tolerances 1 0.1
+    --medialaxis-radius 0.7
+")
+  TEST_TEMPLATE(${TESTNAME}_perl "${SLIC3RPERL_DIR}" perl slic3r.pl --threads 1 --load "${TEST_DIR}/config.slic3r.multiextruder.ini" --import-paths "${TEST_DIR}/${TESTNAME}.paths" x)
+  set_tests_properties(${TESTNAME}_perl PROPERTIES LABELS execfull DEPENDS "put_slic3r_config;${TESTNAME}" 
+    REQUIRED_FILES "${TEST_DIR}/${TESTNAME}.paths;${TEST_DIR}/config.slic3r.multiextruder.ini;${SLIC3RPERL_DIR}/${SLIC3RPERL_TOUCHFILE}")
+  #this COMPARE_* test will always fail, because Slic3r embeds a timestamp in the gcode.
+  #However, it may also fail because of tiny differences in gcode coordinates (Slic3r is not completely deterministic).
+  #Use a diff tool to check the differences and decide if they can be dismissed!
+  TEST_COMPARE(COMPARE_GCODE_${TESTNAME} compfull ${TESTNAME}_perl
+        "${TEST_DIR}/${TESTNAME}.gcode"
+    "${TESTPREV_DIR}/${TESTNAME}.gcode")
+    
+endif()
