@@ -205,7 +205,7 @@ int main(int argc, const char** argv) {
         } else if (strcmp(verbose_input, "vv") == 0) {
             verbose = 2;
         } else {
-            fprintf(stderr, "if present, las argument must be either 'v' or 'vv', but it was <%s>\n", verbose_input);
+            fprintf(stderr, "if present, last argument must be either 'v' or 'vv', but it was <%s>\n", verbose_input);
             return -1;
         }
     }
