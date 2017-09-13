@@ -27,6 +27,7 @@ set(BIGCHUNK_ARENA_SIZE "2097152"  CACHE STRING "Bigchunk size for ArenaMemoryMa
 
 #boost configuration
 set(BOOST_ROOT_PATH            "" CACHE PATH "path prefix to boost library")
+option(Boost_USE_STATIC_LIBS   "Use the static or the dynamic version of the Boost libraries" OFF)
 option(COMPILE_PROGRAMOPTIONS  "if boost sources are in BOOST_ROOT_PATH, compile local version of boost::program_options (useful to avoid building boost twice if Slic3r is built with mingw and multiresolution with MSVS)" ON)
 
 #python configuration
