@@ -148,6 +148,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config.template.txt")
   #copy/generate test files
   file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/compare_tests.cmake" DESTINATION "${MASTERDIR}")
   file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/testing.cmake"       DESTINATION "${MASTERDIR}")
+  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/file.exists.cmake"   DESTINATION "${MASTERDIR}")
   if (WIN32)
     file(WRITE "${MASTERDIR}/compare_tests.bat" "cmake %* -P compare_tests.cmake")
   else()

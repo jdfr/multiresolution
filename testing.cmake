@@ -91,6 +91,12 @@ MACRO(TEST_COPY_FILE THELABEL TESTNAME ABSFILENAME)
   TEST_TEMPLATE_LABEL(${THELABEL} ${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E copy_if_different "${DATATEST_DIR}/${FILENAME}" "${TEST_DIR}/${FILENAME}")
 ENDMACRO()
 
+#test if file(s) exist(s)
+MACRO(TEST_EXISTS TESTNAME THELABELS PREVTEST PATHTOFILE)
+  TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -D "FILETOCHECK=${PATHTOFILE}" -P "${CMAKE_CURRENT_SOURCE_DIR}/file.exists.cmake")
+  set_tests_properties(${TESTNAME} PROPERTIES LABELS "${THELABELS}" DEPENDS "${PREVTEST}" REQUIRED_FILES "${PATHTOFILE}" ${ARGN})
+ENDMACRO()
+
 #test to compare two files
 MACRO(TEST_COMPARE TESTNAME THELABELS PREVTEST FILENAME1 FILENAME2)
   TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${CMAKE_COMMAND}" -E compare_files "${FILENAME1}" "${FILENAME2}")
@@ -114,6 +120,7 @@ MACRO(TEST_MULTIRES_COMPARE PRODUCTFILENAME TESTNAME THELABELS_MULTIRES THELABEL
   #for this to work, the output must be 
   set(PRODUCT "${TEST_DIR}/${PFILENAME}")
   TEST_MULTIRES(${TESTNAME} "${THELABELS_MULTIRES}" "${PREVTEST}" "${INPUTFILE}" "${ARGUMENTS}")
+  TEST_EXISTS(EXISTS_RESULT_${TESTNAME} "${THELABELS_MULTIRES}" "${TESTNAME}" "${PRODUCT}")
   set(PRODUCTPREV "${TESTPREV_DIR}/${PFILENAME}")
   TEST_COMPARE(COMPARE_${TESTNAME} "${THELABELS_COMP}" "${TESTNAME}" "${PRODUCT}" "${PRODUCTPREV}")
 ENDMACRO()
@@ -333,12 +340,13 @@ ${NOSCHED}
 ${MINI_DIMST0}
 ${MINI_DIMST1} --no-toolpaths --no-preprocessing 2
 ${USEGRID}")
-TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N0 compmini ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N0.dxf"
-  "${TESTPREV_DIR}/${TESTNAME}.N0.dxf")
-TEST_COMPARE(COMPARE_DXF_mini_dxf_justcontours_N1 compmini ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N1.dxf"
-  "${TESTPREV_DIR}/${TESTNAME}.N1.dxf")
+FOREACH(SUBNAME N0 N1)
+  TEST_EXISTS(EXISTS_RESULT_DXF_${TESTNAME}_${SUBNAME} execmini ${TESTNAME} "${TEST_DIR}/${TESTNAME}.${SUBNAME}.dxf")
+  TEST_COMPARE(COMPARE_DXF_${TESTNAME}_${SUBNAME} compmini ${TESTNAME}
+        "${TEST_DIR}/${TESTNAME}.${SUBNAME}.dxf"
+    "${TESTPREV_DIR}/${TESTNAME}.${SUBNAME}.dxf"
+    )
+ENDFOREACH()
 
 set(TESTNAME mini_3d_clearance_noinfilling)
 TEST_MULTIRES_BOTHSNAP("" ${TESTNAME} ${MINILABELS} ${MINISTL}
@@ -463,10 +471,13 @@ ${NOSCHED} --save-in-grid 3000 100
 ${FULL_DIMST0}
 ${FULL_DIMST1}
 ${SNAPTHICK}")
-TEST_COMPARE(COMPARE_SAVEINGRID_${TESTNAME} compfull ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N0.0.0.paths"
-  "${TESTPREV_DIR}/${TESTNAME}.N0.0.0.paths"
-  )
+FOREACH(SUBNAME 0.0 0.1 0.2 1.0 1.1 1.2 2.0 2.1 2.2)
+  TEST_EXISTS(EXISTS_RESULT_${TESTNAME}_${SUBNAME} execfull ${TESTNAME} "${TEST_DIR}/${TESTNAME}.N0.${SUBNAME}.paths")
+  TEST_COMPARE(COMPARE_SAVEINGRID_${TESTNAME}_${SUBNAME} compfull ${TESTNAME}
+        "${TEST_DIR}/${TESTNAME}.N0.${SUBNAME}.paths"
+    "${TESTPREV_DIR}/${TESTNAME}.N0.${SUBNAME}.paths"
+    )
+ENDFOREACH()
 
 set(TESTNAME full_no3d_substractive_box)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FULLSTL}
@@ -553,14 +564,13 @@ ${FULL_DIMST0}
 ${FULL_DIMST1}
   --no-toolpaths --no-preprocessing 2
 ${USEGRID}")
-TEST_COMPARE(COMPARE_DXF_${TESTNAME}_N0 compfull ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N0.dxf"
-  "${TESTPREV_DIR}/${TESTNAME}.N0.dxf"
-  )
-TEST_COMPARE(COMPARE_DXF_${TESTNAME}_N1 compfull ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N1.dxf"
-  "${TESTPREV_DIR}/${TESTNAME}.N1.dxf"
-  )
+FOREACH(SUBNAME N0 N1)
+  TEST_EXISTS(EXISTS_RESULT_DXF_${TESTNAME}_${SUBNAME} execfull ${TESTNAME} "${TEST_DIR}/${TESTNAME}.${SUBNAME}.dxf")
+  TEST_COMPARE(COMPARE_DXF_${TESTNAME}_${SUBNAME} compfull ${TESTNAME}
+        "${TEST_DIR}/${TESTNAME}.${SUBNAME}.dxf"
+    "${TESTPREV_DIR}/${TESTNAME}.${SUBNAME}.dxf"
+    )
+ENDFOREACH()
 
 set(TESTNAME full_3d_clearance_noinfilling)
 set(COMMONARGS
@@ -577,11 +587,13 @@ ${COMMONARGS}")
 "--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}_checkpoint.paths\" --checkpoint-save \"${TEST_DIR}/${TESTNAME}.checkpoint\" 5
 ${SCHED}
 ${COMMONARGS}")
+  TEST_EXISTS(EXISTS_RESULT_${TESTNAME}_save_checkpoint execfull ${TESTNAME}_save_checkpoint "${TEST_DIR}/${TESTNAME}.checkpoint")
   #checkpoint load test
   TEST_MULTIRES(${TESTNAME}_load_checkpoint execfull ${TESTNAME}_save_checkpoint "${TEST_DIR}/full.stl;${TEST_DIR}/${TESTNAME}.checkpoint"
 "--load \"${TEST_DIR}/full.stl\" --save \"${TEST_DIR}/${TESTNAME}_checkpoint.paths\" --checkpoint-load \"${TEST_DIR}/${TESTNAME}.checkpoint\"
 ${SCHED}
 ${COMMONARGS}")
+  TEST_EXISTS(EXISTS_RESULT_${TESTNAME}_load_checkpoint execfull ${TESTNAME}_load_checkpoint "${TEST_DIR}/${TESTNAME}_checkpoint.paths")
   #this comparison is not part of the comp* series, because that is intended to compare the results of *two* sets of results;
   #this TEST_COMPARE is to check that the --checkpoint-save and --checkpoint-load flags work as intended 
   TEST_COMPARE(${TESTNAME}_comparecheckpoint execfull "${TESTNAME};${TESTNAME}_load_checkpoint" "${TEST_DIR}/${TESTNAME}.paths" "${TEST_DIR}/${TESTNAME}_checkpoint.paths")
@@ -813,7 +825,14 @@ PowerScaling $scalingtoolI
 --process 0 --pp-nano-tool-begin \"PowerScaling $scalingtool0\" --pp-nano-tool-end \"%end PowerScaling $scalingtool0\"
 --process 1 --pp-nano-tool-begin \"PowerScaling $scalingtool1\" --pp-nano-tool-end \"%end PowerScaling $scalingtool1\"")
 
-
+MACRO(CHECK_GWL_FILES TESTNAME)
+  FOREACH(SUBNAME ${ARGN})
+    TEST_EXISTS(EXISTS_RESULT_GWL_${TESTNAME}${SUBNAME} execfull ${TESTNAME} "${TEST_DIR}/${TESTNAME}${SUBNAME}.gwl")
+    TEST_COMPARE(COMPARE_GWL_${TESTNAME}${SUBNAME} compfull ${TESTNAME}
+          "${TEST_DIR}/${TESTNAME}${SUBNAME}.gwl"
+      "${TESTPREV_DIR}/${TESTNAME}${SUBNAME}.gwl")
+  ENDFOREACH()
+ENDMACRO()
 
 set(TESTNAME full_nanoscribe_ensureAttachment)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${TOWERSTL}  
@@ -829,12 +848,7 @@ ${FULL_NANOA1}
 ${NANOCOMMONPARAMS}
 --nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
 ")
-TEST_COMPARE(COMPARE_GWL_${TESTNAME}_MASTER compfull ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.gwl"
-  "${TESTPREV_DIR}/${TESTNAME}.gwl")
-TEST_COMPARE(COMPARE_GWL_${TESTNAME}_SUB compfull ${TESTNAME}
-      "${TEST_DIR}/${TESTNAME}.N0.0.0.gwl"
-  "${TESTPREV_DIR}/${TESTNAME}.N0.0.0.gwl")
+CHECK_GWL_FILES(${TESTNAME} "" .N0.0.0)
 
 MACRO(TEMPLATE_startOverhangsOverSupport TESTNAME STLTEST STLNAME DIFFERENCE)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${STLTEST} ${STLNAME}  
@@ -847,6 +861,7 @@ ${FULL_NANOA1}
 --nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
 --nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
 ")
+CHECK_GWL_FILES(${TESTNAME} "" .N0.0.0)
 ENDMACRO()
 TEMPLATE_startOverhangsOverSupport(full_nanoscribe_NO_startOverhangsOverSupport ${STAIRSASTL} "")
 TEMPLATE_startOverhangsOverSupport(full_nanoscribe_startOverhangsOverSupport ${STAIRSASTL}
@@ -881,6 +896,7 @@ ${FULL_NANOA1}
 --nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
 --nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
 ")
+CHECK_GWL_FILES(${TESTNAME} "" .N0.0.0)
 
 MACRO(TEMPLATE_nanoscribe_multidomain TESTNAME STLTEST STLNAME DIFFERENCE)
 TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${STLTEST} ${STLNAME}  
@@ -894,15 +910,30 @@ ${FULL_NANOA1}
 ${DIFFERENCE}
 ")
 ENDMACRO()
-TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_90 ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300")
-TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_60 ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-angle 60")
-TEMPLATE_nanoscribe_multidomain(full_nanoscribe_multidomain_90_abs ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-origin 0 0")
-TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_multidomain_1 execfull "full_nanoscribe_multidomain_90;full_nanoscribe_multidomain_60"
-  "${TEST_DIR}/full_nanoscribe_multidomain_90.paths"
-  "${TEST_DIR}/full_nanoscribe_multidomain_60.paths")
-TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_multidomain_2 execfull "full_nanoscribe_multidomain_90;full_nanoscribe_multidomain_90_abs"
-  "${TEST_DIR}/full_nanoscribe_multidomain_90.paths"
-  "${TEST_DIR}/full_nanoscribe_multidomain_90_abs.paths")
+set(TESTNAME full_nanoscribe_multidomain)
+TEMPLATE_nanoscribe_multidomain(${TESTNAME}_90     ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300")
+TEMPLATE_nanoscribe_multidomain(${TESTNAME}_60     ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-angle 60")
+TEMPLATE_nanoscribe_multidomain(${TESTNAME}_90_abs ${STAIRSBSTL} "--nano-spacing 67 --nano-margin 3 --nano-maxsquarelen 300 --nano-origin 0 0")
+TEST_COMPARE(COMPARE_EQUAL_${TESTNAME}_1 execfull "${TESTNAME}_90;${TESTNAME}_60"
+  "${TEST_DIR}/${TESTNAME}_90.paths"
+  "${TEST_DIR}/${TESTNAME}_60.paths")
+TEST_COMPARE(COMPARE_EQUAL_${TESTNAME}_2 execfull "${TESTNAME}_90;${TESTNAME}_90_abs"
+  "${TEST_DIR}/${TESTNAME}_90.paths"
+  "${TEST_DIR}/${TESTNAME}_90_abs.paths")
+CHECK_GWL_FILES(${TESTNAME} 
+  _60
+    _60.N0.0.0 _60.N0.0.1 _60.N0.0.2 _60.N0.0.3
+    _60.N0.1.0 _60.N0.1.1 _60.N0.1.2 _60.N0.1.3
+    _60.N0.2.0 _60.N0.2.1 _60.N0.2.2 _60.N0.2.3
+  _90
+    _90.N0.0.0 _90.N0.0.1 _90.N0.0.2 _90.N0.0.3
+    _90.N0.1.0 _90.N0.1.1 _90.N0.1.2 _90.N0.1.3
+    _90.N0.2.0 _90.N0.2.1 _90.N0.2.2 _90.N0.2.3
+  _90_abs
+    _90_abs.N0.0.0 _90_abs.N0.0.1 _90_abs.N0.0.2 _90_abs.N0.0.3
+    _90_abs.N0.1.0 _90_abs.N0.1.1 _90_abs.N0.1.2 _90_abs.N0.1.3
+    _90_abs.N0.2.0 _90_abs.N0.2.1 _90_abs.N0.2.2 _90_abs.N0.2.3
+    _90_abs.N0.3.0 _90_abs.N0.3.1 _90_abs.N0.3.2 _90_abs.N0.3.3)
 
 
 ###########################################################
@@ -946,6 +977,7 @@ ${SCHED}
   #this COMPARE_* test will always fail, because Slic3r embeds a timestamp in the gcode.
   #However, it may also fail because of tiny differences in gcode coordinates (Slic3r is not completely deterministic).
   #Use a diff tool to check the differences and decide if they can be dismissed!
+  TEST_EXISTS(EXISTS_RESULT_GCODE_${TESTNAME}_perl execfull ${TESTNAME}_perl "${TEST_DIR}/${TESTNAME}.gcode")
   TEST_COMPARE(COMPARE_GCODE_${TESTNAME} compfull ${TESTNAME}_perl
         "${TEST_DIR}/${TESTNAME}.gcode"
     "${TESTPREV_DIR}/${TESTNAME}.gcode")
