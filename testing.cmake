@@ -38,6 +38,10 @@
 #    option to build Perl Slic3r (some tests only make sense if this has been built)
 #  SLIC3RPERL_TOUCHFILE
 #    file that signals that Perl Slic3r has been successfully built.
+#  MAKEMR_CS_AUTOCAD
+#     option to build the AutoCAD plugin
+#  AUTOCAD_PATH_PREFIX
+#     path to AutoCAD, for example, for AutoCAD 2016 it can be: C:\Program Files\Autodesk\AutoCAD 2016
 #  USE_GCOV, LCOVPATH, GENHTMLPATH
 #    to use lcov to generate code coverage reports after doing test targets
 
@@ -882,17 +886,19 @@ TEST_COMPARE(COMPARE_EQUAL_full_nanoscribe_startOverhangsOverSupport_3 execfull 
   "${TEST_DIR}/full_nanoscribe_NO_startOverhangsOverSupport.paths"
   "${TEST_DIR}/full_nanoscribe_startOverhangsOverSupport_notwork.paths") #the results MUST be equal
 
-#this test is not strictly necessary (except for a codepath activated when testing --infill lines* with --infill-byregion and without --infill-static-mode), but it is instructive to see slicings of more sophisticated shapes
-set(TESTNAME full_nanoscribe_filter)
-TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FILTERSTL}  
-"--load \"${TEST_DIR}/filter.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
-${SCHED} --vertical-correction
+set(FILTER_CORE_PARAMS
+"${SCHED} --vertical-correction
 ${FULL_NANOA0}
   --infill linesavh --infill-byregion --infilling-perimeter-overlap 0.45
 ${FULL_NANOA1}
   --infill linesv --medialaxis-radius 0.5  --infill-byregion --infilling-perimeter-overlap 0.45
   --ensure-attachment-offset 0.3 --ensure-attachment-cutoff-offset 0.095
-  --start-overhangs-over-support --start-overhangs-extent-factor 0.5 --overhangs-do-not-start-from-edge-of-support
+  --start-overhangs-over-support --start-overhangs-extent-factor 0.5 --overhangs-do-not-start-from-edge-of-support")
+#this test is not strictly necessary (except for a codepath activated when testing --infill lines* with --infill-byregion and without --infill-static-mode), but it is instructive to see slicings of more sophisticated shapes
+set(TESTNAME full_nanoscribe_filter)
+TEST_MULTIRES_COMPARE("" ${TESTNAME} ${FULLLABELS} ${FILTERSTL}  
+"--load \"${TEST_DIR}/filter.stl\" --save \"${TEST_DIR}/${TESTNAME}.paths\"
+${FILTER_CORE_PARAMS}
 --nanoscribe \"${TEST_DIR}/${TESTNAME}\" --nano-scanmode galvo ${NANOCOMMONPARAMS}
 --nano-spacing 300 --nano-margin 0 --nano-maxsquarelen 300
 ")
@@ -935,6 +941,56 @@ CHECK_GWL_FILES(${TESTNAME}
     _90_abs.N0.2.0 _90_abs.N0.2.1 _90_abs.N0.2.2 _90_abs.N0.2.3
     _90_abs.N0.3.0 _90_abs.N0.3.1 _90_abs.N0.3.2 _90_abs.N0.3.3)
 
+
+###########################################################
+###### TEST CASES FOR USING THE AutoCAD plugin (it implies the test of the DLL interfaces at both sides: C++ and C#)
+###########################################################
+
+if(MAKEMR_CS_AUTOCAD)
+  FILE(WRITE "${TEST_DIR}/full_filter_core_params.params" "${FILTER_CORE_PARAMS}")
+  string(REPLACE ${FILESEP} / AUTOCAD_PATH_PREFIX "${AUTOCAD_PATH_PREFIX}")
+
+  MACRO(SCR_TEMPLATE SCR_FILENAME DXF_FILENAME NUM_OBJECTS ACTION)
+    FILE(WRITE "${SCR_FILENAME}"
+";this script is quite fragile, but then again, it is AuotLISP...
+(setvar \"FILEDIA\" 0)
+(setvar \"CMDDIA\" 0)
+(setvar \"ATTREQ\" 0)
+(setvar \"SECURELOAD\" 0)
+(vl-file-delete \"${DXF_FILENAME}\")
+(command \"NETLOAD\" \"${OUTPUTDIR}/AutoCADMulti.dll\")
+(if (boundp 'loadpaths) (progn 
+  ${ACTION}
+  (setq ss1 (ssget \"X\"))
+  (if (and (boundp 'ss1)            ; If ss1 was not bound by setq, loadpaths probably failed.
+           (> (sslength ss1) ${NUM_OBJECTS})) ; If the number of objects is under ${NUM_OBJECTS}, the DLL code probably failed.
+    (command \"saveas\" \"DXF\" \"16\" \"${DXF_FILENAME}\"))))
+(setvar \"FILEDIA\" 1)
+(setvar \"CMDDIA\" 1)
+(setvar \"ATTREQ\" 1)
+(setvar \"SECURELOAD\" 1)
+quit yes
+")
+  ENDMACRO()
+  
+  MACRO(TEST_AUTOCAD TESTNAME PREVTEST ADDITIONAL_REQUIRED_FILES)
+    SCR_TEMPLATE("${TEST_DIR}/${TESTNAME}.scr" "${TEST_DIR}/${TESTNAME}.dxf" ${ARGN})
+    TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${AUTOCAD_PATH_PREFIX}/AcCoreConsole.exe" "/s" "${TEST_DIR}/${TESTNAME}.scr")
+    set_tests_properties(${TESTNAME} PROPERTIES LABELS "execfull" DEPENDS "${PREVTEST}" REQUIRED_FILES "${TEST_DIR}/${TESTNAME}.scr;${AUTOCAD_PATH_PREFIX}/AcCoreConsole.exe;${OUTPUTDIR}/AutoCADMulti.dll${ADDITIONAL_REQUIRED_FILES}")
+    TEST_EXISTS(EXISTS_RESULT_AUTOCAD_${TESTNAME} execfull ${TESTNAME} "${TEST_DIR}/${TESTNAME}.dxf")
+    #Disable this compare test: AutoCAD ALWAYS includes timestamps of various types in the file, so we would need to post-process it to remove the headers in order to compare it with prev versions
+    # TEST_COMPARE(COMPARE_AUTOCAD_${TESTNAME} compfull ${TESTNAME}
+    #       "${TEST_DIR}/${TESTNAME}.dxf"
+    #   "${TESTPREV_DIR}/${TESTNAME}.dxf")
+  ENDMACRO()
+    
+  TEST_AUTOCAD(full_autocad_loadpaths     full_nanoscribe_filter ";${TEST_DIR}/full_nanoscribe_filter.paths"
+    3000 "(loadpaths  \"config.txt\" \"${TEST_DIR}/full_nanoscribe_filter.paths\")")
+  #OK, this is borderline insane: to output a single \ in the *.scr with FILE(WRITE ...), I need \\\\\\\\ here. Probably has to do with some baroque substitution rule about multiple nested macro calls...
+  TEST_AUTOCAD(full_autocad_multislice_3d full_autocad_loadpaths ""
+    3000 "(multislice \"config.txt\" \"${TEST_DIR}/filter.stl\" \"--response-file \\\\\\\\\"${TEST_DIR}/full_filter_core_params.params\\\\\\\\\"\")")
+    
+endif()
 
 ###########################################################
 ###### TEST CASES FOR GENERATING G-CODE WITH SLIC3R FOR MULTI-EXTRUDER 3D PRINTERS

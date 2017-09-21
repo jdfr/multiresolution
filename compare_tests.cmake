@@ -116,7 +116,9 @@ set(TEST_DIR             \"${TEST_DIR}\")
 set(TESTPREV_DIR         \"${TESTPREV_DIR}\")
 set(SLIC3RPERL_DIR       \"\${OUTPUTDIR}/${SLIC3RPERL_SUBDIR}\")
 set(SLIC3RPERL_TOUCHFILE \"${SLIC3RPERL_TOUCHFILE}\")
-option(BUILD_SLIC3RPERL   "to set up tests for Slic3r Perl"  ${BUILD_SLIC3RPERL})
+option(BUILD_SLIC3RPERL   \"to set up tests for Slic3r Perl\"  ${BUILD_SLIC3RPERL})
+option(MAKEMR_CS_AUTOCAD \"to set up tests for AutoCAD\" ${MAKEMR_CS_AUTOCAD})
+set(AUTOCAD_PATH_PREFIX  \"${AUTOCAD_PATH_PREFIX}\")
 ")
 ENDMACRO()
 
@@ -144,6 +146,8 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config.template.txt")
       CACHE STRING        "subdirectory of the binary directory where Slic3r will be built")
   set(SLIC3RPERL_TOUCHFILE slic3r_perl.built
       CACHE STRING       "Perl Slic3r build process takes *FOREVER*, and is likely to require manual corrections. To avoid costly recompilations, if BUILD_SLIC3RPERL is specified, this file will be created after perl Slic3r is succesfully built (remove it to allow for recompilation)")
+  option(MAKEMR_CS_AUTOCAD "make a .NET AutoCAD plugin that uses the C# client (only in Visual Studio, requires AutoCAD's ObjectARX to be installed, and the paths to AutoCAD to be defined)" OFF)
+  set(AUTOCAD_PATH_PREFIX  "" CACHE PATH "path to AutoCAD libraries (accoremgd.dll et al)")
 
   #copy/generate test files
   file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/compare_tests.cmake" DESTINATION "${MASTERDIR}")

@@ -2,7 +2,7 @@
 option(MAKEMR_LIBRARY       "make shared library"  ON)
 option(MAKEMR_EXECUTABLE    "make standalone executable"  ON)
 option(MAKEMR_CS_INTERFACE  "make the C# client of the DLL shared library (only in Visual Studio)" ${MAKEMR_LIBRARY})
-option(MAKEMR_CS_AUTOCAD    "make a .NET AutoCAD plugin that uses the C# client (only in Visual Studio, requires the AutoCAD SDK to be installed, and the paths to AutoCAD to be defined)" ${MAKEMR_CS_INTERFACE})
+option(MAKEMR_CS_AUTOCAD    "make a .NET AutoCAD plugin that uses the C# client (only in Visual Studio, requires AutoCAD's ObjectARX to be installed, and the paths to AutoCAD to be defined)" ${MAKEMR_CS_INTERFACE})
 option(MAKEMR_SVGCONVERTER  "make svg converter executable"  ON)
 option(MAKEMR_DXFCONVERTER  "make dxf converter executable"  ON)
 option(MAKEMR_NANOCONVERTER "make nanoscribe converter executable"  ON)
