@@ -35,7 +35,9 @@ namespace MultiSlicerInterface {
         public long y;
     }
 
-    //Mirroring SlicerManager inside the DLL
+    //BASIC INTERFACE FOR THE EXTERNAL STANDALONE SLICER PROCESS
+    //In a true use case, it is probable that the slices to be processed by the DLL will be generated from other sources,
+    //but for demo purposes, we use this class to wrap our own slicer
     public class ExternalSlicerManager : IDisposable {
         public Process proc;
         public BinaryWriter stdin;
@@ -232,6 +234,7 @@ namespace MultiSlicerInterface {
         public int useSlicerDebugFile;
     }
 
+    //RAW DLL INTERFACE
     //This object is not prepared for multi-threading yet (checking for errors is not thread-safe), so it should not be used concurrently in several threads
     [SuppressUnmanagedCodeSecurity]
     public class MultiSlicerDllHandler : IDisposable {
@@ -483,7 +486,7 @@ namespace MultiSlicerInterface {
         }
     }
 
-
+    //BASIC WRAPPER 1: USE THE DLL TO LOAD *.PATHS FILES
     [SuppressUnmanagedCodeSecurity]
     public class MultiSlicerLoader : IDisposable {
         public MultiSlicerDllHandler dll;
@@ -578,6 +581,7 @@ namespace MultiSlicerInterface {
 
     }
 
+    //BASIC WRAPPER 2: BASIC METHODS TO USE THE DLL TO PROCESS RAW SLICES AND GENERATE PROCESSED CONTOURS AND TOOLPATHS
     [SuppressUnmanagedCodeSecurity]
     public class MultiSlicerHandler : IDisposable {
         public MultiSlicerDllHandler dll;
