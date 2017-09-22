@@ -15,9 +15,13 @@ option(MAKEMR_FILEINFO      "make info dumper for paths files"  ON)
 option(MAKEMR_FILEUNION     "make tool to merge several paths files into one"  ON)
 option(MAKEMR_FILETOUCH     "make slice header setter for paths files"  ON)
 
+#AutoCAD configuration
+set(AUTOCAD_PATH_PREFIX        "" CACHE PATH "path to AutoCAD libraries and executables (accoremgd.dll et al)")
+
 #test options
 option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS, USE THE check* TARGETS!!!!)" ON)
 option(USE_GCOV             "compile with gcov support, useful for analyzing test code coverage with lcov (automatically added when executing check* targets, output on subdirectory lcov_report in the subproject's build directory)" OFF)
+option(AUTOCAD_USECONSOLE   "if true, the AutoCAD tests use ACCoreConsole.exe; if false, acad.exe. The former is strongly preferred, but I was not able to make it work with AutoCAD 2013, but it worked with acad.exe. Conversely, in the 2016 version, acad.exe was problematic while AcCoreConsole.exe ran like a charm." ON)
 
 #clipper configuration
 option(CLIPPER_USE_ARENA       "enable ArenaMemoryManager for ClipperLib" ON)
@@ -42,4 +46,3 @@ set(INITIAL_MESH_FILE          "PUT_HERE_YOUR_STL_FILE" CACHE PATH "configuratio
 #misc configuration
 option(COMPILE_OPTIMIZATIONS   "optimizations that may make the build process significantly slower" ON)
 option(ENABLE_SLICER_LOGGING   "enable slicer debug output to file" ON) #this option has to be coordinated with the one used in the slicer!!!!
-set(AUTOCAD_PATH_PREFIX        "" CACHE PATH "path to AutoCAD libraries (accoremgd.dll et al)")

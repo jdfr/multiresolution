@@ -42,6 +42,8 @@
 #     option to build the AutoCAD plugin
 #  AUTOCAD_PATH_PREFIX
 #     path to AutoCAD, for example, for AutoCAD 2016 it can be: C:\Program Files\Autodesk\AutoCAD 2016
+#  AUTOCAD_USECONSOLE
+#     this option tells the testing system to use either AutoCAD's command-line interface (AcCoreConsole.exe) or the GUI interface (acad.exe)
 #  USE_GCOV, LCOVPATH, GENHTMLPATH
 #    to use lcov to generate code coverage reports after doing test targets
 
@@ -964,10 +966,18 @@ _quit yes
 ")
   ENDMACRO()
   
+  if(AUTOCAD_USECONSOLE)
+    set(AUTOCAD_EXECUTABLE   "${AUTOCAD_PATH_PREFIX}/AcCoreConsole.exe")
+    set(AUTOCAD_COMMAND_LINE "${AUTOCAD_EXECUTABLE}" "/s" "${TEST_DIR}/${TESTNAME}.scr")
+  else()
+    set(AUTOCAD_EXECUTABLE   "${AUTOCAD_PATH_PREFIX}/acad.exe")
+    set(AUTOCAD_COMMAND_LINE "${AUTOCAD_EXECUTABLE}" "/b" "${TEST_DIR}/${TESTNAME}.scr")
+  endif()
+  
   MACRO(TEST_AUTOCAD TESTNAME PREVTEST ADDITIONAL_REQUIRED_FILES)
     SCR_TEMPLATE("${TEST_DIR}/${TESTNAME}.scr" "${TEST_DIR}/${TESTNAME}.dxf" ${ARGN})
-    TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" "${AUTOCAD_PATH_PREFIX}/AcCoreConsole.exe" "/s" "${TEST_DIR}/${TESTNAME}.scr")
-    set_tests_properties(${TESTNAME} PROPERTIES LABELS "execfull" DEPENDS "${PREVTEST}" REQUIRED_FILES "${TEST_DIR}/${TESTNAME}.scr;${AUTOCAD_PATH_PREFIX}/AcCoreConsole.exe;${OUTPUTDIR}/AutoCADMulti.dll${ADDITIONAL_REQUIRED_FILES}")
+    TEST_TEMPLATE(${TESTNAME} "${OUTPUTDIR}" ${AUTOCAD_COMMAND_LINE})
+    set_tests_properties(${TESTNAME} PROPERTIES LABELS "execfull" DEPENDS "${PREVTEST}" REQUIRED_FILES "${AUTOCAD_EXECUTABLE};${TEST_DIR}/${TESTNAME}.scr;${OUTPUTDIR}/AutoCADMulti.dll${ADDITIONAL_REQUIRED_FILES}")
     TEST_EXISTS(EXISTS_RESULT_AUTOCAD_${TESTNAME} execfull ${TESTNAME} "${TEST_DIR}/${TESTNAME}.dxf")
     #Disable this compare test: AutoCAD ALWAYS includes timestamps of various types in the file, so we would need to post-process it to remove the headers in order to compare it with prev versions
     # TEST_COMPARE(COMPARE_PREVTEST_AUTOCAD_${TESTNAME} compfull ${TESTNAME}
