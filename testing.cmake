@@ -949,18 +949,18 @@ if(MAKEMR_CS_AUTOCAD)
 (setvar \"ATTREQ\" 0)
 (setvar \"SECURELOAD\" 0)
 (vl-file-delete \"${DXF_FILENAME}\")
-(command \"NETLOAD\" \"${OUTPUTDIR}/AutoCADMulti.dll\")
+(command \"_NETLOAD\" \"${OUTPUTDIR}/AutoCADMulti.dll\")
 (if (boundp 'loadpaths) (progn 
   ${ACTION}
   (setq ss1 (ssget \"X\"))
   (if (and (boundp 'ss1)            ; If ss1 was not bound by setq, loadpaths probably failed.
            (> (sslength ss1) ${NUM_OBJECTS})) ; If the number of objects is under ${NUM_OBJECTS}, the DLL code probably failed.
-    (command \"saveas\" \"DXF\" \"16\" \"${DXF_FILENAME}\"))))
+    (command \"_saveas\" \"DXF\" \"16\" \"${DXF_FILENAME}\"))))
 (setvar \"FILEDIA\" 1)
 (setvar \"CMDDIA\" 1)
 (setvar \"ATTREQ\" 1)
 (setvar \"SECURELOAD\" 1)
-quit yes
+_quit yes
 ")
   ENDMACRO()
   
