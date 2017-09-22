@@ -1,4 +1,4 @@
-﻿namespace AutoCADMulti {
+﻿namespace AutoCADMultiGUI {
     partial class maindialog {
         /// <summary>
         /// Required designer variable.

@@ -8,12 +8,14 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.ApplicationServices;
 
+// AutoCAD plugin adding command-line functions to use the multislicing engine
+
 /*HOW TO USE THIS PLUGIN:
  *    a) compile the project (the dependencies should also be compiled and, if necessary, put in the same output folder)
  *    b) open AutoCAD
- *    c) in AutoCAD, tcreate or open a document
+ *    c) in AutoCAD, create or open a document
  *    d) in AutoCAD, execute the command NETLOAD in AutoCAD, navigate to the directory containing the DLL for this project, and select the DLL for this plugin (AutoCADMulti.dll)
- *    e) in AutoCAD, execute the command MULTISLICER
+ *    e) in AutoCAD, execute the commands/functions (multislicer_unload_dll, multislice, externalslice, loadpaths)
  */
 
 [assembly: CommandClass(typeof(AutoCADMulti.main))]
@@ -24,19 +26,11 @@ namespace AutoCADMulti {
 
         static string basepath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
 
-        //these singletons are not thread-safe, so commands and function are not, either!!!!
-
-        static maindialog singletondialog = null;
+        //this singleton is not thread-safe, so commands and functions are not, either!!!!
 
         static MultiSlicerServices services = null;
 
-        public delegate void singletonClear();
-        static public void clearSingletonDialog() {
-            singletondialog = null;
-            multislicer_unload_dll();
-        }
-
-        static MultiSlicerServices getServices() {
+        public static MultiSlicerServices getServices() {
             if (services == null) {
                 services = new MultiSlicerServices(basepath);
             }
@@ -49,17 +43,6 @@ namespace AutoCADMulti {
             if (services != null) {
                 services.dodispose();
                 services = null;
-            }
-        }
-
-        //this command launches the visual plugin
-        [CommandMethod("multislicer_gui")]
-        public void multislicer_gui() {
-            if (singletondialog == null) {
-                singletondialog = new maindialog(basepath, getServices(), clearSingletonDialog);
-                Application.ShowModelessDialog(singletondialog);
-            } else {
-                singletondialog.Activate();
             }
         }
 

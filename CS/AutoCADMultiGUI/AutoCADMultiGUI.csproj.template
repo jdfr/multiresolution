@@ -4,12 +4,12 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{556AA3FF-02C1-4D79-ADD1-5B4B6BFCD62D}</ProjectGuid>
+    <ProjectGuid>{17452815-071B-4051-BF89-80BCFC3EF454}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <OutputPath>AutoCADMulti.dir\Debug\</OutputPath>
+    <OutputPath>AutoCADMultiGUI.dir\Debug\</OutputPath>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AutoCADMulti</RootNamespace>
-    <AssemblyName>AutoCADMulti</AssemblyName>
+    <RootNamespace>AutoCADMultiGUI</RootNamespace>
+    <AssemblyName>AutoCADMultiGUI</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>AutoCADMulti.dir\Debug.AnyCPU\</OutputPath>
+    <OutputPath>AutoCADMultiGUI.dir\Debug.AnyCPU\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -29,7 +29,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutDir>${CS_OUTPUT_DIR}</OutDir>
-    <IntDir>AutoCADMulti.dir\Release\</IntDir>
+    <IntDir>AutoCADMultiGUI.dir\Release\</IntDir>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -41,6 +41,8 @@
 ${AUTOCAD_DLL_REFERENCES}
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -48,9 +50,19 @@ ${AUTOCAD_DLL_REFERENCES}
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}main.cs" />
-    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}services.cs" />
-    <Compile Include="${AutoCADMulti_SOURCE_DIR_PREFIX}Properties\AssemblyInfo.cs" />
+    <Compile Include="${AutoCADMultiGUI_SOURCE_DIR_PREFIX}main.cs" />
+    <Compile Include="${AutoCADMultiGUI_SOURCE_DIR_PREFIX}maindialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="${AutoCADMultiGUI_SOURCE_DIR_PREFIX}maindialog.Designer.cs">
+      <DependentUpon>${AutoCADMultiGUI_SOURCE_DIR_PREFIX}maindialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="${AutoCADMultiGUI_SOURCE_DIR_PREFIX}Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="${AutoCADMultiGUI_SOURCE_DIR_PREFIX}maindialog.resx">
+      <DependentUpon>${AutoCADMultiGUI_SOURCE_DIR_PREFIX}maindialog.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="${MULTIRES_LIBRARY_PROJECT_FILE}">
@@ -60,6 +72,10 @@ ${AUTOCAD_DLL_REFERENCES}
     <ProjectReference Include="${MultiSlicerInterface_PROJECT_FILE}">
       <Project>{cb80c200-ca82-40a9-b7b7-f3b57578cef2}</Project>
       <Name>MultiSlicerInterface</Name>
+    </ProjectReference>
+    <ProjectReference Include="${AutoCADMulti_PROJECT_FILE}">
+      <Project>{556aa3ff-02c1-4d79-add1-5b4b6bfcd62d}</Project>
+      <Name>AutoCADMulti</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
