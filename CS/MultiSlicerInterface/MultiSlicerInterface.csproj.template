@@ -46,12 +46,6 @@
     <Compile Include="${MultiSlicerInterface_SOURCE_DIR_PREFIX}interface.cs" />
     <Compile Include="${MultiSlicerInterface_SOURCE_DIR_PREFIX}Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="${MULTIRES_LIBRARY_PROJECT_FILE}">
-      <Project>${multiresolution_library_GUID_CMAKE}</Project>
-      <Name>multiresolution_library</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

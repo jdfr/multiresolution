@@ -239,6 +239,9 @@ if(MAKEMR_LIBRARY)
     OUTPUT_NAME multires
     CXX_VISIBILITY_PRESET hidden #avoid exporting all symbols in shared libraries
   )
+  if(MINGW)
+    set_target_properties(multiresolution_library PROPERTIES PREFIX "") #avoid default lib prefix in mingw
+  endif()
   target_link_libraries(multiresolution_library corelib ${Boost_LIBRARIES})
 endif()
 
@@ -250,57 +253,29 @@ if (NOT FILESEP)
   endif()
 endif()
 
-if(MSVC)
-  if(MAKEMR_LIBRARY)
-    if(MAKEMR_CS_INTERFACE)
-      set(CS_OUTPUT_DIR "${OUTPUTDIR}")
-      set(MultiSlicerInterface_SOURCE_DIR_PREFIX "${SRC}\\CS\\MultiSlicerInterface\\")
-      set(multiresolution_library_GUID_CMAKE "b3b551ad-5df5-4538-a482-0025ed6d4e2f" CACHE INTERNAL "")
-      set(MULTIRES_LIBRARY_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/multiresolution_library.vcxproj")
-      set(MultiSlicerInterface_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/MultiSlicerInterface.csproj")
-      configure_file(${MultiSlicerInterface_SOURCE_DIR_PREFIX}MultiSlicerInterface.csproj.template ${MultiSlicerInterface_PROJECT_FILE})
-      include_external_msproject(MultiSlicerInterface ${MultiSlicerInterface_PROJECT_FILE}
-                                 GUID CB80C200-CA82-40A9-B7B7-F3B57578CEF2
-                                 #TYPE
-                                 PLATFORM AnyCPU)
-      if(MAKEMR_CS_AUTOCAD)
-        string(REPLACE / ${FILESEP} AUTOCAD_PATH_PREFIX "${AUTOCAD_PATH_PREFIX}")
-        MESSAGE(STATUS "Please set AUTOCAD_PATH_PREFIX if necessary. Currently, it is ${AUTOCAD_PATH_PREFIX}")
-        
-        list(APPEND AUTOCAD_DLL_PATHS "")
-        list(APPEND AUTOCAD_DLL_REFERENCES_LIST "")
-        MACRO(ADD_AUTOCAD_DLLS)
-          foreach(AUTOCAD_DLL_NAME ${ARGN})
-            set(AUTOCAD_DLL_PATH "${AUTOCAD_PATH_PREFIX}\\${AUTOCAD_DLL_NAME}.dll")
-            if (NOT EXISTS "${AUTOCAD_DLL_PATH}")
-              message(FATAL_ERROR "Error: Building the AutoCAD plugin requires the AutoCAD DLLs, but this DLL could not be found: ${AUTOCAD_DLL_PATH}\n    You have two options:\n        (a) set MAKEMR_CS_AUTOCAD to OFF,\n        (b) make sure that AutoCAD's ObjectARX is installed and AUTOCAD_PATH_PREFIX actually points to the directory where the AutoCAD DLLs are located (currently it is ${AUTOCAD_PATH_PREFIX} )")
-            endif()
-            list(APPEND AUTOCAD_DLL_PATHS "${AUTOCAD_DLL_PATH}")
-            list(APPEND AUTOCAD_DLL_REFERENCES_LIST "    <Reference Include=\"${AUTOCAD_DLL_NAME}\">\n        <HintPath>${AUTOCAD_DLL_PATH}</HintPath>\n    </Reference>")
-          endforeach()
-          string(REPLACE ";" "\n" AUTOCAD_DLL_REFERENCES "${AUTOCAD_DLL_REFERENCES_LIST}")
-        ENDMACRO()
-        
-        ADD_AUTOCAD_DLLS(accoremgd acdbmgd)
-        set(AutoCADMulti_SOURCE_DIR_PREFIX "${SRC}\\CS\\AutoCADMulti\\")
-        set(AutoCADMulti_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/AutoCADMulti.csproj")
-        configure_file(${AutoCADMulti_SOURCE_DIR_PREFIX}AutoCADMulti.csproj.template ${AutoCADMulti_PROJECT_FILE})
-        include_external_msproject(AutoCADMulti ${AutoCADMulti_PROJECT_FILE}
-                                   GUID 556AA3FF-02C1-4D79-ADD1-5B4B6BFCD62D
-                                   #TYPE
-                                   PLATFORM AnyCPU)
-        ADD_AUTOCAD_DLLS(AcCui acdbmgdbrep acmgd AcWindows) #this keeps the DLLs from the previous call to the macro
-        set(AutoCADMultiGUI_SOURCE_DIR_PREFIX "${SRC}\\CS\\AutoCADMultiGUI\\")
-        set(AutoCADMultiGUI_PROJECT_FILE "${CMAKE_CURRENT_BINARY_DIR}/AutoCADMultiGUI.csproj")
-        configure_file(${AutoCADMultiGUI_SOURCE_DIR_PREFIX}AutoCADMultiGUI.csproj.template ${AutoCADMultiGUI_PROJECT_FILE})
-        include_external_msproject(AutoCADMultiGUI ${AutoCADMultiGUI_PROJECT_FILE}
-                                   GUID 17452815-071B-4051-BF89-80BCFC3EF454
-                                   #TYPE
-                                   PLATFORM AnyCPU)
-      endif()
+if(WIN32 AND MAKEMR_LIBRARY AND MAKEMR_CS_INTERFACE)
+  if(MSVC)
+    add_subdirectory(CS)
+  elseif(MINGW)
+    set(subdir ${CMAKE_CURRENT_BINARY_DIR}/CS)
+    if (NOT IS_DIRECTORY ${subdir})
+      file(MAKE_DIRECTORY ${subdir})
     endif()
+    #GENERATOR_MULTIRES_CS must be a Visual Studio generator!!!!!!
+    execute_process(WORKING_DIRECTORY ${subdir}
+                    COMMAND ${CMAKE_COMMAND} -G "${GENERATOR_MULTIRES_CS}"
+      #--no-warn-unused-cli
+      -D AUTOCAD_PATH_PREFIX=${AUTOCAD_PATH_PREFIX}
+      -D DOTNET_VERSION=${DOTNET_VERSION}
+      -D MAKEMR_CS_AUTOCAD:BOOL=${MAKEMR_CS_AUTOCAD}
+      -D OUTPUTDIR=${OUTPUTDIR}
+      "${CMAKE_CURRENT_SOURCE_DIR}/CS")
+    add_custom_target(csharp ALL 
+                      COMMAND "${CMAKE_COMMAND}" --build . --config "${CMAKE_BUILD_TYPE}" #for MSVS
+                      WORKING_DIRECTORY "${subdir}" VERBATIM)
   endif()
 endif()
+
 
 set(EXECUTABLE_HEADERS apps/apputil.hpp)
   

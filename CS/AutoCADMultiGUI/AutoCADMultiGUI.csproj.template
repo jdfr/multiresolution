@@ -65,10 +65,6 @@ ${AUTOCAD_DLL_REFERENCES}
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="${MULTIRES_LIBRARY_PROJECT_FILE}">
-      <Project>${multiresolution_library_GUID_CMAKE}</Project>
-      <Name>multiresolution_library</Name>
-    </ProjectReference>
     <ProjectReference Include="${MultiSlicerInterface_PROJECT_FILE}">
       <Project>{cb80c200-ca82-40a9-b7b7-f3b57578cef2}</Project>
       <Name>MultiSlicerInterface</Name>

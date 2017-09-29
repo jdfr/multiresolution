@@ -18,6 +18,7 @@ option(MAKEMR_FILETOUCH     "make slice header setter for paths files"  ON)
 #AutoCAD configuration
 set(AUTOCAD_PATH_PREFIX        "" CACHE PATH "path to AutoCAD libraries and executables (accoremgd.dll et al)")
 set(DOTNET_VERSION             "v4.5" CACHE STRING "version of .NET to compile the c# interfaces and plugins (use the one suitable for your AutoCAD version. For example, 2013 uses v4.0, while 2016 uses v4.5)")
+set(GENERATOR_MULTIRES_CS      "" CACHE STRING "In Windows, if the generator for the multiresolution project is MinGW Makefiles, you can specify this to be the Visual Studio generator for the C# projects")
 
 #test options
 option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS, USE THE check* TARGETS!!!!)" ON)
