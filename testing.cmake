@@ -44,8 +44,8 @@
 #     path to AutoCAD, for example, for AutoCAD 2016 it can be: C:\Program Files\Autodesk\AutoCAD 2016
 #  AUTOCAD_USECONSOLE
 #     this option tells the testing system to use either AutoCAD's command-line interface (AcCoreConsole.exe) or the GUI interface (acad.exe)
-#  USE_GCOV, LCOVPATH, GENHTMLPATH
-#    to use lcov to generate code coverage reports after doing test targets
+#  USE_GCOV, COMMAND_GCOV_RESET, COMMAND_GCOV_PROCESS
+#    to generate code coverage reports with gcov and a report generation tool after doing test targets
 
 enable_testing()
 
@@ -178,9 +178,8 @@ endif()
 set(CTEST_ARGS -C ${CBT} --output-on-failure)
 if(USE_GCOV)
   #these commands work because they are executed in the build directory of the current subproject
-  set(PRETEST  COMMAND ${LCOVPATH} --directory . --zerocounters)
-  set(POSTTEST COMMAND ${LCOVPATH} --capture --directory . --output-file coverage.info
-               COMMAND ${GENHTMLPATH} coverage.info --output-directory lcov_report)
+  set(PRETEST  ${COMMAND_GCOV_RESET})
+  set(POSTTEST ${COMMAND_GCOV_PROCESS})
 else()
   set(PRETEST )
   set(POSTTEST )

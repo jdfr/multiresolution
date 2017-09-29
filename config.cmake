@@ -21,7 +21,9 @@ set(DOTNET_VERSION             "v4.5" CACHE STRING "version of .NET to compile t
 
 #test options
 option(GENERATE_TESTS       "generate tests and test targets (IMPORTANT: DO NOT SIMPLY RUN ALL TESTS, USE THE check* TARGETS!!!!)" ON)
-option(USE_GCOV             "compile with gcov support, useful for analyzing test code coverage with lcov (automatically added when executing check* targets, output on subdirectory lcov_report in the subproject's build directory)" OFF)
+option(USE_GCOV             "compile with gcov support, useful for analyzing test code coverage. See COMMAND_GCOV_RESET and COMMAND_GCOV_PROCESS" OFF)
+set(COMMAND_GCOV_RESET      "COMMAND;lcov;--directory;.;--zerocounters" CACHE STRING "command(s) necessary to execute lcov. It is stored as a list, so spaces are replaced by semicolons. The default value (resetting the coverage counters with lcov) should be fine for linux. In Windows, you will probably have to roll your own solution, since neither lcov's Windows port nor gcovr work for our use case.")
+set(COMMAND_GCOV_PROCESS    "COMMAND;lcov;--capture;--directory;.;--output-file;coverage.info;COMMAND;genhtml;coverage.info;--output-directory;lcov_report" CACHE STRING "command(s) necessary to process gcno files into a coverage report. Same considerations as for COMMAND_GCOV_RESET")
 option(AUTOCAD_USECONSOLE   "if true, the AutoCAD tests use ACCoreConsole.exe; if false, acad.exe. The former is strongly preferred, but I was not able to make it work with AutoCAD 2013, but it worked with acad.exe. Conversely, in the 2016 version, acad.exe was problematic while AcCoreConsole.exe ran like a charm." ON)
 
 #clipper configuration
