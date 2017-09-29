@@ -939,7 +939,7 @@ CHECK_GWL_FILES(${TESTNAME}
 ###### TEST CASES FOR USING THE AutoCAD plugin (it implies the test of the DLL interfaces at both sides: C++ and C#)
 ###########################################################
 
-if(MAKEMR_CS_AUTOCAD)
+if(WIN32 AND MAKEMR_CS_AUTOCAD)
   FILE(WRITE "${TEST_DIR}/full_filter_core_params.params" "${FILTER_CORE_PARAMS}")
   string(REPLACE ${FILESEP} / AUTOCAD_PATH_PREFIX "${AUTOCAD_PATH_PREFIX}")
 
