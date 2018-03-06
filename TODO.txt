@@ -1,0 +1,98 @@
+TODO SUMMARY
+
+1.  (RELATIVELY) LOW HANGING FRUIT
+-make the code significantly faster
+-once the feature set is more stable, implement a GUI to configure the options
+-add paralellism. 
+-infillings:
+   *add support for rectilinear infillings which are not always in the same orientation.
+   *add support for other types of infillings
+-motion planner:
+   *make it smarter
+-snapping to grid:
+   *make it more robust
+-calibration: add the possibility to rotate/translate the 3D model prior to slicing to print correctly in tilted surfaces. This, however, would depend on the ability of the backend machine to support non-planar toolpaths.
+-when toolpath clearance is not required (think of stereolithography or mechanical ablation), it should be possible to completely fill/machine small details at high resolution by making the hi-res contours to intrude in lo-res contours. Think about how to implement this; probably a modification to --ensure-attachment-offset, which already has similar functionality but does not cover small corners...
+
+2. MORE IMPORTANT CHALLENGES
+-medial axis:
+   *modify algorithm to fill narrow shapes more efficiently
+   *Tweak the medial axis algorithm to work better for non-elongated shapes
+   *Add support in medial axis to generate simple, non-intersecting segments
+   *Add support for variable-width medial axis toolpaths
+-atenuate power output to decrease polimerization (or excavation) in partially overlapping zones, such as acute corners
+-fill open gaps in flat or nearly flat areas with non-horizontal slicing.
+-if possible, implement an actual example of live feedback (now it works offline, but that is very cumbersome to use): scan the low-res printed surface, in order to take into account imperfections for higher res processes before they are executed.
+-add/sub workflow:
+   *implement and use variable-width offsetting
+-implement non-stl multislicing. Three strategies, from easiest to hardest:
+   *convert all autocad objects to polylines
+   *reimplement the algorithms with autocad primitives
+   *export autocad primitives and reimplement the algorithms to work natively on curve primitives
+
+3. NICETIES
+
+-it would be nice to be able to test the add/sub workflow in an actual machine
+-it would be nice to test the feedback loop mechanism in an actual machine
+
+LONGER EXPLANATIONS TO SOME TODOs
+
+make the code significantly faster: Angus Johnson's ClipperLib is a really marvelous piece of software: incredibly robust, and a very complex beast beneath a really simple interface. However, usign valgrind to profile the software, I found that it spends most of its time in malloc! It turns out, CliperLib makes LOTS and LOTS of allocations and dealocations of small objects. Not an issue for simple clipings, but it takes a heavy toll when using very big polylines performing and very many clippings and offsettings. Two possible solutions:
+  -rewrite ClipperLib to minimize the use of new/delete in internal data structures, and use a new monolithic output data format requiring only one big allocation per output. This is very probably a major undertaking, but it will probably make the code faster within one order of magnitude.
+  -modify the code to use a different allocator (for example, a memory pool optimized for small objects) for ClipperLib's internal data structures. This is already done, but the performance gains of the former strategy are probably better.
+
+fill open gaps in flat or nearly flat areas with non-horizontal slicing: slicing objects with flat or nearly flat surfaces is problematic, because slicing at constant intervals will produce slices that are too far apart in flat regions, so far as to not defining a tight shell around the object. The usual way to solve this is adaptively modulating the slicing height, but this just results in very large build times. A solution to this is to detect the flat surfaces (alternatively, and maybe also easier, detect the open gaps), and slice them perpendicularly (problematic: requires closed features), or maybe just scan lines through them (lines resulting from the intersection of the open flat portion of the shell with vertical planes). This is more feasible, but it would require to modify slic3r’s code to allow for open scanning paths, or possibly to use other library for this purpose. Connected papers:
+  -2003.Pandey.Slicing procedures in layered manufacturing: a review
+  -2005.Park.Subregional slicing method to increase three-dimensional nanofabrication efficiency in two-photon polymerization
+  -2007.Liao.Two-dimensional slicing method to speed up the fabrication of micro-objects based on two-photon polymerization
+
+-atenuate power output to decrease polimerization (or excavation) in partially overlapping zones, such as acute corners. Related:
+  -2011.Lin.Simulation and Correction of Angular Defects in Two-Photon Lithography
+
+add paralellism (easiest: at the slice level). This is not straightforward if using the current 3D slicing scheduler, however, since it requires a strict ordering between some of the slicing computations
+
+calibration: add the possibility to rotate/translate the 3D model prior to slicing to print correctly in tilted surfaces
+
+add paralellism (easiest: at the slice level). This is somewhat in conflict with the current slicing pipeline which uses a separate process for reading the STL file and the basic slicing. Doing it optimally would imply to link the basic slicing part (beware slic3r’s AGPL!!!)
+
+Modify the workflow to use the medial axis algorithms before infilling narrow shapes: currently infilling is always before medial axis, and, as a result (and because of the current hard-coded minimum line length), narrow areas are frequently filled unefficiently with lines, where concentric or medial axis would be clearly better. Maybe develop heuristics to apply "concentric" or "lines" infilling depending on the shape and size of the contour to infill?
+
+Tweak the medial axis algorithm to work better for non-elongated shapes
+
+Add support in medial axis to generate simple, non-intersecting segments, which could subsequently be processed in a smarter way (this would require to extract an intersection-finding algorithm from ClipperLib).
+
+Add support for variable-width medial axis. This is a major undertaking, because it spans almost the whole slicing pipeline:
+    -Add a new type of toolpath (with separated IO facilities) for variable-width toolpaths
+    -tweak the medial axis algorithm to work across a wider range of conditions, and modify it to record the width of each line at each point
+    -modify the gcode generator (whatever it may be) to deal with variable-width toolpaths
+
+Enable variable-width offsetting, to either
+  (a) enable arbitrary width profiles (to be used in other subalgorithms), and/or
+  (b) enable profiles whose width adapts to the curvature (kinda like the evolute of a curve, but with limits on the min and max curvatures), in order to enable better toolpath support and possibly enable the two points below.
+This may prove to be a major undertaking or just a minor readjustment to ClipperLib, I am not sure.
+
+add better support for concentric infillings (right now, it does not feel quite right)
+
+add support for other types of infillings
+
+add support for rectilinear infillings which are not always in the same orientation.
+
+right now, snapping to grid is kind of fragile, it depends heavily on the parameters being right for not outputting gibberish (or outright halting after an unrecoverable error). It may be desirable to make the algorithm more resilient.
+
+make a better motion planner (current one is just a straightforward greedy algorithm). Possible improvement:
+  -find NEAREST POINT Pn AT DISTANCE Dn
+  -consider all points within a distance Dn*factor, or possibly nearest NUM points
+  -consider the set VN of very near points, within Dn*smallfactor
+  -select as the next point one from VN such as it is the closest within the general opposite direction where most points are
+
+add support to use more versatile add/sub workflows: right now, it supports only workflows of the type AB*, i.e., one process at the beginning, and all subsequent processes of the other type. This may prove quite tricky to get right, because it may imply to keep track of different sets of contours (one for positive contours, other for negative contours, both may interact in tricky ways), and it may (very possibly) interact in unexpected ways with 3D support.
+
+
+WISH LIST
+
+convert the algorithms to work not only on polygonal lines but also on curves. This will probably be a major undertaking: curve offseting is way trickier than polygonal offsetting, and rational (rather than just integer) coordinates may be required. There is available software that may be used for offsetting (IRIT, www.cs.technion.ac.il/~irit/), but it does not have a permissive license. CGAL, the other obvious library, is GPL.
+
+make the code to have a closed loop with the real world by scanning the printed/removed surface and taking into account imperfections for higher res processes. While the inner code is mostly ready, this may be a major undertaking in image analysis and 3D placement, but it should not be extermely hard.
+
+reimplement the algorithms to work fully in 3D (3D offseting and clipping), either with meshes or CSG (constructive solid geometry).
+
