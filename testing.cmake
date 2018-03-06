@@ -193,6 +193,7 @@ add_custom_target(checkncompfull ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L full 
 add_custom_target(checkcomp      ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L comp          ${POSTTEST})
 add_custom_target(checkcompmini  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compmini      ${POSTTEST})
 add_custom_target(checkcompfull  ${PRETEST} COMMAND ctest ${CTEST_ARGS} -L compfull      ${POSTTEST})
+add_custom_target(putfiles                  COMMAND ctest ${CTEST_ARGS} -L put                      )
 
 #invaluable resource to understand the black art of custom commands/targets in cmake, if we want to move to a more complex testing model:
 # https://samthursfield.wordpress.com/2015/11/21/cmake-dependencies-between-targets-and-files-and-custom-commands/
